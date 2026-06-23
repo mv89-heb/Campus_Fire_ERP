@@ -1,6 +1,6 @@
 from flask import Flask
-from app.extensions import db
-from app.config import Config
+from .extensions import db
+from .config import Config
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -8,20 +8,17 @@ def create_app(config_class=Config):
 
     db.init_app(app)
 
-    # 🚨 התיקון: ייבוא המודלים לכאן כדי ש-SQLAlchemy יכיר אותם לפני יצירת הטבלאות
-    from app.models import Zone, SystemRequirement, Document
-
     with app.app_context():
         db.create_all()
         seed_data()
 
-    from app.api.routes import main_bp
+    from .api.routes import main_bp
     app.register_blueprint(main_bp)
 
     return app
 
 def seed_data():
-    from app.models import Zone, SystemRequirement
+    from .models import Zone, SystemRequirement
     if not Zone.query.first():
         zones_data = [
             ("תשתיות כלליות", "ראשי"), ("מגורים (פנימייה)", "8855-7"), 
