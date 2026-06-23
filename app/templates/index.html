@@ -2,86 +2,295 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>מערכת בטיחות אש | קמפוס ראשית</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>מערכת בטיחות אש | ישיבת אוהבי ירושלים</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-:root { --bg: #0d1117; --bg-card: #161b22; --bg-hover: #1c2330; --border: rgba(255,255,255,0.07); --border-mid: rgba(255,255,255,0.12); --text: #e6edf3; --text-muted: #7d8590; --accent: #f78166; --valid: #3fb950; --warning: #e3b341; --critical: #f85149; --radius: 8px; font-family: system-ui, sans-serif;}
-body { background: var(--bg); color: var(--text); margin: 0; padding: 0; line-height: 1.6; }
-header { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 15px 28px; display: flex; justify-content: space-between; align-items: center; position: sticky; top:0; z-index:100; }
-.btn { padding: 8px 14px; border-radius: var(--radius); font-size: 0.85rem; font-weight: bold; border: none; cursor: pointer; color: white; background: var(--border-mid); transition: 0.2s;}
-.btn:hover { opacity: 0.8; } .btn-primary { background: var(--accent); } .btn-folder { background: #1f6feb; } .btn-outlook { background: #6f42c1; display: none; }
-main { padding: 28px; max-width: 1400px; margin: 0 auto; }
-.score-hero { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 30px; display: flex; align-items: center; gap: 40px; margin-bottom: 20px;}
-.score-num { font-size: 3rem; font-weight: bold; color: var(--valid); }
-.score-kpis { display: flex; gap: 30px; margin-right: auto; }
-.kpi { text-align: center; } .kpi-v { font-size: 1.5rem; font-weight: bold; }
-.panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; overflow: hidden;}
-.panel-header { padding: 15px; border-bottom: 1px solid var(--border); font-weight: bold; display: flex; justify-content: space-between;}
-table { width: 100%; border-collapse: collapse; }
-th { text-align: right; padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; background: rgba(0,0,0,0.2); }
-td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem;}
+:root {
+  --bg:         #0d1117;
+  --bg-card:    #161b22;
+  --bg-hover:   #1c2330;
+  --border:     rgba(255,255,255,0.07);
+  --border-mid: rgba(255,255,255,0.12);
+  --text:       #e6edf3;
+  --text-muted: #7d8590;
+  --accent:     #f78166;
+  --valid:      #3fb950;
+  --warning:    #e3b341;
+  --critical:   #f85149;
+  --radius:     8px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  padding: 10px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+header {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 15px;
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  body { padding: 20px; }
+  header { flex-direction: row; justify-content: space-between; align-items: center; padding: 15px 25px; }
+}
+
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-logo { font-size: 1.8rem; }
+.brand-title { font-size: 1.2rem; font-weight: 700; }
+.brand-subtitle { font-size: 0.8rem; color: var(--text-muted); }
+
+.actions-group { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+@media (min-width: 768px) { .actions-group { width: auto; } }
+
+.btn {
+  flex: 1;
+  min-width: 120px;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 1px solid var(--border-mid);
+  background: var(--bg-hover);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+.btn:hover { background: rgba(255,255,255,0.05); }
+.btn-primary { background: var(--accent); color: #000; border: none; }
+.btn-primary:hover { background: #ff9e85; }
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 100%;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+@media (min-width: 992px) {
+  .dashboard-grid { grid-template-columns: 300px 1fr; }
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 15px;
+  margin-bottom: 15px;
+}
+.card-title { font-size: 1rem; font-weight: 600; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+
+.score-container { text-align: center; padding: 10px 0; }
+.score-circle {
+  font-size: 2.8rem;
+  font-weight: 800;
+  color: var(--valid);
+  margin-bottom: 5px;
+}
+
+.kpi-list { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+.kpi-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: right;
+  font-size: 0.9rem;
+}
+th { background: rgba(0,0,0,0.3); color: var(--text-muted); padding: 12px; font-weight: 600; font-size: 0.8rem; }
+td { padding: 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
 tr:hover td { background: var(--bg-hover); }
-.pill { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
+
+.pill {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
 .pill.valid { background: rgba(63,185,80,0.15); color: var(--valid); }
 .pill.warning { background: rgba(227,179,65,0.15); color: var(--warning); }
 .pill.critical { background: rgba(248,81,73,0.15); color: var(--critical); }
 .pill.missing { background: rgba(110,118,129,0.15); color: var(--text-muted); }
-.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center; }
+
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 1000;
+  padding: 10px;
+  align-items: center;
+  justify-content: center;
+}
 .modal.open { display: flex; }
-.modal-content { background: var(--bg-card); border-radius: var(--radius); width: 85%; height: 85%; display: flex; flex-direction: column; padding: 20px;}
-iframe { flex: 1; border: none; width: 100%; border-radius: 4px; background: white;}
-.toast-container { position: fixed; bottom: 20px; left: 20px; z-index: 500; display: flex; flex-direction: column; gap: 10px; }
-.toast { background: var(--bg-card); border: 1px solid var(--border-mid); padding: 12px 20px; border-radius: var(--radius); font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+.modal-content {
+  background: var(--bg-card);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 700px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  padding: 15px;
+}
+.modal-body { flex: 1; overflow-y: auto; margin: 15px 0; }
+
+iframe { width: 100%; height: 60vh; border: none; background: white; border-radius: 4px; }
+
+.filter-select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border-mid);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  outline: none;
+  width: 100%;
+}
+@media (min-width: 480px) { .filter-select { width: auto; } }
+
+.toast-container { position: fixed; bottom: 15px; left: 15px; right: 15px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast { background: var(--bg-card); border: 1px solid var(--border-mid); padding: 12px; border-radius: var(--radius); box-shadow: 0 4px 12px rgba(0,0,0,0.5); font-size: 0.9rem; pointer-events: auto; }
+
+/* שיפור לחיצה בנייד */
+.btn, .filter-select, table button { min-height: 38px; }
 </style>
 </head>
 <body>
+
 <header>
-  <div style="display:flex; align-items:center; gap:12px;">
-    <div style="font-size:1.6rem;">🛡️</div>
-    <div><strong>מערכת בטיחות אש Enterprise</strong><span style="display:block; font-size:0.75rem; color:var(--text-muted);">קמפוס ראשית</span></div>
+  <div class="brand">
+    <div class="brand-logo">🛡️</div>
+    <div>
+      <h1 class="brand-title">בטיחות אש Enterprise</h1>
+      <div class="brand-subtitle">ישיבת אוהבי ירושלים / בית שמש</div>
+    </div>
   </div>
-  <div style="display:flex; gap:10px; align-items:center;">
-    <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none" onchange="App.onFolderSelect(event)">
-    <button class="btn btn-folder" onclick="document.getElementById('folderInput').click()">📁 סריקת תיקייה (DMS)</button>
-    <button id="btnMail" class="btn btn-outlook" onclick="App.triggerMail()">✉️ דוא"ל אוטומטי (Outlook)</button>
+  <div class="actions-group">
+    <button class="btn btn-primary" onclick="App.openUpload()">📁 העלאת קבצים</button>
+    <button class="btn" onclick="App.runDMS()">⚙️ הרץ DMS</button>
   </div>
 </header>
-<main>
-  <div class="score-hero">
-    <div class="score-num" id="scoreNum">0%</div>
-    <div><h3>מדד מוכנות קמפוס</h3><p style="color:var(--text-muted); font-size:0.8rem;">מחושב עפ"י מסמכים תקינים מתוך סך הדרישות</p></div>
-    <div class="score-kpis">
-      <div class="kpi"><div class="kpi-v" id="kpiExpired" style="color:var(--critical)">0</div><div style="font-size:0.75rem; color:var(--text-muted)">פג תוקף</div></div>
-      <div class="kpi"><div class="kpi-v" id="kpiCritical" style="color:var(--accent)">0</div><div style="font-size:0.75rem; color:var(--text-muted)">קריטי (14 יום)</div></div>
-      <div class="kpi"><div class="kpi-v" id="kpiWarning" style="color:var(--warning)">0</div><div style="font-size:0.75rem; color:var(--text-muted)">אזהרה (30 יום)</div></div>
-      <div class="kpi"><div class="kpi-v" id="kpiValid" style="color:var(--valid)">0</div><div style="font-size:0.75rem; color:var(--text-muted)">תקין</div></div>
+
+<div class="dashboard-grid">
+  <div class="sidebar-layout">
+    <div class="card">
+      <div class="card-title">📊 מדד מוכנות</div>
+      <div class="score-container">
+        <div class="score-circle" id="scoreNum">0%</div>
+        <div style="font-size:0.8rem; color:var(--text-muted)">סך הכל דרישות תקינות</div>
+      </div>
+      <div class="kpi-list">
+        <div class="kpi-item"><span>תקין:</span><span id="kpiValid" style="color:var(--valid)">0</span></div>
+        <div class="kpi-item"><span>אזהרה (30 יום):</span><span id="kpiWarning" style="color:var(--warning)">0</span></div>
+        <div class="kpi-item"><span>קריטי (14 יום):</span><span id="kpiCritical" style="color:var(--accent)">0</span></div>
+        <div class="kpi-item"><span>פג תוקף / חסר:</span><span id="kpiExpired" style="color:var(--critical)">0</span></div>
+      </div>
     </div>
   </div>
 
-  <div class="panel">
-    <div class="panel-header">
-      <span>📄 סטטוס אישורים וטפסים מרוכז</span>
-      <select id="filterZone" onchange="App.refresh()" style="background:var(--bg); color:white; border:1px solid var(--border); padding:4px 10px; border-radius:4px;"><option value="all">כל המתחמים</option></select>
+  <div class="main-layout">
+    <div class="card">
+      <div class="card-title">
+        <span>📋 סטטוס דרישות וטפסים</span>
+        <select id="filterZone" class="filter-select" onchange="App.setZoneFilter(this.value)">
+          <option value="all">כל המתחמים</option>
+        </select>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>מתחם / קוד</th>
+              <th>דרישה מערכתית</th>
+              <th>סטטוס תוקף</th>
+              <th>פעולות</th>
+            </tr>
+          </thead>
+          <tbody id="tblReqs">
+            <tr><td colspan="4" style="text-align:center;color:var(--text-muted)">טוען נתונים...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
-    <table>
-      <thead><tr><th>מתחם</th><th>דרישה (טופס)</th><th>סטטוס / תוקף</th><th>פעולות</th></tr></thead>
-      <tbody id="tblReqs"></tbody>
-    </table>
-  </div>
 
-  <div class="panel">
-    <div class="panel-header">🗂️ ארכיון מסמכים מלא (50 אחרונים)</div>
-    <table>
-      <thead><tr><th>שם קובץ</th><th>מתחם ששויך</th><th>דרישה שזוהתה</th><th>תאריך העלאה</th><th>פעולות</th></tr></thead>
-      <tbody id="tblArchive"></tbody>
-    </table>
+    <div class="card">
+      <div class="card-title">🗂️ ארכיון מסמכים (אחרונים)</div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>שם מסמך</th>
+              <th>מתחם שויך</th>
+              <th>תאריך העלאה</th>
+              <th>ניהול</th>
+            </tr>
+          </thead>
+          <tbody id="tblArchive">
+            <tr><td colspan="4" style="text-align:center;color:var(--text-muted)">אין מסמכים בארכיון</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
-</main>
+</div>
 
 <div class="modal" id="pdfModal">
   <div class="modal-content">
-    <div style="display:flex; justify-content:space-between; margin-bottom:15px;"><h3 id="pdfTitle">צפייה</h3><button class="btn" onclick="App.closePdf()">סגור ✕</button></div>
-    <iframe id="pdfFrame"></iframe>
+    <div style="display:flex; justify-content:between; align-items:center;">
+      <h3 id="pdfTitle" style="flex:1;">צפייה במסמך</h3>
+      <button class="btn" onclick="App.closePdf()" style="min-width:60px; padding:4px 10px;">✕</button>
+    </div>
+    <div class="modal-body">
+      <iframe id="pdfFrame"></iframe>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="uploadModal">
+  <div class="modal-content">
+    <div style="display:flex; justify-content:between; align-items:center;">
+      <h3>העלאת מסמך PDF חדש</h3>
+      <button class="btn" onclick="App.closeUpload()" style="min-width:60px; padding:4px 10px;">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="file" id="filePicker" accept=".pdf" style="margin-bottom:15px; width:100%;">
+      <button class="btn btn-primary" style="width:100%;" onclick="App.submitUpload()">העלה וסרוק</button>
+    </div>
   </div>
 </div>
 
@@ -90,93 +299,138 @@ iframe { flex: 1; border: none; width: 100%; border-radius: 4px; background: whi
 <script>
 const App = (() => {
   let _data = null;
+  let _currentZone = 'all';
+
   const showToast = (msg, type='success') => {
     const c = document.getElementById('toastContainer');
-    const t = document.createElement('div'); t.className = 'toast';
-    t.innerHTML = (type==='success'?'✅ ':(type==='warning'?'⏳ ':'❌ '))+msg;
-    c.appendChild(t); setTimeout(() => t.remove(), 4000);
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.innerText = msg;
+    c.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
   };
-
-  async function init() {
-    await refresh();
-    if(_data && _data.zones) {
-      const fz = document.getElementById('filterZone');
-      if (fz.options.length === 1) {
-          _data.zones.forEach(z => fz.innerHTML += `<option value="${z.zone_name}">${z.zone_name}</option>`);
-      }
-    }
-  }
 
   async function refresh() {
     try {
-        const r = await fetch('/api/dashboard');
-        _data = await r.json();
-        renderAll();
-    } catch(e) { showToast("שגיאת רשת מול השרת", "error"); }
+      const res = await fetch('/api/dashboard');
+      _data = await res.json();
+      renderFilters();
+      renderAll();
+    } catch(e) {
+      showToast("שגיאה בחיבור לשרת ה-API", "error");
+    }
+  }
+
+  function renderFilters() {
+    const select = document.getElementById('filterZone');
+    if(select.options.length > 1 || !_data.zones) return;
+    _data.zones.forEach(z => {
+      select.innerHTML += `<option value="${z.id}">${z.zone_name}</option>`;
+    });
   }
 
   function renderAll() {
     if(!_data) return;
-    document.getElementById('scoreNum').textContent = _data.readiness_score + '%';
-    document.getElementById('kpiExpired').textContent = _data.alerts.expired.length;
-    document.getElementById('kpiCritical').textContent = _data.alerts.critical_14.length;
-    document.getElementById('kpiWarning').textContent = _data.alerts.warning_30.length;
-    document.getElementById('kpiValid').textContent = _data.valid_count;
 
-    if(_data.outlook_enabled) document.getElementById('btnMail').style.display = 'inline-block';
+    // עדכון מדדים
+    document.getElementById('scoreNum').innerText = (_data.readiness_score || 0) + '%';
+    document.getElementById('kpiValid').innerText = _data.stats?.valid || 0;
+    document.getElementById('kpiWarning').innerText = _data.stats?.warning || 0;
+    document.getElementById('kpiCritical').innerText = _data.stats?.critical || 0;
+    document.getElementById('kpiExpired').innerText = _data.stats?.expired || 0;
 
-    const fz = document.getElementById('filterZone').value;
-    const tBody = document.getElementById('tblReqs');
-    tBody.innerHTML = '';
+    // טבלת דרישות
+    const tblReqs = document.getElementById('tblReqs');
+    tblReqs.innerHTML = '';
     
-    _data.requirements.forEach(r => {
-      if(fz !== 'all' && r.zone_name != fz) return;
+    if(_data.requirements) {
+      _data.requirements.forEach(r => {
+        if(_currentZone !== 'all' && r.zone_id != _currentZone) return;
+        
+        let statusPill = `<span class="pill missing">חסר מסמך</span>`;
+        let actionBtn = `<span style="color:var(--text-muted); font-size:0.8rem;">ממתין לקובץ</span>`;
+        
+        if(r.file_path) {
+          statusPill = `<span class="pill ${r.status}">תוקף: ${r.expiry_date || 'לא מוגבל'}</span>`;
+          actionBtn = `<button class="btn" style="padding:4px 8px; min-height:30px; font-size:0.8rem;" onclick="App.previewDoc('${r.file_path}', '${r.file_name}')">👁 צפה</button>`;
+        }
+
+        tblReqs.innerHTML += `
+          <tr>
+            <td><strong>${r.zone_name}</strong><br><small style="color:var(--text-muted)">${r.file_number}</small></td>
+            <td><b>${r.form_name}</b></td>
+            <td>${statusPill}</td>
+            <td>${actionBtn}</td>
+          </tr>`;
+      });
+    }
+
+    // ארכיון מסמכים
+    const tblArchive = document.getElementById('tblArchive');
+    tblArchive.innerHTML = '';
+    if(_data.recent_docs && _data.recent_docs.length > 0) {
+      _data.recent_docs.forEach(d => {
+        tblArchive.innerHTML += `
+          <tr>
+            <td style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${d.file_name}</td>
+            <td>${d.zone_name || 'כללי'}</td>
+            <td><small>${d.uploaded_at?.split('T')[0] || ''}</small></td>
+            <td><button class="btn" style="padding:4px 8px; min-height:30px; font-size:0.8rem;" onclick="App.previewDoc('${d.file_path}', '${d.file_name}')">👁</button></td>
+          </tr>`;
+      });
+    } else {
+      tblArchive.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted)">אין מסמכים בארכיון</td></tr>`;
+    }
+  }
+
+  return {
+    init: () => { refresh(); },
+    setZoneFilter: (val) => { _currentZone = val; renderAll(); },
+    openUpload: () => document.getElementById('uploadModal').classList.add('open'),
+    closeUpload: () => document.getElementById('uploadModal').classList.remove('open'),
+    openPdf: () => document.getElementById('pdfModal').classList.add('open'),
+    closePdf: () => {
+      document.getElementById('pdfModal').classList.remove('open');
+      document.getElementById('pdfFrame').src = '';
+    },
+    previewDoc: (path, name) => {
+      const fileName = path.split('/').pop().split('\\').pop();
+      document.getElementById('pdfTitle').innerText = name;
+      document.getElementById('pdfFrame').src = '/uploads/' + encodeURIComponent(fileName);
+      App.openPdf();
+    },
+    submitUpload: async () => {
+      const fileInput = document.getElementById('filePicker');
+      if(!fileInput.files[0]) { showToast("אנא בחר קובץ PDF תחילה", "warning"); return; }
       
-      let btn = `<span style="color:var(--text-muted)">אין קובץ</span>`;
-      let status = `<span class="pill missing">חסר מסמך</span>`;
-      let docMeta = r.doc_count > 0 ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:5px; line-height:1.2;">📎 סה"כ ${r.doc_count} מסמכים מוצמדים<br>${r.doc_names.join(', ')}</div>` : '';
-
-      if (r.file_path) {
-        btn = `<button class="btn btn-primary" onclick="App.previewDoc('/uploads/${r.file_path}', '${r.file_name}')">👁 צפה קובץ אחרון</button>`;
-        status = `<span class="pill ${r.status}">בתוקף: ${r.expiry_date}</span>`;
-      }
-
-      tBody.innerHTML += `<tr><td><b>${r.zone_name}</b> <div style="font-size:0.75rem;color:var(--text-muted);">${r.file_number}</div></td><td><div style="font-weight:bold;">${r.system_name}</div><div style="font-size:0.8rem;color:var(--text-muted)">${r.required_form}</div>${docMeta}</td><td>${status}</td><td>${btn}</td></tr>`;
-    });
-
-    const aBody = document.getElementById('tblArchive');
-    aBody.innerHTML = '';
-    _data.recent_docs.forEach(doc => {
-        aBody.innerHTML += `<tr><td style="font-family:monospace;">${doc.file_name}</td><td>${doc.zone_name}</td><td>${doc.form_code}</td><td style="font-size:0.8rem; color:var(--text-muted);">${doc.expiry_date}</td><td><button class="btn btn-primary" onclick="App.previewDoc('/uploads/${doc.file_path}', '${doc.file_name}')">👁 צפה</button></td></tr>`;
-    });
-  }
-
-  async function onFolderSelect(e) {
-    const files = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
-    if(files.length === 0) { showToast('לא נמצאו קבצי PDF בתיקייה', 'error'); return; }
-    
-    showToast(`מעלה וסורק ${files.length} מסמכים... אנא המתן`, 'warning');
-    const fd = new FormData();
-    files.forEach(f => fd.append('file', f));
-    
-    try {
-      const res = await fetch('/api/documents/upload_bulk', { method: 'POST', body: fd });
-      const data = await res.json();
-      if(data.success) { showToast(`✅ סריקה הושלמה! עובדו ${data.processed} מסמכים בהצלחה.`); refresh(); }
-    } catch(err) { showToast('שגיאה בתקשורת עם השרת', 'error'); }
-    e.target.value = '';
-  }
-
-  async function triggerMail() {
-    await fetch('/api/outlook', { method: 'POST', headers: {'Content-Type': 'application/json'}});
-    showToast('חלון חדש נפתח באאוטלוק');
-  }
-
-  return { init, refresh, onFolderSelect, triggerMail,
-    previewDoc: (url, title) => { document.getElementById('pdfTitle').innerText=title; document.getElementById('pdfFrame').src=url; document.getElementById('pdfModal').classList.add('open'); },
-    closePdf: () => { document.getElementById('pdfModal').classList.remove('open'); document.getElementById('pdfFrame').src=''; }
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      
+      showToast("מעלה ומנתח מסמך...", "warning");
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const resData = await res.json();
+        if(resData.success || resData.doc_id) {
+          showToast("הקובץ הועלה ונשמר בארכיון בהצלחה!");
+          App.closeUpload();
+          refresh();
+        } else {
+          showToast(resData.error || "העלאה נכשלה", "error");
+        }
+      } catch(e) { showToast("שגיאת רשת בהעלאת הקובץ", "error"); }
+    },
+    runDMS: async () => {
+      showToast("מריץ סריקת DMS על תיקיית הקבצים...", "warning");
+      try {
+        const res = await fetch('/api/dms/run-batch', { method: 'POST' });
+        const data = await res.json();
+        showToast(`הסריקה הושלמה! עובדו ${data.processed} קבצים.`);
+        refresh();
+      } catch(e) { showToast("שגיאה בהרצת מנוע ה-DMS", "error"); }
+    }
   };
 })();
+
 document.addEventListener('DOMContentLoaded', App.init);
 </script>
 </body>
