@@ -1,5 +1,4 @@
 import os
-import shutil
 from flask import Flask
 from .extensions import db
 from .config import Config
@@ -10,18 +9,11 @@ def create_app(config_class=Config):
 
     db.init_app(app)
 
-    with app.app_context():
-        # --- מנגנון ניקוי אוטומטי (Factory Reset) ---
-        db.drop_all()  # מוחק את כל הטבלאות והמידע הפגום
-        
-        # מחיקת קבצי ה-PDF הישנים מהשרת
-        upload_path = app.config.get('UPLOAD_FOLDER', 'uploads')
-        if os.path.exists(upload_path):
-            shutil.rmtree(upload_path, ignore_errors=True)
-        os.makedirs(upload_path, exist_ok=True)
-        # ----------------------------------------------
+    # יבוא המודלים להקשר של האפליקציה
+    from app.models import Zone, SystemRequirement, Document
 
-        # יצירת הכל מחדש בצורה נקייה
+    with app.app_context():
+        # יצירת הטבלאות רק אם הן לא קיימות - ללא drop_all הרסני
         db.create_all()
         seed_data()
 
