@@ -1,69 +1,110 @@
-import hashlib
+"""
+dms_engine.py
+Enterprise Fire Safety ERP — DMS Auto-Ingestion Engine
+"""
+
 import os
-from datetime import date, timedelta
-from app.extensions import db
-from app.models import Document, Zone, SystemRequirement
+import re
+import hashlib
+import shutil
 import logging
+from datetime import date, timedelta
+from pathlib import Path
 
 try:
-    import fitz
-    HAS_FITZ = True
+    import fitz  # PyMuPDF
+    PYMUPDF_AVAILABLE = True
 except ImportError:
-    HAS_FITZ = False
+    PYMUPDF_AVAILABLE = False
 
-logger = logging.getLogger(__name__)
+import database_core as db
 
-class DMSService:
-    @staticmethod
-    def calculate_hash(filepath: str) -> str:
-        h = hashlib.sha256()
-        with open(filepath, "rb") as f:
-            for chunk in iter(lambda: f.read(65536), b""): h.update(chunk)
-        return h.hexdigest()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("dms_engine")
 
-    @staticmethod
-    def ingest_document(filepath: str, original_filename: str):
-        file_hash = DMSService.calculate_hash(filepath)
-        if Document.query.filter_by(file_hash=file_hash).first():
-            return None 
+INCOMING_DIR = Path("incoming_files")
+STORAGE_DIR  = Path("uploads")
 
-        text = ""
-        if HAS_FITZ:
-            try:
-                with fitz.open(filepath) as doc:
-                    text = " ".join(page.get_text() for page in doc)
-            except Exception as e:
-                logger.warning(f"Could not read PDF text: {e}")
+RE_FILE_NUMBER = re.compile(r"\b(88[0-9]{2}-[0-9])\b")
+RE_FORM_CODE   = re.compile(r"(טופס\s+\d+)", re.UNICODE)
 
-        combined_context = (text + " " + original_filename).replace(" ", "")
+def sha256_file(filepath: Path) -> str:
+    h = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+def process_file(filepath: Path) -> dict:
+    filepath = Path(filepath)
+    file_hash = sha256_file(filepath)
+    
+    # בדיקת כפילויות
+    existing = db.fetchall("SELECT id FROM documents WHERE file_hash=?", (file_hash,))
+    if existing:
+        return {"status": "duplicate", "doc_id": existing[0]["id"]}
         
-        detected_zone_id = None
-        if "8855" in combined_context: detected_zone_id = Zone.query.filter_by(file_number="8855-7").first().id
-        elif "8859" in combined_context: detected_zone_id = Zone.query.filter_by(file_number="8859-7").first().id
-        elif "8853" in combined_context: detected_zone_id = Zone.query.filter_by(file_number="8853-7").first().id
-        elif "8860" in combined_context: detected_zone_id = Zone.query.filter_by(file_number="8860-7").first().id
-        elif "ראשי" in combined_context: detected_zone_id = Zone.query.filter_by(file_number="ראשי").first().id
-        
-        detected_req_id = None
-        reqs = SystemRequirement.query.all()
-        for req in reqs:
-            if req.required_form.replace(" ","") in combined_context:
-                detected_req_id = req.id
-                detected_zone_id = req.zone_id
-                break
+    text = ""
+    if PYMUPDF_AVAILABLE and filepath.exists():
+        try:
+            with fitz.open(str(filepath)) as doc:
+                text = " ".join(page.get_text() for page in doc)
+        except Exception as e:
+            logger.warning(f"Could not read text from PDF: {e}")
 
-        if not detected_zone_id:
-            zone = Zone.query.filter_by(file_number="8855-7").first()
-            if zone: detected_zone_id = zone.id
+    content_to_scan = text + " " + filepath.name
+    
+    # זיהוי מתחם
+    zone_id = None
+    fn_match = RE_FILE_NUMBER.search(content_to_scan)
+    if fn_match:
+        fn = fn_match.group(1)
+        z_rows = db.fetchall("SELECT id FROM zones WHERE file_number=?", (fn,))
+        if z_rows: zone_id = z_rows[0]["id"]
+    
+    if not zone_id:
+        z_rows = db.fetchall("SELECT id FROM zones WHERE file_number='ראשי'")
+        if z_rows: zone_id = z_rows[0]["id"]
 
-        new_doc = Document(
-            req_id=detected_req_id,
-            zone_id=detected_zone_id,
-            file_name=original_filename,
-            file_path=os.path.basename(filepath),
-            file_hash=file_hash,
-            expiry_date=date.today() + timedelta(days=365)
-        )
-        db.session.add(new_doc)
-        db.session.commit()
-        return new_doc
+    # זיהוי סוג טופס
+    form_type_id = None
+    form_match = RE_FORM_CODE.search(content_to_scan)
+    if form_match:
+        f_name = form_match.group(1)
+        ft_rows = db.fetchall("SELECT id FROM form_types WHERE name=?", (f_name,))
+        if ft_rows: form_type_id = ft_rows[0]["id"]
+
+    if not form_type_id:
+        ft_rows = db.fetchall("SELECT id FROM form_types WHERE name='טופס 1'")
+        if ft_rows: form_type_id = ft_rows[0]["id"]
+
+    # העברה סופית לתיקיית היעד ללא תיקיות פנימיות מורכבות
+    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    dest_path = STORAGE_DIR / f"{file_hash}_{filepath.name}"
+    shutil.copy(str(filepath), str(dest_path))
+
+    expiry_date = (date.today() + timedelta(days=365)).isoformat()
+
+    doc_id = db.execute("""
+        INSERT INTO documents (zone_id, form_type_id, file_name, file_path, file_hash, expiry_date, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'active')
+    """, (zone_id, form_type_id, filepath.name, str(dest_path), file_hash, expiry_date))
+
+    return {
+        "status": "ingested",
+        "doc_id": doc_id,
+        "zone_id": zone_id,
+        "form_type_id": form_type_id
+    }
+
+def run_batch():
+    INCOMING_DIR.mkdir(parents=True, exist_ok=True)
+    files = list(INCOMING_DIR.glob("*.pdf")) + list(INCOMING_DIR.glob("*.PDF"))
+    results = []
+    for f in files:
+        try:
+            results.append(process_file(f))
+            f.unlink()  # מחיקה מתיקיית ה-Incoming לאחר עיבוד מוצלח
+        except Exception as e:
+            logger.error(f"Error processing batch file {f.name}: {e}")
+    return results
