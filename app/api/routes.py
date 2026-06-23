@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, current_app, render_template, send_from_directory
+from flask import Blueprint, jsonify, request, current_app, render_template, send_file
 from app.extensions import db
 from app.models import Zone, SystemRequirement, Document
 from app.services.dms_service import DMSService
@@ -17,9 +17,16 @@ def index():
 
 @main_bp.route('/uploads/<path:filename>')
 def serve_upload(filename):
-    # התיקון: שליפה בטוחה בלי לפגוע בשם הקובץ שניגשים אליו
+    # שימוש בנתיב אבסולוטי מלא ומניעת path traversal
+    base_dir = current_app.config['UPLOAD_FOLDER']
     fname = os.path.basename(filename)
-    return send_from_directory(current_app.config['UPLOAD_FOLDER'], fname)
+    full_path = os.path.join(base_dir, fname)
+    
+    if os.path.exists(full_path):
+        return send_file(full_path, mimetype='application/pdf')
+    else:
+        # הודעת דיבאג מפורשת במקרה של חוסר סנכרון בדיסק
+        return f"File not found on server storage path: {full_path}", 404
 
 @main_bp.route('/api/dashboard')
 def dashboard():
