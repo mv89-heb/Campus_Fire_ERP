@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מערכת בטיחות אש | קמפוס ראשית</title>
+<style>
+:root { --bg: #0d1117; --bg-card: #161b22; --bg-hover: #1c2330; --border: rgba(255,255,255,0.07); --border-mid: rgba(255,255,255,0.12); --text: #e6edf3; --text-muted: #7d8590; --accent: #f78166; --valid: #3fb950; --warning: #e3b341; --critical: #f85149; --radius: 8px; font-family: system-ui, sans-serif;}
+body { background: var(--bg); color: var(--text); margin: 0; padding: 0; line-height: 1.6; }
+header { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 15px 28px; display: flex; justify-content: space-between; align-items: center; position: sticky; top:0; z-index:100; }
+.btn { padding: 8px 14px; border-radius: var(--radius); font-size: 0.85rem; font-weight: bold; border: none; cursor: pointer; color: white; background: var(--border-mid); transition: 0.2s;}
+.btn:hover { opacity: 0.8; } .btn-primary { background: var(--accent); } .btn-folder { background: #1f6feb; } .btn-outlook { background: #6f42c1; display: none; }
+main { padding: 28px; max-width: 1400px; margin: 0 auto; }
+.score-hero { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 30px; display: flex; align-items: center; gap: 40px; margin-bottom: 20px;}
+.score-num { font-size: 3rem; font-weight: bold; color: var(--valid); }
+.score-kpis { display: flex; gap: 30px; margin-right: auto; }
+.kpi { text-align: center; } .kpi-v { font-size: 1.5rem; font-weight: bold; }
+.panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; overflow: hidden;}
+.panel-header { padding: 15px; border-bottom: 1px solid var(--border); font-weight: bold; display: flex; justify-content: space-between;}
+table { width: 100%; border-collapse: collapse; }
+th { text-align: right; padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; background: rgba(0,0,0,0.2); }
+td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem;}
+tr:hover td { background: var(--bg-hover); }
+.pill { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
+.pill.valid { background: rgba(63,185,80,0.15); color: var(--valid); }
+.pill.warning { background: rgba(227,179,65,0.15); color: var(--warning); }
+.pill.critical { background: rgba(248,81,73,0.15); color: var(--critical); }
+.pill.missing { background: rgba(110,118,129,0.15); color: var(--text-muted); }
+.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center; }
+.modal.open { display: flex; }
+.modal-content { background: var(--bg-card); border-radius: var(--radius); width: 85%; height: 85%; display: flex; flex-direction: column; padding: 20px;}
+iframe { flex: 1; border: none; width: 100%; border-radius: 4px; background: white;}
+.toast-container { position: fixed; bottom: 20px; left: 20px; z-index: 500; display: flex; flex-direction: column; gap: 10px; }
+.toast { background: var(--bg-card); border: 1px solid var(--border-mid); padding: 12px 20px; border-radius: var(--radius); font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <div style="font-size:1.6rem;">🛡️</div>
+    <div><strong>מערכת בטיחות אש Enterprise</strong><span style="display:block; font-size:0.75rem; color:var(--text-muted);">קמפוס ראשית</span></div>
+  </div>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none" onchange="App.onFolderSelect(event)">
+    <button class="btn btn-folder" onclick="document.getElementById('folderInput').click()">📁 סריקת תיקייה (DMS)</button>
+    <button id="btnMail" class="btn btn-outlook" onclick="App.triggerMail()">✉️ דוא"ל אוטומטי (Outlook)</button>
+  </div>
+</header>
+<main>
+  <div class="score-hero">
+    <div class="score-num" id="scoreNum">0%</div>
+    <div><h3>מדד מוכנות קמפוס</h3><p style="color:var(--text-muted); font-size:0.8rem;">מחושב עפ"י מסמכים תקינים מתוך סך הדרישות</p></div>
+    <div class="score-kpis">
+      <div class="kpi"><div class="kpi-v" id="kpiExpired" style="color:var(--critical)">0</div><div style="font-size:0.75rem; color:var(--text-muted)">פג תוקף</div></div>
+      <div class="kpi"><div class="kpi-v" id="kpiCritical" style="color:var(--accent)">0</div><div style="font-size:0.75rem; color:var(--text-muted)">קריטי (14 יום)</div></div>
+      <div class="kpi"><div class="kpi-v" id="kpiWarning" style="color:var(--warning)">0</div><div style="font-size:0.75rem; color:var(--text-muted)">אזהרה (30 יום)</div></div>
+      <div class="kpi"><div class="kpi-v" id="kpiValid" style="color:var(--valid)">0</div><div style="font-size:0.75rem; color:var(--text-muted)">תקין</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <span>📄 סטטוס אישורים וטפסים מרוכז</span>
+      <select id="filterZone" onchange="App.refresh()" style="background:var(--bg); color:white; border:1px solid var(--border); padding:4px 10px; border-radius:4px;"><option value="all">כל המתחמים</option></select>
+    </div>
+    <table>
+      <thead><tr><th>מתחם</th><th>דרישה (טופס)</th><th>סטטוס / תוקף</th><th>פעולות</th></tr></thead>
+      <tbody id="tblReqs"></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">🗂️ ארכיון מסמכים מלא (50 אחרונים)</div>
+    <table>
+      <thead><tr><th>שם קובץ</th><th>מתחם ששויך</th><th>דרישה שזוהתה</th><th>תאריך העלאה</th><th>פעולות</th></tr></thead>
+      <tbody id="tblArchive"></tbody>
+    </table>
+  </div>
+</main>
+
+<div class="modal" id="pdfModal">
+  <div class="modal-content">
+    <div style="display:flex; justify-content:space-between; margin-bottom:15px;"><h3 id="pdfTitle">צפייה</h3><button class="btn" onclick="App.closePdf()">סגור ✕</button></div>
+    <iframe id="pdfFrame"></iframe>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+const App = (() => {
+  let _data = null;
+  const showToast = (msg, type='success') => {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div'); t.className = 'toast';
+    t.innerHTML = (type==='success'?'✅ ':(type==='warning'?'⏳ ':'❌ '))+msg;
+    c.appendChild(t); setTimeout(() => t.remove(), 4000);
+  };
+
+  async function init() {
+    await refresh();
+    if(_data && _data.zones) {
+      const fz = document.getElementById('filterZone');
+      if (fz.options.length === 1) {
+          _data.zones.forEach(z => fz.innerHTML += `<option value="${z.zone_name}">${z.zone_name}</option>`);
+      }
+    }
+  }
+
+  async function refresh() {
+    try {
+        const r = await fetch('/api/dashboard');
+        _data = await r.json();
+        renderAll();
+    } catch(e) { showToast("שגיאת רשת מול השרת", "error"); }
+  }
+
+  function renderAll() {
+    if(!_data) return;
+    document.getElementById('scoreNum').textContent = _data.readiness_score + '%';
+    document.getElementById('kpiExpired').textContent = _data.alerts.expired.length;
+    document.getElementById('kpiCritical').textContent = _data.alerts.critical_14.length;
+    document.getElementById('kpiWarning').textContent = _data.alerts.warning_30.length;
+    document.getElementById('kpiValid').textContent = _data.valid_count;
+
+    if(_data.outlook_enabled) document.getElementById('btnMail').style.display = 'inline-block';
+
+    const fz = document.getElementById('filterZone').value;
+    const tBody = document.getElementById('tblReqs');
+    tBody.innerHTML = '';
+    
+    _data.requirements.forEach(r => {
+      if(fz !== 'all' && r.zone_name != fz) return;
+      
+      let btn = `<span style="color:var(--text-muted)">אין קובץ</span>`;
+      let status = `<span class="pill missing">חסר מסמך</span>`;
+      let docMeta = r.doc_count > 0 ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:5px; line-height:1.2;">📎 סה"כ ${r.doc_count} מסמכים מוצמדים<br>${r.doc_names.join(', ')}</div>` : '';
+
+      if (r.file_path) {
+        btn = `<button class="btn btn-primary" onclick="App.previewDoc('/uploads/${r.file_path}', '${r.file_name}')">👁 צפה קובץ אחרון</button>`;
+        status = `<span class="pill ${r.status}">בתוקף: ${r.expiry_date}</span>`;
+      }
+
+      tBody.innerHTML += `<tr><td><b>${r.zone_name}</b> <div style="font-size:0.75rem;color:var(--text-muted);">${r.file_number}</div></td><td><div style="font-weight:bold;">${r.system_name}</div><div style="font-size:0.8rem;color:var(--text-muted)">${r.required_form}</div>${docMeta}</td><td>${status}</td><td>${btn}</td></tr>`;
+    });
+
+    const aBody = document.getElementById('tblArchive');
+    aBody.innerHTML = '';
+    _data.recent_docs.forEach(doc => {
+        aBody.innerHTML += `<tr><td style="font-family:monospace;">${doc.file_name}</td><td>${doc.zone_name}</td><td>${doc.form_code}</td><td style="font-size:0.8rem; color:var(--text-muted);">${doc.expiry_date}</td><td><button class="btn btn-primary" onclick="App.previewDoc('/uploads/${doc.file_path}', '${doc.file_name}')">👁 צפה</button></td></tr>`;
+    });
+  }
+
+  async function onFolderSelect(e) {
+    const files = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+    if(files.length === 0) { showToast('לא נמצאו קבצי PDF בתיקייה', 'error'); return; }
+    
+    showToast(`מעלה וסורק ${files.length} מסמכים... אנא המתן`, 'warning');
+    const fd = new FormData();
+    files.forEach(f => fd.append('file', f));
+    
+    try {
+      const res = await fetch('/api/documents/upload_bulk', { method: 'POST', body: fd });
+      const data = await res.json();
+      if(data.success) { showToast(`✅ סריקה הושלמה! עובדו ${data.processed} מסמכים בהצלחה.`); refresh(); }
+    } catch(err) { showToast('שגיאה בתקשורת עם השרת', 'error'); }
+    e.target.value = '';
+  }
+
+  async function triggerMail() {
+    await fetch('/api/outlook', { method: 'POST', headers: {'Content-Type': 'application/json'}});
+    showToast('חלון חדש נפתח באאוטלוק');
+  }
+
+  return { init, refresh, onFolderSelect, triggerMail,
+    previewDoc: (url, title) => { document.getElementById('pdfTitle').innerText=title; document.getElementById('pdfFrame').src=url; document.getElementById('pdfModal').classList.add('open'); },
+    closePdf: () => { document.getElementById('pdfModal').classList.remove('open'); document.getElementById('pdfFrame').src=''; }
+  };
+})();
+document.addEventListener('DOMContentLoaded', App.init);
+</script>
+</body>
+</html>
