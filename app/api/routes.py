@@ -17,16 +17,17 @@ def index():
 
 @main_bp.route('/uploads/<path:filename>')
 def serve_upload(filename):
-    # שימוש בנתיב אבסולוטי מלא ומניעת path traversal
-    base_dir = current_app.config['UPLOAD_FOLDER']
+    # נתיב התיקייה הראשית (איפה שקובץ ה-uploads נמצא בשרת)
+    # אנחנו עולים רמה אחת למעלה מהתיקייה app לתיקיית השורש
+    base_dir = os.path.abspath(os.path.join(current_app.root_path, '..', 'uploads'))
+    
     fname = os.path.basename(filename)
     full_path = os.path.join(base_dir, fname)
     
     if os.path.exists(full_path):
         return send_file(full_path, mimetype='application/pdf')
     else:
-        # הודעת דיבאג מפורשת במקרה של חוסר סנכרון בדיסק
-        return f"File not found on server storage path: {full_path}", 404
+        return f"File not found. Looking in: {full_path}", 404
 
 @main_bp.route('/api/dashboard')
 def dashboard():
