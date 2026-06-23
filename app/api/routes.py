@@ -5,7 +5,7 @@ from app.services.dms_service import DMSService
 from app.utils.security import validate_and_save_pdf
 from datetime import date
 import platform
-from werkzeug.utils import secure_filename
+import os
 
 main_bp = Blueprint('main', __name__)
 
@@ -17,7 +17,9 @@ def index():
 
 @main_bp.route('/uploads/<path:filename>')
 def serve_upload(filename):
-    return send_from_directory(current_app.config['UPLOAD_FOLDER'], secure_filename(filename))
+    # התיקון: שליפה בטוחה בלי לפגוע בשם הקובץ שניגשים אליו
+    fname = os.path.basename(filename)
+    return send_from_directory(current_app.config['UPLOAD_FOLDER'], fname)
 
 @main_bp.route('/api/dashboard')
 def dashboard():
@@ -103,8 +105,7 @@ def outlook():
         mail = outlook.CreateItem(0)
         mail.To = "tservice@102.gov.il"
         mail.Subject = "הגשת מסמכי רישוי"
-        # התיקון בוצע כאן: עטיפה בגרשיים בודדות
-        mail.Body = 'שלום רב,\nמצ"ב מסמכים מעודכנים.'
+        mail.Body = "שלום רב,\nמצ\"ב מסמכים מעודכנים."
         mail.Display(False)
         return jsonify({"success": True})
     except Exception as e:
