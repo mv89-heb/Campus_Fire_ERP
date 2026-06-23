@@ -102,8 +102,8 @@ def outlook():
         outlook = win32.Dispatch('outlook.application')
         mail = outlook.CreateItem(0)
         mail.To = "tservice@102.gov.il"
-        mail.Subject = "הגשת מסמכי רישוי"
-        mail.Body = "שלום רב,\nמצ\"ב מסמכים מעודכנים."
+        mail.Subject = "הגשת מסמכי רישוי קמפוס"
+        mail.Body = "שלום רב,\\nמצ\\"ב מסמכים מעודכנים."
         mail.Display(False)
         return jsonify({"success": True})
     except Exception as e:
