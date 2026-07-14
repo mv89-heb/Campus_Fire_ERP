@@ -1,0 +1,154 @@
+{% extends "_shell.html" %}
+{% block title %}ניהול משתמשים | בטיחות אש Enterprise{% endblock %}
+
+{% block extra_style %}
+.page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
+.page-title-row h1 { font-size: var(--text-xl); }
+.notice { background: var(--tint-warning); border: 1px solid var(--color-warning); color: var(--color-warning); border-radius: 6px; padding: 10px 14px; font-size: 0.82rem; margin-bottom: 15px; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 3000; padding: 15px; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); padding: 20px; width: 100%; max-width: 420px; }
+.inline-form { display: flex; flex-direction: column; gap: 8px; }
+.inline-form input, .inline-form select { background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border-strong); border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; width: 100%; }
+.modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+.modal-actions .ds-btn { flex: 1; }
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:8px;"><a href="/settings" style="color:var(--color-text-muted); font-size:var(--text-sm); text-decoration:none;">⚙️ הגדרות</a> <span style="color:var(--color-text-faint);">/</span> <span style="color:var(--color-text-muted); font-size:var(--text-sm);">משתמשים</span></div>
+<div class="page-title-row">
+  <h1>👥 ניהול משתמשים</h1>
+  <button class="ds-btn ds-btn-primary" onclick="Users.openModal()">➕ משתמש חדש</button>
+</div>
+
+<div class="notice">
+  ⚠️ שים לב: מודול זה מכין את התשתית להרשאות (שלב 13), אך ההתחברות עדיין <b>לא</b> נאכפת על אף מסך במערכת. כל מי שיש לו את כתובת המערכת יכול להיכנס כרגיל, ללא קשר למשתמשים שכאן.
+</div>
+
+<div class="ds-card">
+  <div class="ds-card-title">👥 רשימת משתמשים</div>
+  <div id="usersTableWrap"><table class="ds-table">
+    <thead><tr><th>שם משתמש</th><th>שם מלא</th><th>תפקיד</th><th>סטטוס</th><th>התחברות אחרונה</th><th>פעולות</th></tr></thead>
+    <tbody id="usersBody"><tr><td colspan="6" style="text-align:center;color:var(--color-text-muted)">טוען...</td></tr></tbody>
+  </table></div>
+</div>
+
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <h3 id="userModalTitle" style="margin-bottom:14px;">משתמש חדש</h3>
+    <div class="inline-form">
+      <input type="hidden" id="userId">
+      <input type="text" id="username" placeholder="שם משתמש *">
+      <input type="password" id="password" placeholder="סיסמה (השאר ריק כדי לא לשנות בעריכה)">
+      <input type="text" id="fullName" placeholder="שם מלא">
+      <input type="email" id="email" placeholder="אימייל">
+      <select id="role">
+        <option value="viewer">צופה</option>
+        <option value="technician">טכנאי</option>
+        <option value="inspector">מפקח</option>
+        <option value="manager">מנהל</option>
+        <option value="admin">אדמין</option>
+        <option value="super_admin">אדמין ראשי</option>
+      </select>
+      <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem;">
+        <input type="checkbox" id="active" checked style="width:auto;"> פעיל
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="ds-btn" onclick="Users.closeModal()">ביטול</button>
+      <button class="ds-btn ds-btn-primary" onclick="Users.save()">שמירה</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+const Users = (() => {
+  let _all = [];
+  const showToast = (msg, type='success') => {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `ds-toast ${type}`; t.innerText = msg; c.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  };
+  const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const roleLabel = { super_admin: 'אדמין ראשי', admin: 'אדמין', manager: 'מנהל', inspector: 'מפקח', technician: 'טכנאי', viewer: 'צופה' };
+
+  async function refresh() {
+    try {
+      const res = await fetch('/api/users');
+      _all = await res.json();
+      render();
+    } catch (e) { showToast('שגיאה בטעינת משתמשים', 'error'); }
+  }
+
+  function render() {
+    const body = document.getElementById('usersBody');
+    if (!_all.length) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--color-text-muted)">אין משתמשים עדיין</td></tr>'; return; }
+    body.innerHTML = _all.map(u => `
+      <tr>
+        <td>${esc(u.username)}</td>
+        <td>${esc(u.full_name || '—')}</td>
+        <td>${roleLabel[u.role] || u.role}</td>
+        <td><span class="ds-badge ${u.active ? 'ds-badge-success' : 'ds-badge-neutral'}">${u.active ? 'פעיל' : 'לא פעיל'}</span></td>
+        <td>${u.last_login ? new Date(u.last_login).toLocaleString('he-IL') : 'מעולם לא'}</td>
+        <td>
+          <button class="ds-btn ds-btn-sm" onclick="Users.openModal(${u.id})">✏️</button>
+          <button class="ds-btn ds-btn-sm ds-btn-danger" onclick="Users.remove(${u.id})">🗑️</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  return {
+    init: () => { refresh(); },
+    openModal: (id) => {
+      const u = id ? _all.find(x => x.id === id) : null;
+      document.getElementById('userModalTitle').innerText = id ? 'עריכת משתמש' : 'משתמש חדש';
+      document.getElementById('userId').value = u?.id || '';
+      document.getElementById('username').value = u?.username || '';
+      document.getElementById('username').disabled = !!id;
+      document.getElementById('password').value = '';
+      document.getElementById('fullName').value = u?.full_name || '';
+      document.getElementById('email').value = u?.email || '';
+      document.getElementById('role').value = u?.role || 'viewer';
+      document.getElementById('active').checked = u ? u.active : true;
+      document.getElementById('userModal').classList.add('open');
+    },
+    closeModal: () => document.getElementById('userModal').classList.remove('open'),
+    save: async () => {
+      const id = document.getElementById('userId').value;
+      const payload = {
+        username: document.getElementById('username').value.trim(),
+        password: document.getElementById('password').value,
+        full_name: document.getElementById('fullName').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        role: document.getElementById('role').value,
+        active: document.getElementById('active').checked,
+      };
+      if (!id && !payload.password) { showToast('נדרשת סיסמה למשתמש חדש', 'error'); return; }
+      try {
+        const url = id ? `/api/users/${id}` : '/api/users';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'שגיאה');
+        showToast(id ? 'המשתמש עודכן' : 'המשתמש נוצר');
+        Users.closeModal();
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+    remove: async (id) => {
+      if (!confirm('למחוק את המשתמש?')) return;
+      try {
+        const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('שגיאה במחיקה');
+        showToast('המשתמש נמחק');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+  };
+})();
+document.addEventListener('DOMContentLoaded', Users.init);
+</script>
+{% endblock %}

@@ -1,0 +1,522 @@
+{% extends "_shell.html" %}
+{% block title %}ביקורות וליקויים | בטיחות אש Enterprise{% endblock %}
+
+{% block extra_style %}
+.page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
+.page-title-row h1 { font-size: var(--text-xl); }
+
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; margin-bottom: 15px; }
+.card-title { font-size: 1rem; font-weight: 600; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap:wrap; gap:10px; }
+.empty-state { text-align: center; color: var(--text-muted); padding: 30px 10px; font-size: 0.9rem; }
+.filters-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.filters-row select, .filters-row input { background: var(--bg); color: var(--text); border: 1px solid var(--border-mid); border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; outline: none; }
+
+.audit-block { animation: fadeIn 0.25s ease; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; }
+.audit-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: rgba(255,255,255,0.02); cursor: pointer; gap: 10px; flex-wrap: wrap; }
+.audit-header:hover { background: var(--bg-hover); }
+.audit-title { font-weight: 700; }
+.audit-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+.score-badge { font-size: 1.3rem; font-weight: 800; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; }
+.badge.scheduled { background: rgba(110,118,129,0.15); color: var(--text-muted); }
+.badge.in_progress { background: rgba(88,166,255,0.15); color: #58a6ff; }
+.badge.completed { background: rgba(63,185,80,0.15); color: var(--valid); }
+.badge.pass { background: rgba(63,185,80,0.15); color: var(--valid); }
+.badge.fail { background: rgba(248,81,73,0.15); color: var(--critical); }
+.badge.conditional { background: rgba(227,179,65,0.15); color: var(--warning); }
+.badge.low { background: rgba(110,118,129,0.15); color: var(--text-muted); }
+.badge.medium { background: rgba(227,179,65,0.15); color: var(--warning); }
+.badge.high { background: rgba(248,81,73,0.18); color: var(--critical); }
+.badge.critical { background: rgba(248,81,73,0.3); color: var(--critical); }
+.badge.open { background: rgba(110,118,129,0.15); color: var(--text-muted); }
+.badge.resolved { background: rgba(63,185,80,0.15); color: var(--valid); }
+
+.deficiency-item { border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 8px; background: rgba(0,0,0,0.15); }
+.deficiency-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.deficiency-actions { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+
+.inline-form { display: flex; flex-direction: column; gap: 8px; }
+.inline-form input, .inline-form textarea, .inline-form select { background: var(--bg); color: var(--text); border: 1px solid var(--border-mid); border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; outline: none; width: 100%; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 480px) { .form-grid { grid-template-columns: 1fr; } }
+
+.sig-pad-wrap { border: 1px dashed var(--border-mid); border-radius: 6px; background: #fff; }
+#sigCanvas { display: block; width: 100%; height: 120px; touch-action: none; border-radius: 6px; }
+
+.compare-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 3000; padding: 15px; overflow-y: auto; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: var(--radius); padding: 20px; width: 100%; max-width: 560px; margin: auto; }
+.modal h3 { margin-bottom: 14px; font-size: 1rem; }
+.modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+.modal-actions .btn { flex: 1; }
+.btn, .filter-select, table button { min-height: 38px; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
+.skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 37%, rgba(255,255,255,0.04) 63%); background-size: 400px 100%; animation: shimmer 1.4s ease infinite; border-radius: 6px; height: 70px; margin-bottom: 10px; }
+.error-state { text-align: center; color: var(--critical); padding: 20px; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.retry-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border-mid); background: var(--bg-hover); color: var(--text); cursor: pointer; font-size: 0.8rem; }
+{% endblock %}
+
+{% block content %}
+<div class="page-title-row">
+  <h1>🔍 ביקורות וליקויים</h1>
+  <button class="btn btn-primary" onclick="Audits.openAuditModal()">➕ ביקורת חדשה</button>
+</div>
+
+<div class="card">
+  <div class="card-title"><span>🔍 רשימת ביקורות</span></div>
+  <div class="filters-row">
+    <select id="filterStatus" onchange="Audits.refresh()">
+      <option value="">כל הסטטוסים</option>
+      <option value="scheduled">מתוכננת</option>
+      <option value="in_progress">בביצוע</option>
+      <option value="completed">הושלמה</option>
+    </select>
+    <select id="filterResult" onchange="Audits.refresh()">
+      <option value="">כל התוצאות</option>
+      <option value="pass">עברה</option>
+      <option value="fail">נכשלה</option>
+      <option value="conditional">מותנית</option>
+    </select>
+  </div>
+  <div id="auditsList"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+</div>
+
+<!-- מודאל יצירת/עריכת ביקורת -->
+<div class="modal-overlay" id="auditModal">
+  <div class="modal">
+    <h3 id="auditModalTitle">ביקורת חדשה</h3>
+    <div class="inline-form">
+      <input type="hidden" id="auditId">
+      <div class="form-grid">
+        <input type="text" id="auditNumber" placeholder="מספר ביקורת">
+        <select id="auditSite"><option value="">בחר אתר</option></select>
+        <input type="text" id="inspectorName" placeholder="שם הבודק">
+        <input type="date" id="auditDate">
+        <select id="auditStatus">
+          <option value="scheduled">מתוכננת</option>
+          <option value="in_progress">בביצוע</option>
+          <option value="completed">הושלמה</option>
+        </select>
+        <select id="auditResult">
+          <option value="">ללא תוצאה</option>
+          <option value="pass">עברה</option>
+          <option value="fail">נכשלה</option>
+          <option value="conditional">מותנית</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="number" id="auditScore" placeholder="ציון (0-100)" min="0" max="100" style="flex:1;">
+        <button type="button" class="btn btn-sm" onclick="Audits.suggestScore()">💡 הצע ציון</button>
+      </div>
+      <textarea id="auditNotes" placeholder="הערות" rows="2"></textarea>
+      <div>
+        <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:6px;">✍️ חתימה דיגיטלית</div>
+        <div class="sig-pad-wrap"><canvas id="sigCanvas"></canvas></div>
+        <button type="button" class="btn btn-sm" style="margin-top:6px;" onclick="Audits.clearSignature()">נקה חתימה</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="Audits.closeModal('auditModal')">ביטול</button>
+      <button class="btn btn-primary" onclick="Audits.saveAudit()">שמירה</button>
+    </div>
+  </div>
+</div>
+
+<!-- מודאל יצירת/עריכת ליקוי -->
+<div class="modal-overlay" id="deficiencyModal">
+  <div class="modal">
+    <h3 id="deficiencyModalTitle">ליקוי חדש</h3>
+    <div class="inline-form">
+      <input type="hidden" id="deficiencyId">
+      <input type="hidden" id="deficiencyAuditId">
+      <input type="text" id="deficiencyTitle" placeholder="כותרת הליקוי *">
+      <textarea id="deficiencyDescription" placeholder="תיאור" rows="2"></textarea>
+      <div class="form-grid">
+        <select id="deficiencySeverity">
+          <option value="low">חומרה נמוכה</option>
+          <option value="medium" selected>חומרה בינונית</option>
+          <option value="high">חומרה גבוהה</option>
+          <option value="critical">קריטי</option>
+        </select>
+        <select id="deficiencyStatus">
+          <option value="open">פתוח</option>
+          <option value="in_progress">בטיפול</option>
+          <option value="resolved">טופל</option>
+        </select>
+        <input type="text" id="deficiencyResponsible" placeholder="אחראי">
+        <input type="date" id="deficiencyDueDate" title="יעד לתיקון">
+      </div>
+      <textarea id="deficiencyNotes" placeholder="הערות" rows="2"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="Audits.closeModal('deficiencyModal')">ביטול</button>
+      <button class="btn btn-primary" onclick="Audits.saveDeficiency()">שמירה</button>
+    </div>
+  </div>
+</div>
+
+<!-- Side Panel לפרטי ביקורת (שלב 4 - Workspace: לחיצה על ביקורת פותחת פאנל צד, בלי לעבור מסך) -->
+<div class="ds-side-panel-overlay" id="sidePanelOverlay" onclick="Audits.closeDetail()"></div>
+<div class="ds-side-panel" id="sidePanel">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+    <div>
+      <div id="sidePanelTitle" style="font-size:var(--text-lg); font-weight:700;"></div>
+      <div id="sidePanelSubtitle" style="font-size:var(--text-sm); color:var(--color-text-muted); margin-top:2px;"></div>
+    </div>
+    <button class="btn btn-sm" onclick="Audits.closeDetail()">✕</button>
+  </div>
+  <div id="sidePanelBody"></div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+
+const Audits = (() => {
+  let _audits = [];
+  let _sites = [];
+  let _currentDetailId = null;
+  let sigCtx = null, sigDrawing = false, sigEmpty = true;
+
+  const showToast = (msg, type='success') => {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `ds-toast ${type}`; t.innerText = msg; c.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  };
+  const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const statusLabel = { scheduled: 'מתוכננת', in_progress: 'בביצוע', completed: 'הושלמה' };
+  const resultLabel = { pass: 'עברה', fail: 'נכשלה', conditional: 'מותנית' };
+  const severityLabel = { low: 'נמוכה', medium: 'בינונית', high: 'גבוהה', critical: 'קריטי' };
+  const defStatusLabel = { open: 'פתוח', in_progress: 'בטיפול', resolved: 'טופל' };
+
+  async function refresh() {
+    try {
+      const params = new URLSearchParams();
+      const status = document.getElementById('filterStatus').value;
+      const result = document.getElementById('filterResult').value;
+      if (status) params.set('status', status);
+      if (result) params.set('result', result);
+      const res = await fetch('/api/audits?' + params.toString());
+      _audits = await res.json();
+      render();
+    } catch (e) {
+      document.getElementById('auditsList').innerHTML = `<div class="error-state">⚠️ שגיאה בטעינת ביקורות<button class="retry-btn" onclick="Audits.init()">🔄 נסה שוב</button></div>`;
+      showToast('שגיאה בחיבור לשרת', 'error');
+    }
+  }
+
+  async function loadSites() {
+    try {
+      const res = await fetch('/api/sites');
+      _sites = await res.json();
+      const sel = document.getElementById('auditSite');
+      sel.innerHTML = '<option value="">בחר אתר</option>' + _sites.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+    } catch (e) { /* לא קריטי */ }
+  }
+
+  function render() {
+    const el = document.getElementById('auditsList');
+    if (!_audits.length) { el.innerHTML = `<div class="empty-state">אין ביקורות עדיין</div>`; return; }
+    el.innerHTML = _audits.map(a => renderAudit(a)).join('');
+  }
+
+  function renderAudit(a) {
+    return `
+      <div class="audit-block">
+        <div class="audit-header" onclick="Audits.openDetail(${a.id})">
+          <div>
+            <div class="audit-title">🔍 ${esc(a.audit_number || ('ביקורת #' + a.id))} ${a.site_name ? '· ' + esc(a.site_name) : ''}</div>
+            <div class="audit-meta">
+              ${a.audit_date ? esc(a.audit_date) : 'ללא תאריך'} ${a.inspector_name ? '· בודק: ' + esc(a.inspector_name) : ''}
+              · <span class="badge ${a.status}">${statusLabel[a.status] || a.status}</span>
+              ${a.result ? `<span class="badge ${a.result}">${resultLabel[a.result]}</span>` : ''}
+              ${a.open_deficiency_count ? `· ${a.open_deficiency_count} ליקויים פתוחים` : ''}
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;" onclick="event.stopPropagation()">
+            ${a.score != null ? `<div class="score-badge" style="color:${a.score >= 80 ? 'var(--valid)' : a.score >= 50 ? 'var(--warning)' : 'var(--critical)'}">${a.score}</div>` : ''}
+            <a class="btn btn-sm" href="/audits/${a.id}/report" target="_blank">📄 דו"ח</a>
+            <button class="btn btn-sm" onclick="Audits.openAuditModal(${a.id})">✏️</button>
+            <button class="btn btn-sm btn-danger" onclick="Audits.deleteAudit(${a.id})">🗑️</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  async function renderAuditDetail(auditId) {
+    const el = document.getElementById('sidePanelBody');
+    el.innerHTML = '<div class="empty-state">טוען...</div>';
+    try {
+      const [fullRes, cmpRes] = await Promise.all([
+        fetch(`/api/audits/${auditId}`), fetch(`/api/audits/${auditId}/compare`)
+      ]);
+      const full = await fullRes.json();
+      const previous = await cmpRes.json();
+
+      let cmpHtml = '';
+      if (previous.length) {
+        cmpHtml = `<div style="margin-top:16px;"><div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:4px;">📈 השוואה לביקורות קודמות באתר</div>` +
+          previous.map(p => `<div class="compare-row"><span>${esc(p.audit_date || '')}</span><span>${p.score != null ? p.score : '-'}</span></div>`).join('') + `</div>`;
+      }
+
+      const defHtml = (full.deficiencies || []).map(d => `
+        <div class="deficiency-item">
+          <div class="deficiency-top">
+            <div>
+              <b>${esc(d.title)}</b>
+              <div style="font-size:0.78rem; color:var(--text-muted);">${esc(d.description || '')}</div>
+            </div>
+            <div style="display:flex; gap:4px;">
+              <span class="badge ${d.severity}">${severityLabel[d.severity] || d.severity}</span>
+              <span class="badge ${d.status}">${defStatusLabel[d.status] || d.status}</span>
+            </div>
+          </div>
+          <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">
+            ${d.responsible ? '👤 ' + esc(d.responsible) + ' · ' : ''}${d.due_date ? '📅 יעד: ' + esc(d.due_date) : ''}
+          </div>
+          <div class="deficiency-actions">
+            <button class="btn btn-sm" onclick="Audits.openDeficiencyModal(${auditId}, ${d.id})">✏️ עריכה</button>
+            ${!d.task_id ? `<button class="btn btn-sm" onclick="Audits.createTaskFromDeficiency(${d.id})">➕ צור משימה</button>` : `<span class="badge resolved" style="align-self:center;">משימה #${d.task_id}</span>`}
+            <button class="btn btn-sm btn-danger" onclick="Audits.deleteDeficiency(${d.id}, ${auditId})">🗑️</button>
+          </div>
+        </div>`).join('') || '<div class="empty-state" style="padding:10px;">אין ליקויים בביקורת זו</div>';
+
+      const timelineRes = await fetch(`/api/audit-log?entity_type=audit&entity_id=${auditId}`);
+      const timelineItems = await timelineRes.json();
+      const timelineActionLabel = { create: 'נוצרה', update: 'עודכנה', delete: 'נמחקה' };
+      const timelineHtml = timelineItems.length ? `
+        <div style="margin-top:20px; border-top:1px solid var(--border); padding-top:14px;">
+          <div style="font-size:0.9rem; font-weight:600; margin-bottom:10px;">🕒 Timeline</div>
+          <div class="ds-timeline">
+            ${timelineItems.map(t => `
+              <div class="ds-timeline-item">
+                <div class="ds-timeline-dot"></div>
+                <div class="ds-timeline-time">${new Date(t.created_at).toLocaleString('he-IL')} · ${esc(t.username)}</div>
+                <div class="ds-timeline-label">הביקורת ${timelineActionLabel[t.action] || t.action}</div>
+              </div>`).join('')}
+          </div>
+        </div>` : '';
+
+      document.getElementById('sidePanelTitle').innerText = full.audit_number || `ביקורת #${full.id}`;
+      document.getElementById('sidePanelSubtitle').innerText = [full.site_name, full.audit_date, full.inspector_name ? 'בודק: ' + full.inspector_name : null].filter(Boolean).join(' · ');
+
+      el.innerHTML = `
+        <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+          <span class="badge ${full.status}">${statusLabel[full.status] || full.status}</span>
+          ${full.result ? `<span class="badge ${full.result}">${resultLabel[full.result]}</span>` : ''}
+          ${full.score != null ? `<span class="score-badge" style="color:${full.score >= 80 ? 'var(--valid)' : full.score >= 50 ? 'var(--warning)' : 'var(--critical)'}">${full.score}</span>` : ''}
+        </div>
+        ${full.notes ? `<div style="font-size:0.85rem; margin-bottom:14px;">📝 ${esc(full.notes)}</div>` : ''}
+        <div style="display:flex; gap:8px; margin-bottom:16px;">
+          <a class="btn btn-sm" href="/audits/${auditId}/report" target="_blank">📄 דו"ח PDF</a>
+          <button class="btn btn-sm" onclick="Audits.openAuditModal(${auditId})">✏️ עריכת ביקורת</button>
+        </div>
+        <div style="font-size:0.9rem; font-weight:600; margin-bottom:8px; border-top:1px solid var(--border); padding-top:14px;">ליקויים</div>
+        ${defHtml}
+        <button class="btn btn-sm" style="margin-top:8px;" onclick="Audits.openDeficiencyModal(${auditId})">➕ הוסף ליקוי</button>
+        ${cmpHtml}
+        ${timelineHtml}`;
+    } catch (e) {
+      el.innerHTML = `<div class="empty-state">שגיאה בטעינת פרטי ביקורת</div>`;
+    }
+  }
+
+  function initSignaturePad() {
+    const canvas = document.getElementById('sigCanvas');
+    const resize = () => {
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = canvas.clientWidth * ratio;
+      canvas.height = canvas.clientHeight * ratio;
+      sigCtx = canvas.getContext('2d');
+      sigCtx.scale(ratio, ratio);
+      sigCtx.strokeStyle = '#000'; sigCtx.lineWidth = 2; sigCtx.lineCap = 'round';
+    };
+    resize();
+    const pos = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const p = e.touches ? e.touches[0] : e;
+      return { x: p.clientX - rect.left, y: p.clientY - rect.top };
+    };
+    const start = (e) => { sigDrawing = true; sigEmpty = false; const p = pos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y); };
+    const move = (e) => { if (!sigDrawing) return; e.preventDefault(); const p = pos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); };
+    const end = () => { sigDrawing = false; };
+    canvas.onmousedown = start; canvas.onmousemove = move; canvas.onmouseup = end; canvas.onmouseleave = end;
+    canvas.ontouchstart = start; canvas.ontouchmove = move; canvas.ontouchend = end;
+  }
+
+  function fillAuditForm(a) {
+    document.getElementById('auditId').value = a?.id || '';
+    document.getElementById('auditNumber').value = a?.audit_number || '';
+    document.getElementById('auditSite').value = a?.site_id || '';
+    document.getElementById('inspectorName').value = a?.inspector_name || '';
+    document.getElementById('auditDate').value = a?.audit_date || '';
+    document.getElementById('auditStatus').value = a?.status || 'scheduled';
+    document.getElementById('auditResult').value = a?.result || '';
+    document.getElementById('auditScore').value = a?.score ?? '';
+    document.getElementById('auditNotes').value = a?.notes || '';
+    setTimeout(() => {
+      initSignaturePad();
+      sigEmpty = true;
+    }, 50);
+  }
+
+  return {
+    init: () => { refresh(); loadSites(); },
+    refresh,
+
+    openDetail: (id) => {
+      _currentDetailId = id;
+      document.getElementById('sidePanel').classList.add('open');
+      document.getElementById('sidePanelOverlay').classList.add('open');
+      renderAuditDetail(id);
+    },
+
+    closeDetail: () => {
+      _currentDetailId = null;
+      document.getElementById('sidePanel').classList.remove('open');
+      document.getElementById('sidePanelOverlay').classList.remove('open');
+    },
+
+    openAuditModal: (id) => {
+      document.getElementById('auditModalTitle').innerText = id ? 'עריכת ביקורת' : 'ביקורת חדשה';
+      fillAuditForm(id ? _audits.find(a => a.id === id) : null);
+      document.getElementById('auditModal').classList.add('open');
+    },
+    closeModal: (id) => document.getElementById(id).classList.remove('open'),
+
+    clearSignature: () => {
+      if (!sigCtx) return;
+      sigCtx.clearRect(0, 0, 9999, 9999);
+      sigEmpty = true;
+    },
+
+    suggestScore: async () => {
+      const id = document.getElementById('auditId').value;
+      if (!id) { showToast('שמור את הביקורת קודם, ואז ניתן להציע ציון', 'error'); return; }
+      try {
+        const res = await fetch(`/api/audits/${id}/suggested_score`);
+        const data = await res.json();
+        document.getElementById('auditScore').value = data.suggested_score;
+        showToast('ציון מוצע הוזן (ניתן לערוך ידנית)');
+      } catch (e) { showToast('שגיאה בחישוב ציון', 'error'); }
+    },
+
+    saveAudit: async () => {
+      const id = document.getElementById('auditId').value;
+      const payload = {
+        audit_number: document.getElementById('auditNumber').value.trim(),
+        site_id: document.getElementById('auditSite').value ? parseInt(document.getElementById('auditSite').value) : null,
+        inspector_name: document.getElementById('inspectorName').value.trim(),
+        audit_date: document.getElementById('auditDate').value || null,
+        status: document.getElementById('auditStatus').value,
+        result: document.getElementById('auditResult').value || null,
+        score: document.getElementById('auditScore').value ? parseFloat(document.getElementById('auditScore').value) : null,
+        notes: document.getElementById('auditNotes').value.trim(),
+      };
+      if (!sigEmpty) {
+        payload.signature_data = document.getElementById('sigCanvas').toDataURL('image/png');
+      }
+      try {
+        const url = id ? `/api/audits/${id}` : '/api/audits';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'שגיאה');
+        showToast(id ? 'הביקורת עודכנה' : 'הביקורת נוצרה');
+        Audits.closeModal('auditModal');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    deleteAudit: async (id) => {
+      if (!confirm('למחוק את הביקורת וכל הליקויים המשויכים אליה?')) return;
+      try {
+        const res = await fetch(`/api/audits/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('שגיאה במחיקה');
+        showToast('הביקורת נמחקה');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    openDeficiencyModal: (auditId, deficiencyId) => {
+      document.getElementById('deficiencyModalTitle').innerText = deficiencyId ? 'עריכת ליקוי' : 'ליקוי חדש';
+      document.getElementById('deficiencyAuditId').value = auditId;
+      document.getElementById('deficiencyId').value = deficiencyId || '';
+      if (deficiencyId) {
+        fetch(`/api/deficiencies/${deficiencyId}`).then(r => r.json()).then(d => {
+          document.getElementById('deficiencyTitle').value = d.title || '';
+          document.getElementById('deficiencyDescription').value = d.description || '';
+          document.getElementById('deficiencySeverity').value = d.severity || 'medium';
+          document.getElementById('deficiencyStatus').value = d.status || 'open';
+          document.getElementById('deficiencyResponsible').value = d.responsible || '';
+          document.getElementById('deficiencyDueDate').value = d.due_date || '';
+          document.getElementById('deficiencyNotes').value = d.notes || '';
+        });
+      } else {
+        ['deficiencyTitle','deficiencyDescription','deficiencyResponsible','deficiencyDueDate','deficiencyNotes']
+          .forEach(id => document.getElementById(id).value = '');
+        document.getElementById('deficiencySeverity').value = 'medium';
+        document.getElementById('deficiencyStatus').value = 'open';
+      }
+      document.getElementById('deficiencyModal').classList.add('open');
+    },
+
+    saveDeficiency: async () => {
+      const id = document.getElementById('deficiencyId').value;
+      const auditId = document.getElementById('deficiencyAuditId').value;
+      const payload = {
+        audit_id: parseInt(auditId),
+        title: document.getElementById('deficiencyTitle').value.trim(),
+        description: document.getElementById('deficiencyDescription').value.trim(),
+        severity: document.getElementById('deficiencySeverity').value,
+        status: document.getElementById('deficiencyStatus').value,
+        responsible: document.getElementById('deficiencyResponsible').value.trim(),
+        due_date: document.getElementById('deficiencyDueDate').value || null,
+        notes: document.getElementById('deficiencyNotes').value.trim(),
+      };
+      if (!payload.title) { showToast('כותרת הליקוי היא שדה חובה', 'error'); return; }
+      try {
+        const url = id ? `/api/deficiencies/${id}` : '/api/deficiencies';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'שגיאה');
+        showToast(id ? 'הליקוי עודכן' : 'הליקוי נוסף');
+        Audits.closeModal('deficiencyModal');
+        await refresh();
+        renderAuditDetail(auditId);
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    deleteDeficiency: async (id, auditId) => {
+      if (!confirm('למחוק את הליקוי?')) return;
+      try {
+        const res = await fetch(`/api/deficiencies/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('שגיאה במחיקה');
+        showToast('הליקוי נמחק');
+        await refresh();
+        renderAuditDetail(auditId);
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    createTaskFromDeficiency: async (deficiencyId) => {
+      try {
+        const res = await fetch(`/api/deficiencies/${deficiencyId}/create_task`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'שגיאה');
+        showToast(`נוצרה משימה מקושרת (#${data.task_id})`);
+        const auditId = data.deficiency.audit_id;
+        await refresh();
+        renderAuditDetail(auditId);
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+  };
+})();
+document.addEventListener('DOMContentLoaded', Audits.init);
+</script>
+{% endblock %}

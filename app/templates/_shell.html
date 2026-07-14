@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}בטיחות אש Enterprise{% endblock %}</title>
+<script>
+  (function () {
+    var saved = localStorage.getItem('erp-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+  })();
+</script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
+<style>
+  body { margin: 0; }
+  {% block extra_style %}{% endblock %}
+</style>
+</head>
+<body>
+
+<a href="#main-content" class="skip-link">דלג לתוכן הראשי</a>
+
+<div class="ds-shell">
+  <header class="ds-header" role="banner">
+    <button class="ds-btn ds-btn-icon ds-header-hamburger" onclick="Shell.toggleSidebar()" aria-label="פתח/סגור תפריט ניווט" aria-expanded="false" aria-controls="shellSidebar">☰</button>
+    <div class="ds-header-brand">🛡️ בטיחות אש</div>
+    <div class="ds-header-search">
+      <label for="shellGlobalSearch" class="sr-only">חיפוש גלובלי בכל המערכת</label>
+      <input type="text" id="shellGlobalSearch" placeholder="🔎 חיפוש גלובלי בכל המערכת..." oninput="Shell.onSearchInput(this.value)" role="searchbox" aria-autocomplete="list">
+      <div id="shellSearchResults" role="listbox" style="display:none; position:absolute; top:calc(100% + 4px); right:0; left:0; background:var(--color-surface); border:1px solid var(--color-border-strong); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); z-index:400; max-height:320px; overflow-y:auto;"></div>
+    </div>
+    <div class="ds-header-actions">
+      <button class="ds-btn ds-btn-icon" onclick="Shell.toggleTheme()" id="shellThemeToggle" aria-label="החלף בין מצב כהה לבהיר">🌙</button>
+      <button class="ds-btn ds-btn-icon" onclick="Shell.toggleNotifications()" aria-label="פתח מרכז התראות" aria-haspopup="true" style="position:relative;">
+        🔔<span id="shellNotifBadge" style="display:none; position:absolute; top:-4px; left:-4px; background:var(--color-danger); color:#fff; border-radius:50%; width:18px; height:18px; font-size:0.65rem; align-items:center; justify-content:center;"></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="ds-sidebar-overlay" id="shellSidebarOverlay" onclick="Shell.toggleSidebar()"></div>
+
+  <div id="shellNotifPanel" role="region" aria-label="מרכז התראות" style="display:none; position:fixed; top:64px; left:10px; width:min(380px, calc(100vw - 20px)); background:var(--color-surface); border:1px solid var(--color-border-strong); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); z-index:4000; max-height:70vh; overflow-y:auto;">
+    <div style="padding:12px 15px; border-bottom:1px solid var(--color-border); display:flex; justify-content:space-between; align-items:center;">
+      <b style="font-size:0.9rem;">🔔 התראות</b>
+      <div style="display:flex; gap:8px;">
+        <button class="ds-btn ds-btn-sm" onclick="Shell.markAllNotificationsRead()">סמן הכל כנקרא</button>
+        <button class="ds-btn ds-btn-sm" onclick="Shell.toggleNotifications()" aria-label="סגור מרכז התראות">✕</button>
+      </div>
+    </div>
+    <div id="shellNotifList" style="padding:8px;"></div>
+  </div>
+
+  <div class="ds-body">
+    <nav class="ds-sidebar" id="shellSidebar" role="navigation" aria-label="ניווט ראשי">
+      <div class="ds-sidebar-group">
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'dashboard' else '' }}" href="/org-dashboard">🏠 <span>Dashboard</span></a>
+      </div>
+      <div class="ds-sidebar-group">
+        <div class="ds-sidebar-group-label">Compliance</div>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'permits' else '' }}" href="/">📋 <span>אישורים</span></a>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'audits' else '' }}" href="/audits">🔍 <span>ביקורות וליקויים</span></a>
+      </div>
+      <div class="ds-sidebar-group">
+        <div class="ds-sidebar-group-label">Sites</div>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'sites' else '' }}" href="/sites">🏢 <span>אתרים / מבנים / קומות</span></a>
+      </div>
+      <div class="ds-sidebar-group">
+        <div class="ds-sidebar-group-label">Fire Protection</div>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'equipment' else '' }}" href="/equipment">🧯 <span>ציוד כיבוי אש</span></a>
+      </div>
+      <div class="ds-sidebar-group">
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'tasks' else '' }}" href="/tasks">👷 <span>משימות</span></a>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'suppliers' else '' }}" href="/suppliers">🏭 <span>ספקים</span></a>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'reports' else '' }}" href="/reports">📊 <span>דוחות</span></a>
+      </div>
+      <div class="ds-sidebar-group">
+        <div class="ds-sidebar-group-label">Settings</div>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'settings' else '' }}" href="/settings">⚙️ <span>הגדרות</span></a>
+      </div>
+    </nav>
+
+    <main class="ds-main" id="main-content" role="main" tabindex="-1">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<div class="ds-toast-container" id="toastContainer" role="status" aria-live="polite"></div>
+
+<script>
+const Shell = (() => {
+  const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  let searchTimer = null;
+  let notifPanelOpen = false;
+  const notifTypeIcon = { permit: '📋', task: '✅', audit: '🔍', equipment: '🧯' };
+
+  function updateThemeIcon() {
+    const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    document.getElementById('shellThemeToggle').innerText = theme === 'dark' ? '🌙' : '☀️';
+  }
+
+  async function refreshNotifBadge() {
+    try {
+      const res = await fetch('/api/notifications');
+      const data = await res.json();
+      const badge = document.getElementById('shellNotifBadge');
+      if (data.unread_count > 0) {
+        badge.style.display = 'flex';
+        badge.innerText = data.unread_count > 9 ? '9+' : data.unread_count;
+      } else {
+        badge.style.display = 'none';
+      }
+      return data.items;
+    } catch (e) { return []; }
+  }
+
+  function renderNotifList(items) {
+    const el = document.getElementById('shellNotifList');
+    if (!items.length) { el.innerHTML = '<div style="text-align:center; color:var(--color-text-muted); padding:20px; font-size:0.85rem;">אין התראות</div>'; return; }
+    el.innerHTML = items.map(n => `
+      <div style="padding:8px 10px; border-radius:6px; margin-bottom:4px; background:${n.read_at ? 'transparent' : 'var(--tint-primary)'}; cursor:pointer;" onclick="Shell.markNotificationRead(${n.id})">
+        <div style="font-size:0.85rem;">${notifTypeIcon[n.ref_type] || '🔔'} ${esc(n.title)}</div>
+        <div style="font-size:0.75rem; color:var(--color-text-muted); margin-top:2px;">${esc(n.message || '')} ${n.window_days === 0 ? '· <span style="color:var(--color-danger)">דחוף</span>' : ''}</div>
+      </div>`).join('');
+  }
+
+  return {
+    init: () => { updateThemeIcon(); refreshNotifBadge(); setInterval(refreshNotifBadge, 60000); },
+
+    toggleTheme: () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('erp-theme', next);
+      updateThemeIcon();
+    },
+
+    toggleSidebar: () => {
+      const sidebar = document.getElementById('shellSidebar');
+      const isOpen = sidebar.classList.toggle('open');
+      document.getElementById('shellSidebarOverlay').classList.toggle('open');
+      const hamburger = document.querySelector('.ds-header-hamburger');
+      if (hamburger) hamburger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    },
+
+    toggleNotifications: async () => {
+      notifPanelOpen = !notifPanelOpen;
+      document.getElementById('shellNotifPanel').style.display = notifPanelOpen ? 'block' : 'none';
+      if (notifPanelOpen) { const items = await refreshNotifBadge(); renderNotifList(items); }
+    },
+
+    markNotificationRead: async (id) => {
+      try {
+        await fetch(`/api/notifications/${id}/read`, { method: 'POST' });
+        const items = await refreshNotifBadge();
+        renderNotifList(items);
+      } catch (e) { /* לא קריטי */ }
+    },
+
+    markAllNotificationsRead: async () => {
+      try {
+        await fetch('/api/notifications/mark_all_read', { method: 'POST' });
+        const items = await refreshNotifBadge();
+        renderNotifList(items);
+      } catch (e) { /* לא קריטי */ }
+    },
+
+    onSearchInput: (val) => {
+      clearTimeout(searchTimer);
+      const box = document.getElementById('shellSearchResults');
+      if (val.trim().length < 2) { box.style.display = 'none'; return; }
+      searchTimer = setTimeout(async () => {
+        try {
+          const res = await fetch('/api/search?q=' + encodeURIComponent(val));
+          const items = await res.json();
+          box.innerHTML = items.length
+            ? items.map(i => `<a href="${i.url}" style="display:block; padding:10px 14px; border-bottom:1px solid var(--color-border); color:var(--color-text); text-decoration:none; font-size:0.85rem;"><span style="color:var(--color-primary);">${esc(i.type_label)}</span> · ${esc(i.label)}</a>`).join('')
+            : '<div style="padding:14px; color:var(--color-text-muted); font-size:0.85rem;">אין תוצאות</div>';
+          box.style.display = 'block';
+        } catch (e) { /* לא קריטי */ }
+      }, 300);
+    },
+  };
+})();
+document.addEventListener('DOMContentLoaded', Shell.init);
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.ds-header-search')) {
+    const box = document.getElementById('shellSearchResults');
+    if (box) box.style.display = 'none';
+  }
+  if (!e.target.closest('#shellNotifPanel') && !e.target.closest('[onclick="Shell.toggleNotifications()"]')) {
+    const panel = document.getElementById('shellNotifPanel');
+    if (panel && panel.style.display === 'block' && !e.target.closest('.ds-header-actions')) {
+      panel.style.display = 'none';
+    }
+  }
+});
+</script>
+{% block extra_script %}{% endblock %}
+</body>
+</html>

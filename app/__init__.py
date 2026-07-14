@@ -1,0 +1,108 @@
+import os
+from flask import Flask
+from .extensions import db
+from .config import Config
+
+def create_app(config_class=Config):
+    app = Flask(__name__)
+    app.config.from_object(config_class)
+
+    db.init_app(app)
+
+    # וידוא ארכיטקטוני שתיקיית ה-uploads קיימת בענן כדי למנוע קריסות פתאומיות
+    try:
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    except Exception as e:
+        print(f"Warning: Could not create upload folder: {e}")
+
+    # יבוא המודלים להקשר של האפליקציה
+    from app.models import (
+        Zone, SystemRequirement, Document,
+        Site, Building, Floor, Area,
+        Supplier, Equipment, Task, Audit, Deficiency,
+        DocumentHistory, User, Notification, AuditLog,
+    )
+
+    with app.app_context():
+        try:
+            db.create_all()
+            seed_data()
+        except Exception as e:
+            # מניעת נפילת שרת (502) אם יש שגיאת מסד נתונים זמנית באתחול.
+            # שים לב: אם זו לא שגיאה זמנית (למשל DATABASE_URL שגוי מול Neon),
+            # האפליקציה תמשיך לרוץ אך כל פעולת DB (כולל העלאת מסמכים) תיכשל.
+            # אבחון: GET /api/system/health
+            app.logger.error(f"CRITICAL: Database initialization failed - app will run but DB operations may fail. Error: {e}")
+
+    from .api.routes import main_bp
+    app.register_blueprint(main_bp)
+
+    from .api.sites_routes import sites_bp
+    app.register_blueprint(sites_bp)
+
+    from .api.permits_routes import permits_bp
+    app.register_blueprint(permits_bp)
+
+    from .api.suppliers_routes import suppliers_bp
+    app.register_blueprint(suppliers_bp)
+
+    from .api.equipment_routes import equipment_bp
+    app.register_blueprint(equipment_bp)
+
+    from .api.tasks_routes import tasks_bp
+    app.register_blueprint(tasks_bp)
+
+    from .api.audits_routes import audits_bp
+    app.register_blueprint(audits_bp)
+
+    from .api.org_dashboard_routes import org_dashboard_bp
+    app.register_blueprint(org_dashboard_bp)
+
+    from .api.auth_routes import auth_bp
+    app.register_blueprint(auth_bp)
+
+    from .api.notifications_routes import notifications_bp
+    app.register_blueprint(notifications_bp)
+
+    from .api.audit_log_routes import audit_log_bp
+    app.register_blueprint(audit_log_bp)
+
+    from .api.reports_routes import reports_bp
+    app.register_blueprint(reports_bp)
+
+    from .api.search_routes import search_bp
+    app.register_blueprint(search_bp)
+
+    from .api.design_system_routes import design_system_bp
+    app.register_blueprint(design_system_bp)
+
+    return app
+
+def seed_data():
+    from .models import Zone, SystemRequirement
+    try:
+        if not Zone.query.first():
+            zones_data = [
+                ("תשתיות כלליות", "ראשי"), ("מגורים (פנימייה)", "8855-7"), 
+                ("מטבח וחדר אוכל", "8859-7"), ("אולם ספורט", "8853-7"), ("בית מדרש", "8860-7")
+            ]
+            zones = []
+            for name, fn in zones_data:
+                z = Zone(zone_name=name, file_number=fn)
+                db.session.add(z)
+                zones.append(z)
+            db.session.commit()
+
+            reqs = [
+                (zones[1].id, "ציוד כיבוי", "טופס 1"), (zones[1].id, "תחזוקת מטפים", "טופס 2"),
+                (zones[1].id, "חשמל", "טופס 3"), (zones[1].id, "גילוי אש", "טופס 4"),
+                (zones[1].id, "לוחות חשמל", "טופס 5"), (zones[1].id, "כריזה", "טופס 6"),
+                (zones[1].id, "ספרינקלרים", "טופס 7"), (zones[1].id, "תיק שטח", "טופס 13"),
+                (zones[1].id, "הדרכת עובדים", "טופס 14"), (zones[2].id, "מערכת גז", "טופס 18"),
+                (zones[3].id, "שחרור עשן", "טופס 10"), (zones[4].id, "גילוי אש", "טופס 4")
+            ]
+            for zid, sname, form in reqs:
+                db.session.add(SystemRequirement(zone_id=zid, system_name=sname, required_form=form))
+            db.session.commit()
+    except Exception as e:
+        print(f"Seeding skipped or failed: {e}")

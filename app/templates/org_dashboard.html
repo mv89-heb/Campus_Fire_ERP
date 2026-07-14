@@ -1,0 +1,189 @@
+{% extends "_shell.html" %}
+{% block title %}דשבורד ארגוני | בטיחות אש Enterprise{% endblock %}
+
+{% block extra_style %}
+.page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
+.page-title-row h1 { font-size: var(--text-xl); }
+
+.kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 15px; }
+@media (min-width: 768px) { .kpi-grid { grid-template-columns: repeat(4, 1fr); } }
+.kpi-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; text-align: center; }
+.kpi-value { font-size: 1.8rem; font-weight: 800; }
+.kpi-label { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+.kpi-card.good .kpi-value { color: var(--valid); }
+.kpi-card.warn .kpi-value { color: var(--warning); }
+.kpi-card.bad .kpi-value { color: var(--critical); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px; }
+@media (min-width: 992px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; margin-bottom: 15px; animation: fadeIn 0.3s ease; }
+.card-title { font-size: 1rem; font-weight: 600; margin-bottom: 12px; }
+.empty-state { text-align: center; color: var(--text-muted); padding: 20px; font-size: 0.85rem; }
+.error-state { text-align: center; color: var(--critical); padding: 20px; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.retry-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border-mid); background: var(--bg-hover); color: var(--text); cursor: pointer; font-size: 0.8rem; }
+
+.skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 37%, rgba(255,255,255,0.04) 63%); background-size: 400px 100%; animation: shimmer 1.4s ease infinite; border-radius: 6px; }
+.skeleton-kpi { height: 76px; }
+.skeleton-chart { height: 140px; }
+.skeleton-row { height: 16px; margin-bottom: 8px; }
+
+.bar-chart { display: flex; align-items: flex-end; gap: 10px; height: 140px; padding-top: 10px; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; }
+.bar { width: 100%; max-width: 36px; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 3px; }
+.bar-label { font-size: 0.7rem; color: var(--text-muted); text-align: center; }
+.bar-value { font-size: 0.75rem; font-weight: 700; }
+
+table { width: 100%; border-collapse: collapse; text-align: right; font-size: 0.85rem; }
+th { background: rgba(0,0,0,0.3); color: var(--text-muted); padding: 8px; font-weight: 600; font-size: 0.75rem; }
+td { padding: 8px; border-bottom: 1px solid var(--border); }
+tr:last-child td { border-bottom: none; }
+.pill { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; }
+.pill.expired, .pill.critical, .pill.faulty { background: rgba(248,81,73,0.15); color: var(--critical); }
+.pill.warning, .pill.high { background: rgba(227,179,65,0.15); color: var(--warning); }
+.pill.valid, .pill.low { background: rgba(63,185,80,0.15); color: var(--valid); }
+
+.btn { padding: 10px 16px; border-radius: var(--radius); font-size: 0.9rem; font-weight: 600; border: 1px solid var(--border-mid); background: var(--bg-hover); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration:none; }
+.btn:hover { background: rgba(255,255,255,0.05); }
+{% endblock %}
+
+{% block content %}
+<div class="page-title-row">
+  <h1>🏠 דשבורד ארגוני</h1>
+  <button class="btn" onclick="loadDashboard(true)" title="רענון מיידי (עוקף מטמון)">🔄 רענן</button>
+</div>
+
+<div class="kpi-grid" id="kpiGrid">
+  <div class="skeleton skeleton-kpi"></div>
+  <div class="skeleton skeleton-kpi"></div>
+  <div class="skeleton skeleton-kpi"></div>
+  <div class="skeleton skeleton-kpi"></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title">📅 אישורים לפי חודש תפוגה</div>
+    <div id="chartByMonth" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">📊 סטטוס אישורים</div>
+    <div id="chartByStatus" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title">⚠️ ליקויים פתוחים לפי חומרה</div>
+    <div id="chartDeficiencies" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">✅ משימות לפי סטטוס</div>
+    <div id="chartTasks" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title">⏳ אישורים הקרובים לפקיעה</div>
+    <div id="tblExpirations"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">🔥 משימות דחופות</div>
+    <div id="tblUrgentTasks"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title">🔍 ביקורות השבוע</div>
+    <div id="tblAudits"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">🧯 ציוד הדורש טיפול</div>
+    <div id="tblEquipment"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+function esc(s) { return (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+function renderBarChart(elId, dataObj, labelMap = {}) {
+  const el = document.getElementById(elId);
+  const entries = Object.entries(dataObj || {});
+  if (!entries.length) { el.innerHTML = '<div class="empty-state">אין נתונים</div>'; return; }
+  const max = Math.max(...entries.map(([, v]) => v), 1);
+  el.innerHTML = entries.map(([k, v]) => `
+    <div class="bar-col">
+      <div class="bar-value">${v}</div>
+      <div class="bar" style="height:${Math.max(4, (v / max) * 100)}%"></div>
+      <div class="bar-label">${esc(labelMap[k] || k)}</div>
+    </div>`).join('');
+}
+
+async function loadDashboard(forceRefresh = false) {
+  try {
+    const res = await fetch('/api/org-dashboard' + (forceRefresh ? '?refresh=true' : ''));
+    if (!res.ok) throw new Error('שגיאת שרת');
+    const d = await res.json();
+
+    document.getElementById('kpiGrid').innerHTML = `
+      <div class="kpi-card ${d.readiness_score >= 80 ? 'good' : d.readiness_score >= 50 ? 'warn' : 'bad'}">
+        <div class="kpi-value">${d.readiness_score != null ? d.readiness_score + '%' : '—'}</div>
+        <div class="kpi-label">מדד מוכנות כללי</div>
+      </div>
+      <div class="kpi-card good"><div class="kpi-value">${d.permits.active_count}</div><div class="kpi-label">אישורים תקינים</div></div>
+      <div class="kpi-card warn"><div class="kpi-value">${d.permits.warning_30_count}</div><div class="kpi-label">פגים ב-30 יום</div></div>
+      <div class="kpi-card bad"><div class="kpi-value">${d.permits.expired_count}</div><div class="kpi-label">פג תוקף</div></div>
+      <div class="kpi-card"><div class="kpi-value">${d.suppliers.total_count}</div><div class="kpi-label">ספקים</div></div>
+      <div class="kpi-card warn"><div class="kpi-value">${d.tasks.open_count}</div><div class="kpi-label">משימות פתוחות</div></div>
+      <div class="kpi-card"><div class="kpi-value">${d.audits.this_week.length}</div><div class="kpi-label">ביקורות השבוע</div></div>
+      <div class="kpi-card bad"><div class="kpi-value">${d.deficiencies.open_count}</div><div class="kpi-label">ליקויים פתוחים</div></div>
+      <div class="kpi-card bad"><div class="kpi-value">${d.equipment.faulty_count}</div><div class="kpi-label">ציוד לא תקין</div></div>
+    `;
+
+    renderBarChart('chartByMonth', d.permits.by_month);
+    renderBarChart('chartByStatus', d.permits.by_status, { valid: 'תקין', warning: 'אזהרה', expired: 'פג תוקף' });
+    renderBarChart('chartDeficiencies', d.deficiencies.by_severity, { low: 'נמוך', medium: 'בינוני', high: 'גבוה', critical: 'קריטי' });
+    renderBarChart('chartTasks', d.tasks.by_status, { open: 'פתוחה', in_progress: 'בביצוע', done: 'הושלמה', cancelled: 'בוטלה' });
+
+    const expEl = document.getElementById('tblExpirations');
+    expEl.innerHTML = d.permits.upcoming_expirations.length ? `
+      <table><thead><tr><th>מסמך</th><th>תוקף</th><th>ימים</th></tr></thead><tbody>
+        ${d.permits.upcoming_expirations.map(p => `
+          <tr><td>${esc(p.permit_number || p.file_name)}</td><td>${esc(p.expiry_date)}</td>
+          <td><span class="pill ${p.days_left < 0 ? 'expired' : p.days_left <= 14 ? 'warning' : 'valid'}">${p.days_left} ימים</span></td></tr>`).join('')}
+      </tbody></table>` : '<div class="empty-state">אין אישורים שפגים בקרוב</div>';
+
+    const taskEl = document.getElementById('tblUrgentTasks');
+    taskEl.innerHTML = d.tasks.urgent_tasks.length ? `
+      <table><thead><tr><th>משימה</th><th>עדיפות</th><th>יעד</th></tr></thead><tbody>
+        ${d.tasks.urgent_tasks.map(t => `
+          <tr><td>${esc(t.title)}</td><td><span class="pill ${t.priority === 'urgent' ? 'critical' : 'high'}">${t.priority}</span></td><td>${esc(t.due_date || '—')}</td></tr>`).join('')}
+      </tbody></table>` : '<div class="empty-state">אין משימות דחופות</div>';
+
+    const auditEl = document.getElementById('tblAudits');
+    auditEl.innerHTML = d.audits.this_week.length ? `
+      <table><thead><tr><th>מספר ביקורת</th><th>תאריך</th></tr></thead><tbody>
+        ${d.audits.this_week.map(a => `<tr><td>${esc(a.audit_number || ('#' + a.id))}</td><td>${esc(a.audit_date)}</td></tr>`).join('')}
+      </tbody></table>` : '<div class="empty-state">אין ביקורות מתוכננות השבוע</div>';
+
+    const eqEl = document.getElementById('tblEquipment');
+    eqEl.innerHTML = d.equipment.faulty_items.length ? `
+      <table><thead><tr><th>סוג</th><th>מספר סידורי</th></tr></thead><tbody>
+        ${d.equipment.faulty_items.map(e => `<tr><td>${esc(e.equipment_type)}</td><td>${esc(e.serial_number || '—')}</td></tr>`).join('')}
+      </tbody></table>` : '<div class="empty-state">אין ציוד לא תקין</div>';
+
+  } catch (e) {
+    document.getElementById('kpiGrid').innerHTML = `
+      <div class="error-state" style="grid-column: 1 / -1;">
+        ⚠️ שגיאה בטעינת הדשבורד
+        <button class="retry-btn" onclick="loadDashboard(true)">🔄 נסה שוב</button>
+      </div>`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => loadDashboard(false));
+</script>
+{% endblock %}

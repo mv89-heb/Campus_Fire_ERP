@@ -1,0 +1,350 @@
+{% extends "_shell.html" %}
+{% block title %}ניהול אתרים | בטיחות אש Enterprise{% endblock %}
+
+{% block extra_style %}
+.page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
+.page-title-row h1 { font-size: var(--text-xl); }
+
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; margin-bottom: 15px; }
+.card-title { font-size: 1rem; font-weight: 600; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+.empty-state { text-align: center; color: var(--text-muted); padding: 30px 10px; font-size: 0.9rem; }
+
+.site-block { animation: fadeIn 0.25s ease; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; }
+.site-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: rgba(255,255,255,0.02); cursor: pointer; gap: 10px; flex-wrap: wrap; }
+.site-header:hover { background: var(--bg-hover); }
+.site-name { font-weight: 700; }
+.site-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+.site-actions { display: flex; gap: 6px; }
+.site-body { padding: 10px 15px 15px; display: none; border-top: 1px solid var(--border); }
+.site-body.open { display: block; }
+
+.building-block { margin: 10px 0; padding: 10px 12px; background: rgba(0,0,0,0.15); border-radius: 6px; border: 1px solid var(--border); }
+.building-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.building-name { font-weight: 600; font-size: 0.92rem; }
+.floor-block { margin: 8px 0 8px 14px; padding: 8px 10px; background: rgba(0,0,0,0.2); border-radius: 6px; }
+.floor-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.floor-name { font-weight: 600; font-size: 0.85rem; color: var(--text-muted); }
+.area-list { list-style: none; margin: 8px 0 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.area-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 6px 10px; border-radius: 5px; font-size: 0.82rem; }
+
+.inline-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+.inline-form input, .inline-form textarea {
+  background: var(--bg); color: var(--text); border: 1px solid var(--border-mid); border-radius: 6px;
+  padding: 8px 10px; font-size: 0.85rem; outline: none; flex: 1; min-width: 140px;
+}
+.inline-form input:focus, .inline-form textarea:focus { border-color: var(--accent); }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 3000; padding: 15px; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: var(--radius); padding: 20px; width: 100%; max-width: 420px; }
+.modal h3 { margin-bottom: 14px; font-size: 1rem; }
+.modal .inline-form { flex-direction: column; align-items: stretch; }
+.modal .inline-form input, .modal .inline-form textarea { width: 100%; }
+.modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+.modal-actions .btn { flex: 1; }
+
+.btn {
+  flex: 1; min-width: 110px; padding: 10px 16px; border-radius: var(--radius); font-size: 0.9rem; font-weight: 600;
+  border: 1px solid var(--border-mid); background: var(--bg-hover); color: var(--text); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s;
+}
+.btn:hover { background: rgba(255,255,255,0.05); }
+.btn-primary { background: var(--accent); color: #000; border: none; }
+.btn-primary:hover { background: #ff9e85; }
+.btn-sm { flex: none; min-width: 0; padding: 5px 10px; font-size: 0.8rem; min-height: 30px; }
+.btn-danger { color: var(--critical); }
+.btn, table button { min-height: 38px; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
+.skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 37%, rgba(255,255,255,0.04) 63%); background-size: 400px 100%; animation: shimmer 1.4s ease infinite; border-radius: 6px; height: 70px; margin-bottom: 10px; }
+.error-state { text-align: center; color: var(--critical); padding: 20px; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.retry-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border-mid); background: var(--bg-hover); color: var(--text); cursor: pointer; font-size: 0.8rem; }
+{% endblock %}
+
+{% block content %}
+<div class="page-title-row">
+  <h1>🏢 ניהול אתרים</h1>
+  <button class="btn btn-primary" onclick="Sites.openSiteModal()">➕ אתר חדש</button>
+</div>
+<p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:var(--space-4);">היררכיה: אתר ← מבנה ← קומה ← אזור</p>
+
+<div class="card">
+  <div class="card-title"><span>🗂️ רשימת אתרים</span></div>
+  <div id="sitesList"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+</div>
+
+<!-- מודאל יצירת/עריכת אתר -->
+<div class="modal-overlay" id="siteModal">
+  <div class="modal">
+    <h3 id="siteModalTitle">אתר חדש</h3>
+    <div class="inline-form">
+      <input type="hidden" id="siteId">
+      <input type="text" id="siteName" placeholder="שם האתר *">
+      <input type="text" id="siteAddress" placeholder="כתובת">
+      <input type="text" id="siteContactName" placeholder="איש קשר">
+      <input type="text" id="siteContactPhone" placeholder="טלפון">
+      <input type="text" id="siteContactEmail" placeholder="אימייל">
+      <textarea id="siteNotes" placeholder="הערות" rows="2"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="Sites.closeModal('siteModal')">ביטול</button>
+      <button class="btn btn-primary" onclick="Sites.saveSite()">שמירה</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+const Sites = (() => {
+  let _sites = [];
+  const openSections = new Set();
+
+  const showToast = (msg, type='success') => {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `ds-toast ${type}`;
+    t.innerText = msg;
+    c.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  };
+
+  const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+  async function refresh() {
+    try {
+      const res = await fetch('/api/sites');
+      if (!res.ok) throw new Error('bad status');
+      _sites = await res.json();
+      render();
+    } catch (e) {
+      document.getElementById('sitesList').innerHTML = `<div class="error-state">⚠️ שגיאה בטעינת אתרים<button class="retry-btn" onclick="Sites.init()">🔄 נסה שוב</button></div>`;
+      showToast('שגיאה בחיבור לשרת', 'error');
+    }
+  }
+
+  function render() {
+    const el = document.getElementById('sitesList');
+    if (!_sites.length) {
+      el.innerHTML = `<div class="empty-state">אין אתרים עדיין. לחץ על "אתר חדש" כדי להתחיל.</div>`;
+      return;
+    }
+    el.innerHTML = _sites.map(site => renderSite(site)).join('');
+  }
+
+  function renderSite(site) {
+    const key = `site-${site.id}`;
+    const open = openSections.has(key);
+    return `
+      <div class="site-block">
+        <div class="site-header" onclick="Sites.toggle('${key}')">
+          <div>
+            <div class="site-name">🏢 ${esc(site.name)}</div>
+            <div class="site-meta">${esc(site.address || 'ללא כתובת')} · ${site.building_count} מבנים</div>
+          </div>
+          <div class="site-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-sm" onclick="Sites.openSiteModal(${site.id})">✏️</button>
+            <button class="btn btn-sm btn-danger" onclick="Sites.deleteSite(${site.id})">🗑️</button>
+          </div>
+        </div>
+        <div class="site-body ${open ? 'open' : ''}" id="${key}">
+          ${(site.buildings || []).map(b => renderBuilding(site.id, b)).join('') || '<div class="empty-state">אין מבנים באתר זה</div>'}
+          <div class="inline-form">
+            <input type="text" id="newBuildingName-${site.id}" placeholder="שם מבנה חדש">
+            <button class="btn btn-sm" onclick="Sites.addBuilding(${site.id})">➕ הוסף מבנה</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderBuilding(siteId, b) {
+    const key = `building-${b.id}`;
+    const open = openSections.has(key);
+    return `
+      <div class="building-block">
+        <div class="building-header" onclick="Sites.toggle('${key}')" style="cursor:pointer">
+          <div class="building-name">🏗️ ${esc(b.name)}</div>
+          <div class="site-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-sm btn-danger" onclick="Sites.deleteBuilding(${b.id}, ${siteId})">🗑️</button>
+          </div>
+        </div>
+        <div class="${open ? 'open' : ''}" style="display:${open ? 'block' : 'none'}">
+          ${(b.floors || []).map(f => renderFloor(b.id, f)).join('') || '<div class="empty-state" style="padding:10px">אין קומות במבנה זה</div>'}
+          <div class="inline-form">
+            <input type="text" id="newFloorName-${b.id}" placeholder="שם קומה חדשה">
+            <button class="btn btn-sm" onclick="Sites.addFloor(${b.id})">➕ הוסף קומה</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderFloor(buildingId, f) {
+    return `
+      <div class="floor-block">
+        <div class="floor-header">
+          <div class="floor-name">🧱 ${esc(f.name)}</div>
+          <button class="btn btn-sm btn-danger" onclick="Sites.deleteFloor(${f.id}, ${buildingId})">🗑️</button>
+        </div>
+        <ul class="area-list">
+          ${(f.areas || []).map(a => `
+            <li class="area-item">
+              <span>📍 ${esc(a.name)}</span>
+              <button class="btn btn-sm btn-danger" onclick="Sites.deleteArea(${a.id}, ${f.id})">🗑️</button>
+            </li>`).join('') || '<li class="area-item" style="justify-content:center;color:var(--text-muted)">אין אזורים</li>'}
+        </ul>
+        <div class="inline-form">
+          <input type="text" id="newAreaName-${f.id}" placeholder="שם אזור חדש">
+          <button class="btn btn-sm" onclick="Sites.addArea(${f.id})">➕ הוסף אזור</button>
+        </div>
+      </div>`;
+  }
+
+  return {
+    init: () => { refresh(); },
+
+    toggle: (key) => {
+      if (openSections.has(key)) openSections.delete(key); else openSections.add(key);
+      render();
+    },
+
+    openSiteModal: (siteId) => {
+      document.getElementById('siteId').value = siteId || '';
+      document.getElementById('siteModalTitle').innerText = siteId ? 'עריכת אתר' : 'אתר חדש';
+      if (siteId) {
+        const s = _sites.find(x => x.id === siteId);
+        document.getElementById('siteName').value = s?.name || '';
+        document.getElementById('siteAddress').value = s?.address || '';
+        document.getElementById('siteContactName').value = s?.contact_name || '';
+        document.getElementById('siteContactPhone').value = s?.contact_phone || '';
+        document.getElementById('siteContactEmail').value = s?.contact_email || '';
+        document.getElementById('siteNotes').value = s?.notes || '';
+      } else {
+        ['siteName','siteAddress','siteContactName','siteContactPhone','siteContactEmail','siteNotes']
+          .forEach(id => document.getElementById(id).value = '');
+      }
+      document.getElementById('siteModal').classList.add('open');
+    },
+
+    closeModal: (id) => document.getElementById(id).classList.remove('open'),
+
+    saveSite: async () => {
+      const id = document.getElementById('siteId').value;
+      const payload = {
+        name: document.getElementById('siteName').value.trim(),
+        address: document.getElementById('siteAddress').value.trim(),
+        contact_name: document.getElementById('siteContactName').value.trim(),
+        contact_phone: document.getElementById('siteContactPhone').value.trim(),
+        contact_email: document.getElementById('siteContactEmail').value.trim(),
+        notes: document.getElementById('siteNotes').value.trim(),
+      };
+      if (!payload.name) { showToast('שם האתר הוא שדה חובה', 'error'); return; }
+      try {
+        const url = id ? `/api/sites/${id}` : '/api/sites';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'שגיאה');
+        showToast(id ? 'האתר עודכן' : 'האתר נוצר בהצלחה');
+        Sites.closeModal('siteModal');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    deleteSite: async (id) => {
+      if (!confirm('למחוק את האתר וכל מה שתחתיו (מבנים/קומות/אזורים)?')) return;
+      try {
+        const res = await fetch(`/api/sites/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('שגיאה במחיקה');
+        showToast('האתר נמחק');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    addBuilding: async (siteId) => {
+      const input = document.getElementById(`newBuildingName-${siteId}`);
+      const name = input.value.trim();
+      if (!name) { showToast('הזן שם מבנה', 'error'); return; }
+      try {
+        const res = await fetch(`/api/sites/${siteId}/buildings`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'שגיאה');
+        openSections.add(`site-${siteId}`);
+        input.value = '';
+        showToast('המבנה נוסף');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    deleteBuilding: async (buildingId, siteId) => {
+      if (!confirm('למחוק את המבנה וכל מה שתחתיו?')) return;
+      try {
+        const res = await fetch(`/api/buildings/${buildingId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('שגיאה במחיקה');
+        openSections.add(`site-${siteId}`);
+        showToast('המבנה נמחק');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    addFloor: async (buildingId) => {
+      const input = document.getElementById(`newFloorName-${buildingId}`);
+      const name = input.value.trim();
+      if (!name) { showToast('הזן שם קומה', 'error'); return; }
+      try {
+        const res = await fetch(`/api/buildings/${buildingId}/floors`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'שגיאה');
+        openSections.add(`building-${buildingId}`);
+        input.value = '';
+        showToast('הקומה נוספה');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    deleteFloor: async (floorId, buildingId) => {
+      if (!confirm('למחוק את הקומה וכל האזורים בה?')) return;
+      try {
+        const res = await fetch(`/api/floors/${floorId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('שגיאה במחיקה');
+        openSections.add(`building-${buildingId}`);
+        showToast('הקומה נמחקה');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    addArea: async (floorId) => {
+      const input = document.getElementById(`newAreaName-${floorId}`);
+      const name = input.value.trim();
+      if (!name) { showToast('הזן שם אזור', 'error'); return; }
+      try {
+        const res = await fetch(`/api/floors/${floorId}/areas`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'שגיאה');
+        input.value = '';
+        showToast('האזור נוסף');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    deleteArea: async (areaId) => {
+      if (!confirm('למחוק את האזור?')) return;
+      try {
+        const res = await fetch(`/api/areas/${areaId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('שגיאה במחיקה');
+        showToast('האזור נמחק');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+  };
+})();
+
+document.addEventListener('DOMContentLoaded', Sites.init);
+</script>
+{% endblock %}

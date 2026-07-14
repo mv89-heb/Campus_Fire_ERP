@@ -1,0 +1,85 @@
+{% extends "_shell.html" %}
+{% block title %}הגדרות | בטיחות אש Enterprise{% endblock %}
+
+{% block extra_style %}
+.page-title-row { margin-bottom: var(--space-5); }
+.page-title-row h1 { font-size: var(--text-xl); }
+.settings-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-4); }
+@media (min-width: 768px) { .settings-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1100px) { .settings-grid { grid-template-columns: repeat(3, 1fr); } }
+.settings-card { text-decoration: none; display: block; transition: border-color var(--transition-fast), transform var(--transition-fast); }
+.settings-card:hover { border-color: var(--color-primary); transform: translateY(-2px); }
+.settings-card.disabled { opacity: 0.5; cursor: default; pointer-events: none; }
+.settings-icon { font-size: 1.6rem; margin-bottom: var(--space-2); }
+.settings-title { font-weight: 700; font-size: var(--text-base); margin-bottom: 4px; }
+.settings-desc { font-size: var(--text-sm); color: var(--color-text-muted); }
+{% endblock %}
+
+{% block content %}
+<div class="page-title-row">
+  <h1>⚙️ הגדרות</h1>
+  <p style="color:var(--color-text-muted); font-size:var(--text-sm); margin-top:4px;">ניהול המערכת, לפי קטגוריות</p>
+</div>
+
+<div class="settings-grid">
+  <a class="ds-card settings-card" href="/users">
+    <div class="settings-icon">👥</div>
+    <div class="settings-title">משתמשים</div>
+    <div class="settings-desc">ניהול משתמשים ותפקידים במערכת</div>
+  </a>
+
+  <a class="ds-card settings-card" href="/audit-log">
+    <div class="settings-icon">🕵️</div>
+    <div class="settings-title">Audit Log</div>
+    <div class="settings-desc">יומן כל הפעולות שבוצעו במערכת</div>
+  </a>
+
+  <a class="ds-card settings-card" href="/sites">
+    <div class="settings-icon">🏢</div>
+    <div class="settings-title">אתרים</div>
+    <div class="settings-desc">ניהול היררכיית אתרים, מבנים וקומות</div>
+  </a>
+
+  <a class="ds-card settings-card" href="/design-system">
+    <div class="settings-icon">🎨</div>
+    <div class="settings-title">Design System</div>
+    <div class="settings-desc">ספריית העיצוב והרכיבים המשותפים</div>
+  </a>
+
+  <div class="ds-card settings-card disabled">
+    <div class="settings-icon">🔐</div>
+    <div class="settings-title">הרשאות <span class="ds-badge ds-badge-neutral">בקרוב</span></div>
+    <div class="settings-desc">תשתית המשתמשים קיימת; אכיפת הרשאות טרם הופעלה במכוון</div>
+  </div>
+
+  <div class="ds-card settings-card disabled">
+    <div class="settings-icon">🏭</div>
+    <div class="settings-title">ארגון <span class="ds-badge ds-badge-neutral">בקרוב</span></div>
+    <div class="settings-desc">פרטי הארגון, לוגו ומידע כללי</div>
+  </div>
+
+  <div class="ds-card settings-card disabled">
+    <div class="settings-icon">🔔</div>
+    <div class="settings-title">התראות <span class="ds-badge ds-badge-neutral">בקרוב</span></div>
+    <div class="settings-desc">התאמה אישית של חלונות זמן וערוצי התראה</div>
+  </div>
+
+  <div class="ds-card settings-card disabled">
+    <div class="settings-icon">📄</div>
+    <div class="settings-title">תבניות <span class="ds-badge ds-badge-neutral">בקרוב</span></div>
+    <div class="settings-desc">תבניות מסמכים ודוחות מותאמות אישית</div>
+  </div>
+
+  <div class="ds-card settings-card disabled">
+    <div class="settings-icon">🔌</div>
+    <div class="settings-title">אינטגרציות <span class="ds-badge ds-badge-neutral">בקרוב</span></div>
+    <div class="settings-desc">חיבור למערכות חיצוניות</div>
+  </div>
+
+  <div class="ds-card settings-card disabled">
+    <div class="settings-icon">💾</div>
+    <div class="settings-title">גיבוי <span class="ds-badge ds-badge-neutral">בקרוב</span></div>
+    <div class="settings-desc">גיבוי ושחזור נתוני המערכת</div>
+  </div>
+</div>
+{% endblock %}
