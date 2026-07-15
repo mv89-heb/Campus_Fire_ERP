@@ -1,0 +1,136 @@
+{% extends "_shell.html" %}
+{% block title %}Audit Log | בטיחות אש Enterprise{% endblock %}
+
+{% block extra_style %}
+.page-title-row { margin-bottom: var(--space-4); }
+.page-title-row h1 { font-size: var(--text-xl); }
+.filters-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.filters-row input, .filters-row select { background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border-strong); border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; }
+.filters-row input { flex: 1; min-width: 160px; }
+.diff-box { font-size: 0.72rem; color: var(--color-text-muted); max-width: 260px; word-break: break-word; }
+.table-scroll { overflow-x: auto; max-height: 70vh; overflow-y: auto; }
+.ds-table th.sortable { cursor: pointer; user-select: none; }
+.ds-table th.sortable:hover { color: var(--color-text); }
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:8px;"><a href="/settings" style="color:var(--color-text-muted); font-size:var(--text-sm); text-decoration:none;">⚙️ הגדרות</a> <span style="color:var(--color-text-faint);">/</span> <span style="color:var(--color-text-muted); font-size:var(--text-sm);">Audit Log</span></div>
+<div class="page-title-row">
+  <h1>🕵️ Audit Log</h1>
+  <p style="color:var(--color-text-muted); font-size:var(--text-sm);">יומן פעולות מערכתי - כל היצירות/עדכונים/מחיקות</p>
+</div>
+
+<div class="ds-card">
+  <div class="ds-card-title">🔎 סינון</div>
+  <div class="filters-row">
+    <input type="text" id="filterQ" placeholder="חיפוש לפי שם ישות / משתמש..." oninput="AuditLog.refresh()">
+    <select id="filterEntity" onchange="AuditLog.refresh()"><option value="">כל סוגי הישויות</option></select>
+    <select id="filterAction" onchange="AuditLog.refresh()">
+      <option value="">כל הפעולות</option>
+      <option value="create">יצירה</option>
+      <option value="update">עדכון</option>
+      <option value="delete">מחיקה</option>
+      <option value="lock">נעילה</option>
+      <option value="unlock">שחרור נעילה</option>
+    </select>
+  </div>
+</div>
+
+<div class="ds-card" style="margin-top:var(--space-4);">
+  <div class="ds-card-title">📜 יומן פעולות (200 אחרונות)</div>
+  <div class="table-scroll">
+    <table class="ds-table">
+      <thead><tr>
+        <th class="sortable" onclick="AuditLog.sortBy('created_at')">זמן <span id="sortIcon-created_at"></span></th>
+        <th class="sortable" onclick="AuditLog.sortBy('username')">משתמש <span id="sortIcon-username"></span></th>
+        <th class="sortable" onclick="AuditLog.sortBy('action')">פעולה <span id="sortIcon-action"></span></th>
+        <th class="sortable" onclick="AuditLog.sortBy('entity_type')">סוג ישות <span id="sortIcon-entity_type"></span></th>
+        <th class="sortable" onclick="AuditLog.sortBy('entity_label')">ישות <span id="sortIcon-entity_label"></span></th>
+        <th>פרטים</th>
+      </tr></thead>
+      <tbody id="logBody"><tr><td colspan="6" class="ds-empty-state">טוען...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+const AuditLog = (() => {
+  const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const actionLabel = { create: 'יצירה', update: 'עדכון', delete: 'מחיקה', lock: 'נעילה', unlock: 'שחרור נעילה' };
+  const entityLabel = { site: 'אתר', building: 'מבנה', floor: 'קומה', area: 'אזור', permit: 'אישור', supplier: 'ספק', equipment: 'ציוד', task: 'משימה', audit: 'ביקורת', deficiency: 'ליקוי', user: 'משתמש' };
+  const actionBadge = { create: 'ds-badge-success', update: 'ds-badge-info', delete: 'ds-badge-danger', lock: 'ds-badge-warning', unlock: 'ds-badge-warning' };
+  let _items = [];
+  let _sortCol = 'created_at';
+  let _sortDir = 'desc'; // ברירת המחדל של ה-API כבר ממוין מהחדש לישן
+
+  async function loadEntityTypes() {
+    try {
+      const res = await fetch('/api/audit-log/entity_types');
+      const types = await res.json();
+      const sel = document.getElementById('filterEntity');
+      sel.innerHTML = '<option value="">כל סוגי הישויות</option>' + types.map(t => `<option value="${t}">${entityLabel[t] || t}</option>`).join('');
+    } catch (e) { /* לא קריטי */ }
+  }
+
+  async function refresh() {
+    const q = document.getElementById('filterQ').value.trim();
+    const entityType = document.getElementById('filterEntity').value;
+    const action = document.getElementById('filterAction').value;
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (entityType) params.set('entity_type', entityType);
+    if (action) params.set('action', action);
+    try {
+      const res = await fetch('/api/audit-log?' + params.toString());
+      _items = await res.json();
+      applySortAndRender();
+    } catch (e) {
+      document.getElementById('logBody').innerHTML = '<tr><td colspan="6" class="ds-empty-state">שגיאה בטעינה</td></tr>';
+    }
+  }
+
+  function applySortAndRender() {
+    const sorted = [..._items].sort((a, b) => {
+      let va = a[_sortCol] ?? '', vb = b[_sortCol] ?? '';
+      if (_sortCol === 'created_at') { va = new Date(va).getTime(); vb = new Date(vb).getTime(); }
+      else { va = va.toString().toLowerCase(); vb = vb.toString().toLowerCase(); }
+      if (va < vb) return _sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return _sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    ['created_at', 'username', 'action', 'entity_type', 'entity_label'].forEach(col => {
+      const icon = document.getElementById(`sortIcon-${col}`);
+      if (icon) icon.innerText = col === _sortCol ? (_sortDir === 'asc' ? '▲' : '▼') : '';
+    });
+    render(sorted);
+  }
+
+  function render(items) {
+    const body = document.getElementById('logBody');
+    if (!items.length) { body.innerHTML = '<tr><td colspan="6" class="ds-empty-state">אין רשומות תואמות</td></tr>'; return; }
+    body.innerHTML = items.map(e => `
+      <tr>
+        <td>${new Date(e.created_at).toLocaleString('he-IL')}</td>
+        <td>${esc(e.username)}</td>
+        <td><span class="ds-badge ${actionBadge[e.action] || 'ds-badge-neutral'}">${actionLabel[e.action] || e.action}</span></td>
+        <td>${entityLabel[e.entity_type] || esc(e.entity_type)}</td>
+        <td>${esc(e.entity_label || ('#' + e.entity_id))}</td>
+        <td class="diff-box">${e.new_value ? esc(e.new_value.slice(0, 150)) : ''}</td>
+      </tr>`).join('');
+  }
+
+  return {
+    init: () => { loadEntityTypes(); refresh(); },
+    refresh,
+    sortBy: (col) => {
+      if (_sortCol === col) { _sortDir = _sortDir === 'asc' ? 'desc' : 'asc'; }
+      else { _sortCol = col; _sortDir = 'asc'; }
+      applySortAndRender();
+    },
+  };
+})();
+document.addEventListener('DOMContentLoaded', AuditLog.init);
+</script>
+{% endblock %}

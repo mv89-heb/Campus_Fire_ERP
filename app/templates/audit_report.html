@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>דו"ח ביקורת {{ audit.audit_number or audit.id }}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Arial, sans-serif; color: #1a1a1a; padding: 30px; max-width: 800px; margin: auto; }
+  h1 { font-size: 1.4rem; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 16px; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; margin-bottom: 20px; font-size: 0.9rem; }
+  .meta-grid div span.label { color: #666; display:block; font-size:0.75rem; }
+  .score-box { display: inline-block; padding: 10px 20px; border-radius: 8px; font-size: 1.6rem; font-weight: 800; margin-bottom: 20px; }
+  .score-good { background: #e6f7ec; color: #1a7f37; }
+  .score-mid { background: #fff5e0; color: #9a6700; }
+  .score-bad { background: #ffe9e9; color: #cf222e; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+  th { background: #f5f5f5; }
+  .severity-critical { color: #cf222e; font-weight: 700; }
+  .severity-high { color: #d1242f; font-weight: 600; }
+  .severity-medium { color: #9a6700; }
+  .severity-low { color: #57606a; }
+  .sig-box { margin-top: 30px; }
+  .sig-box img { max-width: 220px; border: 1px solid #ddd; border-radius: 4px; }
+  .notes-box { margin-top: 16px; padding: 12px; background: #f8f8f8; border-radius: 6px; font-size: 0.88rem; }
+  .print-btn { position: fixed; top: 15px; left: 15px; padding: 8px 16px; border-radius: 6px; border: none; background: #f78166; color: #000; font-weight: 700; cursor: pointer; }
+  @media print { .print-btn { display: none; } body { padding: 0; } }
+</style>
+</head>
+<body>
+
+<button class="print-btn" onclick="window.print()">🖨️ הדפסה / שמירה כ-PDF</button>
+
+<h1>דו"ח ביקורת בטיחות אש</h1>
+
+<div class="meta-grid">
+  <div><span class="label">מספר ביקורת</span>{{ audit.audit_number or ('#' ~ audit.id) }}</div>
+  <div><span class="label">אתר</span>{{ audit.site_name or '—' }}</div>
+  <div><span class="label">תאריך ביקורת</span>{{ audit.audit_date or '—' }}</div>
+  <div><span class="label">שם הבודק</span>{{ audit.inspector_name or '—' }}</div>
+  <div><span class="label">סטטוס</span>{{ audit.status }}</div>
+  <div><span class="label">תוצאה</span>{{ audit.result or '—' }}</div>
+</div>
+
+{% if audit.score is not none %}
+<div class="score-box {{ 'score-good' if audit.score >= 80 else ('score-mid' if audit.score >= 50 else 'score-bad') }}">
+  ציון: {{ audit.score }}
+</div>
+{% endif %}
+
+{% if audit.notes %}
+<div class="notes-box"><strong>הערות:</strong> {{ audit.notes }}</div>
+{% endif %}
+
+<h2 style="font-size:1.05rem; margin-top:24px; margin-bottom:8px;">ליקויים שנמצאו ({{ audit.deficiencies|length }})</h2>
+{% if audit.deficiencies %}
+<table>
+  <thead>
+    <tr><th>כותרת</th><th>חומרה</th><th>אחראי</th><th>יעד לתיקון</th><th>סטטוס</th></tr>
+  </thead>
+  <tbody>
+    {% for d in audit.deficiencies %}
+    <tr>
+      <td>{{ d.title }}{% if d.description %}<br><small>{{ d.description }}</small>{% endif %}</td>
+      <td class="severity-{{ d.severity }}">{{ d.severity }}</td>
+      <td>{{ d.responsible or '—' }}</td>
+      <td>{{ d.due_date or '—' }}</td>
+      <td>{{ d.status }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p style="color:#666;">לא נמצאו ליקויים בביקורת זו.</p>
+{% endif %}
+
+{% if signature_data %}
+<div class="sig-box">
+  <div class="label" style="color:#666; font-size:0.8rem; margin-bottom:6px;">חתימת הבודק:</div>
+  <img src="{{ signature_data }}" alt="חתימה">
+</div>
+{% endif %}
+
+</body>
+</html>

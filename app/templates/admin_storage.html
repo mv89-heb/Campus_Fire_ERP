@@ -1,0 +1,257 @@
+{% extends "_shell.html" %}
+{% block title %}ניהול אחסון מסמכים | בטיחות אש Enterprise{% endblock %}
+
+{% block extra_style %}
+.page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
+.page-title-row h1 { font-size: var(--text-xl); }
+.kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: var(--space-5); }
+@media (min-width: 768px) { .kpi-grid { grid-template-columns: repeat(4, 1fr); } }
+.kpi-grid .ds-kpi-value { font-size: var(--text-xl); }
+.section-title { font-size: var(--text-base); font-weight: 700; margin-bottom: var(--space-3); display: flex; align-items: center; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
+.cleanup-bar { display: none; align-items: center; gap: 10px; background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 10px; font-size: var(--text-sm); flex-wrap: wrap; }
+.cleanup-bar.visible { display: flex; }
+.select-links { display: flex; gap: 10px; font-size: var(--text-xs); }
+.select-links a { color: var(--color-primary); cursor: pointer; text-decoration: none; }
+.table-scroll { overflow-x: auto; }
+.spin { display: inline-block; animation: ds-spin 0.8s linear infinite; }
+@keyframes ds-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:8px;"><a href="/settings" style="color:var(--color-text-muted); font-size:var(--text-sm); text-decoration:none;">⚙️ הגדרות</a> <span style="color:var(--color-text-faint);">/</span> <span style="color:var(--color-text-muted); font-size:var(--text-sm);">ניהול אחסון מסמכים</span></div>
+
+<div class="page-title-row">
+  <h1>🗄️ ניהול אחסון מסמכים</h1>
+  <button class="ds-btn ds-btn-primary" id="btnScan" onclick="StorageAdmin.runScan()">🔍 הרץ סריקה</button>
+</div>
+
+<div class="kpi-grid" id="kpiGrid">
+  <div class="ds-skeleton" style="height:76px;"></div>
+  <div class="ds-skeleton" style="height:76px;"></div>
+  <div class="ds-skeleton" style="height:76px;"></div>
+  <div class="ds-skeleton" style="height:76px;"></div>
+</div>
+
+<div class="ds-card" style="margin-bottom:var(--space-5);">
+  <div class="section-title">
+    <span>⚠️ בעיות שזוהו</span>
+  </div>
+  <div id="issuesBox"><div class="ds-skeleton" style="height:40px;"></div></div>
+</div>
+
+<div class="ds-card">
+  <div class="section-title">
+    <span>🧹 ניקוי קבצים יתומים (Orphans)</span>
+    <button class="ds-btn ds-btn-sm" onclick="StorageAdmin.loadPreview()">🔄 רענן רשימה</button>
+  </div>
+  <div class="select-links" id="selectLinks" style="display:none; margin-bottom:8px;">
+    <a onclick="StorageAdmin.selectAll()">בחר הכל</a>
+    <a onclick="StorageAdmin.selectNone()">נקה בחירה</a>
+  </div>
+  <div class="cleanup-bar" id="cleanupBar">
+    <span id="cleanupCount">0 נבחרו</span>
+    <button class="ds-btn ds-btn-sm" style="background:var(--color-danger); color:#fff; border:none;" onclick="StorageAdmin.confirmCleanup()">🗑️ אשר מחיקה של הנבחרים</button>
+  </div>
+  <div class="table-scroll">
+    <table class="ds-table" id="orphanTable" style="display:none;">
+      <thead><tr>
+        <th style="width:30px;"></th>
+        <th>שם קובץ</th>
+        <th>נתיב</th>
+        <th>גודל</th>
+        <th>עדכון אחרון</th>
+        <th>סיבה</th>
+      </tr></thead>
+      <tbody id="orphanBody"></tbody>
+    </table>
+    <div id="orphanEmpty" style="display:none;" class="ds-empty-state">
+      <div class="ds-empty-icon">✅</div>
+      <div class="ds-empty-title">אין קבצים יתומים</div>
+      <div class="ds-empty-desc">כל הקבצים באחסון משויכים לרשומה במסד הנתונים.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Dialog אישור ניקוי -->
+<div class="ds-modal-overlay" id="cleanupConfirmModal">
+  <div class="ds-modal" style="max-width:420px;">
+    <h3 style="margin-bottom:10px;">🗑️ אישור ניקוי קבצים יתומים</h3>
+    <p style="font-size:var(--text-sm); color:var(--color-text-muted); margin-bottom:14px;">
+      <span id="cleanupConfirmCount"></span> קבצים ימחקו לצמיתות מהאחסון (מקומי/Supabase).
+      פעולה זו נבדקת שוב ברגע האמת - קובץ שהפך רלוונטי מאז הרשימה יידלג אוטומטית ולא יימחק.
+    </p>
+    <div style="display:flex; gap:8px;">
+      <button class="ds-btn" style="flex:1" onclick="StorageAdmin.closeCleanupConfirm()">ביטול</button>
+      <button class="ds-btn" style="flex:1; background:var(--color-danger); color:#fff; border:none;" id="cleanupConfirmBtn" onclick="StorageAdmin.executeCleanup()">מחק לצמיתות</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+const StorageAdmin = (() => {
+  const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const showToast = (msg, type='success') => {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `ds-toast ${type}`; t.innerText = msg; c.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  };
+  let _orphans = [];
+  let _selected = new Set();
+
+  function fmtSize(bytes) {
+    if (bytes == null) return '-';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    return (bytes/1024/1024).toFixed(1) + ' MB';
+  }
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleString('he-IL'); } catch(e) { return iso; }
+  }
+
+  async function loadDashboard() {
+    document.getElementById('btnScan').disabled = true;
+    document.getElementById('btnScan').innerHTML = '<span class="spin">🔄</span> סורק...';
+    try {
+      const res = await fetch('/api/admin/storage/dashboard');
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'שגיאה'); }
+      const d = await res.json();
+
+      document.getElementById('kpiGrid').innerHTML = `
+        <div class="ds-kpi-card"><div class="ds-kpi-value">${d.total}</div><div class="ds-kpi-label">סה"כ מסמכים</div></div>
+        <div class="ds-kpi-card good"><div class="ds-kpi-value">${d.active}</div><div class="ds-kpi-label">פעילים</div></div>
+        <div class="ds-kpi-card warn"><div class="ds-kpi-value">${d.archived}</div><div class="ds-kpi-label">בארכיון</div></div>
+        <div class="ds-kpi-card bad"><div class="ds-kpi-value">${d.deleted}</div><div class="ds-kpi-label">נמחקו</div></div>
+        <div class="ds-kpi-card ${d.missing > 0 ? 'bad' : 'good'}"><div class="ds-kpi-value">${d.missing}</div><div class="ds-kpi-label">קבצים חסרים</div></div>
+        <div class="ds-kpi-card ${d.orphaned > 0 ? 'warn' : 'good'}"><div class="ds-kpi-value">${d.orphaned}</div><div class="ds-kpi-label">קבצים יתומים</div></div>
+        <div class="ds-kpi-card ${d.hash_errors > 0 ? 'bad' : 'good'}"><div class="ds-kpi-value">${d.hash_errors}</div><div class="ds-kpi-label">שגיאות Hash</div></div>
+        <div class="ds-kpi-card"><div class="ds-kpi-value" style="font-size:var(--text-sm);">${fmtDate(d.last_scan_at)}</div><div class="ds-kpi-label">סריקה אחרונה</div></div>
+      `;
+
+      const issuesBox = document.getElementById('issuesBox');
+      const allIssues = [
+        ...(d.missing_items || []).map(i => ({ type: 'חסר', text: `Document #${i.document_id} (${esc(i.file_name)}) - הקובץ לא נמצא ב-${esc(i.file_path)}` })),
+        ...(d.hash_error_items || []).map(i => ({ type: 'Hash שגוי', text: `Document #${i.document_id} (${esc(i.file_name)}) - תוכן הקובץ השתנה` })),
+      ];
+      issuesBox.innerHTML = allIssues.length
+        ? `<table class="ds-table"><thead><tr><th>סוג</th><th>פרטים</th></tr></thead><tbody>${allIssues.map(i => `<tr><td><span class="ds-badge ds-badge-danger">${i.type}</span></td><td>${i.text}</td></tr>`).join('')}</tbody></table>`
+        : `<div class="ds-empty-state"><div class="ds-empty-icon">✅</div><div class="ds-empty-desc">לא נמצאו בעיות</div></div>`;
+
+      _orphans = d.orphaned_items || [];
+      renderOrphanTable();
+      showToast('✅ הסריקה הושלמה');
+    } catch (e) {
+      document.getElementById('kpiGrid').innerHTML = `<div class="ds-error-state" style="grid-column:1/-1;">⚠️ שגיאה בטעינת נתוני האחסון: ${esc(e.message)}<button class="ds-btn ds-btn-sm" onclick="StorageAdmin.runScan()">🔄 נסה שוב</button></div>`;
+      showToast('❌ הסריקה נכשלה: ' + e.message, 'error');
+    } finally {
+      document.getElementById('btnScan').disabled = false;
+      document.getElementById('btnScan').innerHTML = '🔍 הרץ סריקה';
+    }
+  }
+
+  function renderOrphanTable() {
+    const table = document.getElementById('orphanTable');
+    const empty = document.getElementById('orphanEmpty');
+    const links = document.getElementById('selectLinks');
+    _selected.clear();
+    updateCleanupBar();
+
+    if (!_orphans.length) {
+      table.style.display = 'none';
+      links.style.display = 'none';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    links.style.display = 'flex';
+    table.style.display = 'table';
+
+    document.getElementById('orphanBody').innerHTML = _orphans.map((o, i) => `
+      <tr>
+        <td><input type="checkbox" onchange="StorageAdmin.toggleSelect('${esc(o.path)}', this.checked)"></td>
+        <td>${esc(o.path.split('/').pop())}</td>
+        <td style="font-size:var(--text-xs); color:var(--color-text-muted);">${esc(o.path)} <span class="ds-badge ds-badge-neutral">${o.location}</span></td>
+        <td>${fmtSize(o.size)}</td>
+        <td>${fmtDate(o.modified_at)}</td>
+        <td style="font-size:var(--text-xs); color:var(--color-text-muted);">${esc(o.reason || '')}</td>
+      </tr>`).join('');
+  }
+
+  function updateCleanupBar() {
+    const bar = document.getElementById('cleanupBar');
+    const count = document.getElementById('cleanupCount');
+    if (_selected.size > 0) {
+      bar.classList.add('visible');
+      count.innerText = `${_selected.size} נבחרו`;
+    } else {
+      bar.classList.remove('visible');
+    }
+  }
+
+  return {
+    init: () => loadDashboard(),
+    runScan: () => loadDashboard(),
+
+    loadPreview: async () => {
+      try {
+        const res = await fetch('/api/admin/storage/cleanup-preview', { method: 'POST' });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'שגיאה'); }
+        const d = await res.json();
+        _orphans = d.orphaned_items || [];
+        renderOrphanTable();
+        showToast('הרשימה עודכנה');
+      } catch (e) { showToast('שגיאה ברענון הרשימה: ' + e.message, 'error'); }
+    },
+
+    toggleSelect: (path, checked) => {
+      if (checked) _selected.add(path); else _selected.delete(path);
+      updateCleanupBar();
+    },
+    selectAll: () => {
+      document.querySelectorAll('#orphanBody input[type=checkbox]').forEach(cb => { cb.checked = true; });
+      _orphans.forEach(o => _selected.add(o.path));
+      updateCleanupBar();
+    },
+    selectNone: () => {
+      document.querySelectorAll('#orphanBody input[type=checkbox]').forEach(cb => { cb.checked = false; });
+      _selected.clear();
+      updateCleanupBar();
+    },
+
+    confirmCleanup: () => {
+      if (!_selected.size) return;
+      document.getElementById('cleanupConfirmCount').innerText = _selected.size;
+      document.getElementById('cleanupConfirmModal').classList.add('open');
+    },
+    closeCleanupConfirm: () => document.getElementById('cleanupConfirmModal').classList.remove('open'),
+
+    executeCleanup: async () => {
+      const btn = document.getElementById('cleanupConfirmBtn');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/admin/storage/cleanup-confirm', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ paths: [..._selected] }),
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'שגיאה'); }
+        const d = await res.json();
+        StorageAdmin.closeCleanupConfirm();
+        let msg = `✅ הניקוי הושלם: ${d.deleted.length} נמחקו`;
+        if (d.skipped.length) msg += `, ${d.skipped.length} דולגו (כבר לא יתומים)`;
+        if (d.failed.length) msg += `, ${d.failed.length} נכשלו`;
+        showToast(msg, d.failed.length ? 'warning' : 'success');
+        loadDashboard();
+      } catch (e) {
+        showToast('❌ הניקוי נכשל: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    },
+  };
+})();
+document.addEventListener('DOMContentLoaded', StorageAdmin.init);
+</script>
+{% endblock %}

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design System | בטיחות אש Enterprise</title>
+<script>
+  // הפעלת ה-theme השמור *לפני* טעינת ה-CSS, כדי למנוע הבזק (flash) של המצב הלא-נכון ברענון
+  (function () {
+    var saved = localStorage.getItem('erp-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+  })();
+</script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
+<style>
+  body { padding: var(--space-6); max-width: 1100px; margin: auto; }
+  .ds-doc-section { margin-bottom: var(--space-8); }
+  .ds-doc-section h2 { font-size: var(--text-lg); margin-bottom: var(--space-2); padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border); }
+  .ds-doc-section p.intro { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-4); }
+  .ds-row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; margin-bottom: var(--space-3); }
+  .ds-swatch { width: 100px; }
+  .ds-swatch-color { height: 60px; border-radius: var(--radius-md); border: 1px solid var(--color-border-strong); margin-bottom: 4px; }
+  .ds-swatch-label { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .ds-type-row { display: flex; align-items: baseline; gap: var(--space-4); margin-bottom: var(--space-2); }
+  .ds-type-row .sample { font-family: var(--font-sans); }
+  .ds-type-row .meta { font-size: var(--text-xs); color: var(--color-text-muted); min-width: 140px; }
+  .ds-grid-demo { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); }
+  header.doc-header { margin-bottom: var(--space-8); }
+  header.doc-header h1 { font-size: var(--text-2xl); margin-bottom: var(--space-1); }
+  header.doc-header p { color: var(--color-text-muted); font-size: var(--text-base); }
+  .ds-note { background: var(--tint-info); border: 1px solid var(--color-info); border-radius: var(--radius-md); padding: var(--space-3); font-size: var(--text-sm); margin-bottom: var(--space-6); }
+</style>
+</head>
+<body>
+
+<header class="doc-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:var(--space-4); flex-wrap:wrap;">
+  <div>
+    <h1>🎨 Design System</h1>
+    <p>מקור האמת החזותי היחיד למערכת. שלב 1 מתוך תהליך ה-Redesign.</p>
+  </div>
+  <button class="ds-btn" id="themeToggle" onclick="toggleTheme()">🌙 החלף מצב תצוגה</button>
+  <a class="ds-btn ds-btn-primary" href="/org-dashboard">🖥️ הדשבורד המהוגר (Shell בפעולה)</a>
+</header>
+
+<script>
+  function toggleTheme() {
+    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+    var next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('erp-theme', next);
+    updateToggleLabel(next);
+  }
+  function updateToggleLabel(theme) {
+    document.getElementById('themeToggle').innerText = theme === 'dark' ? '🌙 החלף מצב תצוגה' : '☀️ החלף מצב תצוגה';
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    updateToggleLabel(document.documentElement.getAttribute('data-theme') || 'dark');
+  });
+</script>
+
+<div class="ds-note">
+  ℹ️ זהו עמוד תיעוד/אישור בלבד — הוא <b>אינו מקושר עדיין</b> מ-11 המסכים הקיימים. אחרי אישור הכיוון כאן, שלב 2 יבנה Shell מאוחד (Header + Sidebar), ושלב 3 יחבר את התוכן הקיים לכל זה בלי לשנות לוגיקה עסקית.
+</div>
+
+<div class="ds-doc-section">
+  <h2>צבעים</h2>
+  <p class="intro">פלטה כהה + אקצנט טרה-קוטה שכבר קיימת ומוכחת ב-11 המסכים מאז ספרינט 1. לא הומצאה כאן פלטה חדשה — הטוקנים רק מסודרים ומתועדים רשמית לראשונה.</p>
+  <div class="ds-row">
+    <div class="ds-swatch"><div class="ds-swatch-color" style="background:var(--color-bg)"></div><div class="ds-swatch-label">bg</div></div>
+    <div class="ds-swatch"><div class="ds-swatch-color" style="background:var(--color-surface)"></div><div class="ds-swatch-label">surface</div></div>
+    <div class="ds-swatch"><div class="ds-swatch-color" style="background:var(--color-primary)"></div><div class="ds-swatch-label">primary</div></div>
+    <div class="ds-swatch"><div class="ds-swatch-color" style="background:var(--color-success)"></div><div class="ds-swatch-label">success</div></div>
+    <div class="ds-swatch"><div class="ds-swatch-color" style="background:var(--color-warning)"></div><div class="ds-swatch-label">warning</div></div>
+    <div class="ds-swatch"><div class="ds-swatch-color" style="background:var(--color-danger)"></div><div class="ds-swatch-label">danger</div></div>
+    <div class="ds-swatch"><div class="ds-swatch-color" style="background:var(--color-info)"></div><div class="ds-swatch-label">info</div></div>
+    <div class="ds-swatch"><div class="ds-swatch-color" style="background:var(--color-neutral)"></div><div class="ds-swatch-label">neutral</div></div>
+  </div>
+</div>
+
+<div class="ds-doc-section">
+  <h2>טיפוגרפיה</h2>
+  <div class="ds-type-row"><span class="sample" style="font-size:var(--text-2xl); font-weight:800;">כותרת עמוד</span><span class="meta">text-2xl / black</span></div>
+  <div class="ds-type-row"><span class="sample" style="font-size:var(--text-xl); font-weight:700;">כותרת מסך</span><span class="meta">text-xl / bold</span></div>
+  <div class="ds-type-row"><span class="sample" style="font-size:var(--text-lg); font-weight:700;">כותרת כרטיס</span><span class="meta">text-lg / bold</span></div>
+  <div class="ds-type-row"><span class="sample" style="font-size:var(--text-md); font-weight:600;">כותרת משנה</span><span class="meta">text-md / medium</span></div>
+  <div class="ds-type-row"><span class="sample" style="font-size:var(--text-base);">טקסט רגיל בממשק</span><span class="meta">text-base</span></div>
+  <div class="ds-type-row"><span class="sample" style="font-size:var(--text-sm); color:var(--color-text-muted);">טקסט משני / הערות</span><span class="meta">text-sm / muted</span></div>
+  <div class="ds-type-row"><span class="sample" style="font-size:var(--text-xs); color:var(--color-text-muted);">תווית קטנה / metadata</span><span class="meta">text-xs / muted</span></div>
+</div>
+
+<div class="ds-doc-section">
+  <h2>Spacing Scale</h2>
+  <div class="ds-row">
+    <div class="ds-swatch"><div style="height:24px; width:var(--space-1); background:var(--color-primary); border-radius:2px;"></div><div class="ds-swatch-label">space-1 (4px)</div></div>
+    <div class="ds-swatch"><div style="height:24px; width:var(--space-2); background:var(--color-primary); border-radius:2px;"></div><div class="ds-swatch-label">space-2 (8px)</div></div>
+    <div class="ds-swatch"><div style="height:24px; width:var(--space-3); background:var(--color-primary); border-radius:2px;"></div><div class="ds-swatch-label">space-3 (12px)</div></div>
+    <div class="ds-swatch"><div style="height:24px; width:var(--space-4); background:var(--color-primary); border-radius:2px;"></div><div class="ds-swatch-label">space-4 (16px)</div></div>
+    <div class="ds-swatch"><div style="height:24px; width:var(--space-6); background:var(--color-primary); border-radius:2px;"></div><div class="ds-swatch-label">space-6 (24px)</div></div>
+    <div class="ds-swatch"><div style="height:24px; width:var(--space-8); background:var(--color-primary); border-radius:2px;"></div><div class="ds-swatch-label">space-8 (32px)</div></div>
+  </div>
+</div>
+
+<div class="ds-doc-section">
+  <h2>כפתורים</h2>
+  <div class="ds-row">
+    <button class="ds-btn ds-btn-primary">פעולה ראשית</button>
+    <button class="ds-btn">פעולה משנית</button>
+    <button class="ds-btn ds-btn-ghost">Ghost</button>
+    <button class="ds-btn ds-btn-danger">מחיקה</button>
+    <button class="ds-btn ds-btn-sm">קטן</button>
+    <button class="ds-btn ds-btn-icon">🔍</button>
+    <button class="ds-btn ds-btn-primary" disabled>מושבת</button>
+  </div>
+</div>
+
+<div class="ds-doc-section">
+  <h2>Badges / Tags / Avatars</h2>
+  <div class="ds-row">
+    <span class="ds-badge ds-badge-success">תקין</span>
+    <span class="ds-badge ds-badge-warning">אזהרה</span>
+    <span class="ds-badge ds-badge-danger">קריטי</span>
+    <span class="ds-badge ds-badge-info">מידע</span>
+    <span class="ds-badge ds-badge-neutral">ניטרלי</span>
+    <span class="ds-badge ds-badge-primary">מותאם</span>
+    <span class="ds-tag">🏷️ תגית</span>
+    <span class="ds-avatar">מ.כ</span>
+  </div>
+</div>
+
+<div class="ds-doc-section">
+  <h2>כרטיסים ו-KPI</h2>
+  <div class="ds-grid-demo">
+    <div class="ds-kpi-card good"><div class="ds-kpi-value">42</div><div class="ds-kpi-label">אישורים תקינים</div></div>
+    <div class="ds-kpi-card warn"><div class="ds-kpi-value">7</div><div class="ds-kpi-label">פגים בקרוב</div></div>
+    <div class="ds-kpi-card bad"><div class="ds-kpi-value">2</div><div class="ds-kpi-label">פג תוקף</div></div>
+  </div>
+  <div style="height:var(--space-4)"></div>
+  <div class="ds-card">
+    <div class="ds-card-title"><span>כותרת כרטיס</span><button class="ds-btn ds-btn-sm">פעולה</button></div>
+    <p style="color:var(--color-text-muted); font-size:var(--text-sm);">תוכן הכרטיס. כל תיבת תוכן במערכת אמורה להשתמש במבנה הזה.</p>
+  </div>
+</div>
+
+<div class="ds-doc-section">
+  <h2>טבלה</h2>
+  <div class="ds-card" style="padding:0; overflow:hidden;">
+    <table class="ds-table">
+      <thead><tr><th>שם</th><th>סטטוס</th><th>תאריך</th></tr></thead>
+      <tbody>
+        <tr><td>דוגמה 1</td><td><span class="ds-badge ds-badge-success">תקין</span></td><td>2026-08-01</td></tr>
+        <tr><td>דוגמה 2</td><td><span class="ds-badge ds-badge-warning">קרוב לפקיעה</span></td><td>2026-07-20</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="ds-doc-section">
+  <h2>טפסים</h2>
+  <div class="ds-card" style="max-width:400px;">
+    <div class="ds-field">
+      <label class="ds-label">שם מלא</label>
+      <input class="ds-input" placeholder="לדוגמה: ישראל ישראלי">
+    </div>
+    <div class="ds-field error">
+      <label class="ds-label">שדה חובה</label>
+      <input class="ds-input error" placeholder="שדה זה חסר">
+      <span class="ds-help-text error">שדה זה הוא חובה</span>
+    </div>
+    <div class="ds-field">
+      <label class="ds-label">בחירה</label>
+      <select class="ds-select"><option>אפשרות א'</option><option>אפשרות ב'</option></select>
+    </div>
+  </div>
+</div>
+
+<div class="ds-doc-section">
+  <h2>Empty / Error / Loading States</h2>
+  <div class="ds-grid-demo">
+    <div class="ds-card">
+      <div class="ds-empty-state">
+        <div class="ds-empty-icon">📭</div>
+        <div class="ds-empty-title">אין נתונים עדיין</div>
+        <div class="ds-empty-desc">התחל בהוספת הרשומה הראשונה</div>
+        <button class="ds-btn ds-btn-primary ds-btn-sm">➕ הוספה</button>
+      </div>
+    </div>
+    <div class="ds-card">
+      <div class="ds-error-state">
+        ⚠️ שגיאה בטעינת הנתונים
+        <button class="ds-btn ds-btn-sm">🔄 נסה שוב</button>
+      </div>
+    </div>
+    <div class="ds-card">
+      <div class="ds-skeleton" style="height:16px; margin-bottom:8px;"></div>
+      <div class="ds-skeleton" style="height:16px; margin-bottom:8px; width:70%;"></div>
+      <div class="ds-skeleton" style="height:16px; width:50%;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="ds-doc-section">
+  <h2>Timeline</h2>
+  <div class="ds-card">
+    <div class="ds-timeline">
+      <div class="ds-timeline-item"><div class="ds-timeline-dot"></div><div class="ds-timeline-time">13.07.2026 10:20</div><div class="ds-timeline-label">נוצר על ידי מתן</div></div>
+      <div class="ds-timeline-item"><div class="ds-timeline-dot"></div><div class="ds-timeline-time">13.07.2026 11:05</div><div class="ds-timeline-label">בוצעה ביקורת</div></div>
+      <div class="ds-timeline-item"><div class="ds-timeline-dot"></div><div class="ds-timeline-time">14.07.2026 09:00</div><div class="ds-timeline-label">נפתח ליקוי חדש</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="ds-doc-section">
+  <h2>Toast</h2>
+  <button class="ds-btn ds-btn-primary" onclick="document.getElementById('demoToastContainer').style.display='flex'">הצג דוגמת Toast</button>
+  <div class="ds-toast-container" id="demoToastContainer" style="display:none; position:static; margin-top:var(--space-3);">
+    <div class="ds-toast success">✅ הפעולה בוצעה בהצלחה</div>
+    <div class="ds-toast error">⚠️ אירעה שגיאה</div>
+  </div>
+</div>
+
+</body>
+</html>

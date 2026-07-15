@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>התחברות | בטיחות אש Enterprise</title>
+<script>
+  (function () {
+    var saved = localStorage.getItem('erp-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+  })();
+</script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
+<style>
+body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: var(--space-5); }
+.login-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-8); width: 100%; max-width: 380px; }
+.login-title { font-size: var(--text-lg); font-weight: 700; margin-bottom: 6px; text-align: center; }
+.login-subtitle { font-size: var(--text-sm); color: var(--color-text-muted); text-align: center; margin-bottom: var(--space-6); }
+.error-msg { color: var(--color-danger); font-size: var(--text-sm); text-align: center; min-height: 18px; }
+.hint { font-size: var(--text-xs); color: var(--color-text-muted); text-align: center; margin-top: var(--space-4); }
+.hint a { color: var(--color-primary); }
+</style>
+</head>
+<body>
+
+<div class="login-card">
+  <div class="login-title">🛡️ בטיחות אש Enterprise</div>
+  <div class="login-subtitle">התחברות למערכת</div>
+  <div class="ds-field">
+    <input class="ds-input" type="text" id="username" placeholder="שם משתמש" autocomplete="username">
+  </div>
+  <div class="ds-field">
+    <input class="ds-input" type="password" id="password" placeholder="סיסמה" autocomplete="current-password">
+  </div>
+  <div class="error-msg" id="errorMsg"></div>
+  <button class="ds-btn ds-btn-primary" id="submitBtn" onclick="Login.submit()" style="width:100%;">התחברות</button>
+  <div class="hint">
+    <a href="/">← המשך ללא התחברות (המערכת עדיין פתוחה לכולם בשלב זה)</a>
+  </div>
+</div>
+
+<script>
+const Login = (() => {
+  return {
+    submit: async () => {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const errEl = document.getElementById('errorMsg');
+      errEl.innerText = '';
+      if (!username || !password) { errEl.innerText = 'יש למלא שם משתמש וסיסמה'; return; }
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'שגיאה בהתחברות');
+        window.location.href = '/';
+      } catch (e) { errEl.innerText = e.message; }
+    },
+  };
+})();
+
+document.getElementById('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') Login.submit(); });
+</script>
+</body>
+</html>

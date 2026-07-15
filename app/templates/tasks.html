@@ -1,0 +1,356 @@
+{% extends "_shell.html" %}
+{% block title %}משימות | בטיחות אש Enterprise{% endblock %}
+
+{% block extra_style %}
+.page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
+.page-title-row h1 { font-size: var(--text-xl); }
+
+.btn { flex: none; padding: 10px 16px; border-radius: var(--radius); font-size: 0.9rem; font-weight: 600; border: 1px solid var(--border-mid); background: var(--bg-hover); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s; }
+.btn:hover { background: rgba(255,255,255,0.05); }
+.btn-primary { background: var(--accent); color: #000; border: none; }
+.btn-primary:hover { background: #ff9e85; }
+.btn-sm { flex: none; min-width: 0; padding: 5px 10px; font-size: 0.8rem; min-height: 30px; }
+.btn-danger { color: var(--critical); }
+.btn-success { color: var(--valid); }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; margin-bottom: 15px; }
+.card-title { font-size: 1rem; font-weight: 600; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap:wrap; gap:10px; }
+.empty-state { text-align: center; color: var(--text-muted); padding: 30px 10px; font-size: 0.9rem; }
+.filters-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.filters-row input, .filters-row select { background: var(--bg); color: var(--text); border: 1px solid var(--border-mid); border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; outline: none; }
+.filters-row input { flex: 1; min-width: 160px; }
+.task-list { display: flex; flex-direction: column; gap: 10px; }
+.task-card { animation: fadeIn 0.25s ease; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; background: rgba(255,255,255,0.015); display: flex; flex-direction: column; gap: 6px; }
+.task-card.done { opacity: 0.55; }
+.task-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.task-title { font-weight: 700; }
+.task-meta { font-size: 0.78rem; color: var(--text-muted); display: flex; gap: 10px; flex-wrap: wrap; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; }
+.badge.urgent { background: rgba(248,81,73,0.18); color: var(--critical); }
+.badge.high { background: rgba(227,179,65,0.18); color: var(--warning); }
+.badge.normal { background: rgba(88,166,255,0.15); color: #58a6ff; }
+.badge.low { background: rgba(110,118,129,0.15); color: var(--text-muted); }
+.badge.open { background: rgba(110,118,129,0.15); color: var(--text-muted); }
+.badge.in_progress { background: rgba(88,166,255,0.15); color: #58a6ff; }
+.badge.done { background: rgba(63,185,80,0.15); color: var(--valid); }
+.badge.cancelled { background: rgba(248,81,73,0.15); color: var(--critical); }
+.checklist { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.checklist-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+.checklist-item input { accent-color: var(--accent); }
+.checklist-item.done label { text-decoration: line-through; color: var(--text-muted); }
+.task-actions { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.task-select { margin-top: 2px; accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; }
+.bulk-bar { display: none; align-items: center; gap: 10px; background: var(--bg-hover); border: 1px solid var(--border-mid); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; font-size: 0.85rem; }
+.bulk-bar.visible { display: flex; }
+.inline-form { display: flex; flex-direction: column; gap: 8px; }
+.inline-form input, .inline-form textarea, .inline-form select { background: var(--bg); color: var(--text); border: 1px solid var(--border-mid); border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; outline: none; width: 100%; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 480px) { .form-grid { grid-template-columns: 1fr; } }
+.checklist-editor { display: flex; flex-direction: column; gap: 6px; }
+.checklist-editor-row { display: flex; gap: 6px; }
+.checklist-editor-row input { flex: 1; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 3000; padding: 15px; overflow-y: auto; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: var(--radius); padding: 20px; width: 100%; max-width: 540px; margin: auto; }
+.modal h3 { margin-bottom: 14px; font-size: 1rem; }
+.modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+.modal-actions .btn { flex: 1; }
+.btn, .filter-select, table button { min-height: 38px; }
+.skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 37%, rgba(255,255,255,0.04) 63%); background-size: 400px 100%; animation: shimmer 1.4s ease infinite; border-radius: 6px; height: 70px; margin-bottom: 10px; }
+.error-state { text-align: center; color: var(--critical); padding: 20px; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.retry-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border-mid); background: var(--bg-hover); color: var(--text); cursor: pointer; font-size: 0.8rem; }
+{% endblock %}
+
+{% block content %}
+<div class="page-title-row">
+  <h1>✅ משימות</h1>
+  <button class="btn btn-primary" onclick="Tasks.openModal()">➕ משימה חדשה</button>
+</div>
+
+<div class="card">
+  <div class="card-title"><span>📋 רשימת משימות</span></div>
+  <div class="filters-row">
+    <input type="text" id="filterQ" placeholder="חיפוש..." oninput="clearTimeout(window._filterDebounce); window._filterDebounce = setTimeout(() => Tasks.applyFilters(), 150)">
+    <select id="filterStatus" onchange="Tasks.applyFilters()">
+      <option value="">כל הסטטוסים</option>
+      <option value="open">פתוחה</option>
+      <option value="in_progress">בביצוע</option>
+      <option value="done">הושלמה</option>
+      <option value="cancelled">בוטלה</option>
+    </select>
+    <select id="filterPriority" onchange="Tasks.applyFilters()">
+      <option value="">כל העדיפויות</option>
+      <option value="urgent">דחוף</option>
+      <option value="high">גבוה</option>
+      <option value="normal">רגיל</option>
+      <option value="low">נמוך</option>
+    </select>
+  </div>
+  <div id="bulkBar" class="bulk-bar">
+    <span id="bulkCount">0 נבחרו</span>
+    <button class="btn btn-sm btn-danger" onclick="Tasks.bulkDelete()">🗑️ מחק נבחרים</button>
+    <button class="btn btn-sm" onclick="Tasks.clearSelection()">בטל בחירה</button>
+  </div>
+  <div id="taskList" class="task-list"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+</div>
+
+<div class="modal-overlay" id="taskModal">
+  <div class="modal">
+    <h3 id="taskModalTitle">משימה חדשה</h3>
+    <div class="inline-form">
+      <input type="hidden" id="taskId">
+      <input type="text" id="taskTitle" placeholder="כותרת המשימה *">
+      <textarea id="taskDescription" placeholder="תיאור" rows="2"></textarea>
+      <div class="form-grid">
+        <input type="text" id="taskAssignee" placeholder="שיוך לעובד">
+        <input type="date" id="taskDueDate" title="תאריך יעד">
+        <select id="taskPriority">
+          <option value="urgent">דחוף</option>
+          <option value="high">גבוה</option>
+          <option value="normal" selected>רגיל</option>
+          <option value="low">נמוך</option>
+        </select>
+        <select id="taskStatus">
+          <option value="open">פתוחה</option>
+          <option value="in_progress">בביצוע</option>
+          <option value="done">הושלמה</option>
+          <option value="cancelled">בוטלה</option>
+        </select>
+      </div>
+      <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem;">
+        <input type="checkbox" id="taskRecurring" style="width:auto;" onchange="Tasks.toggleRecurrence()"> משימה חוזרת
+      </label>
+      <select id="taskRecurrence" style="display:none;">
+        <option value="daily">יומי</option>
+        <option value="weekly">שבועי</option>
+        <option value="monthly">חודשי</option>
+        <option value="quarterly">רבעוני</option>
+        <option value="yearly">שנתי</option>
+      </select>
+      <div>
+        <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:6px;">צ'קליסט</div>
+        <div class="checklist-editor" id="checklistEditor"></div>
+        <button type="button" class="btn btn-sm" style="margin-top:6px;" onclick="Tasks.addChecklistItem()">➕ הוסף פריט</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="Tasks.closeModal()">ביטול</button>
+      <button class="btn btn-primary" onclick="Tasks.save()">שמירה</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+const Tasks = (() => {
+  let _all = [];
+  let _checklistDraft = [];
+  let _selected = new Set();
+
+  const showToast = (msg, type='success') => {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `ds-toast ${type}`; t.innerText = msg; c.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  };
+  const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const priorityLabel = { urgent: 'דחוף', high: 'גבוה', normal: 'רגיל', low: 'נמוך' };
+  const statusLabel = { open: 'פתוחה', in_progress: 'בביצוע', done: 'הושלמה', cancelled: 'בוטלה' };
+
+  async function refresh() {
+    try {
+      const res = await fetch('/api/tasks');
+      _all = await res.json();
+      render(_all);
+    } catch (e) {
+      document.getElementById('taskList').innerHTML = `<div class="error-state">⚠️ שגיאה בטעינת משימות<button class="retry-btn" onclick="Tasks.init()">🔄 נסה שוב</button></div>`;
+      showToast('שגיאה בחיבור לשרת', 'error');
+    }
+  }
+
+  function render(list) {
+    const el = document.getElementById('taskList');
+    if (!list.length) { el.innerHTML = `<div class="empty-state">אין משימות</div>`; return; }
+    el.innerHTML = list.map(t => {
+      const checklistDone = (t.checklist || []).filter(c => c.done).length;
+      const checklistTotal = (t.checklist || []).length;
+      return `
+      <div class="task-card ${t.status === 'done' ? 'done' : ''}">
+        <div class="task-top">
+          <div style="display:flex; gap:8px; align-items:flex-start;">
+            <input type="checkbox" class="task-select" ${_selected.has(t.id) ? 'checked' : ''} onchange="Tasks.toggleSelect(${t.id}, this.checked)">
+            <div>
+              <div class="task-title">${esc(t.title)}</div>
+              ${t.description ? `<div style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">${esc(t.description)}</div>` : ''}
+            </div>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <span class="badge ${t.priority}">${priorityLabel[t.priority] || t.priority}</span>
+            <span class="badge ${t.status}">${statusLabel[t.status] || t.status}</span>
+          </div>
+        </div>
+        <div class="task-meta">
+          ${t.assignee ? `<span>👤 ${esc(t.assignee)}</span>` : ''}
+          ${t.due_date ? `<span>📅 ${esc(t.due_date)}</span>` : ''}
+          ${t.is_recurring ? `<span>🔁 חוזר (${esc(t.recurrence_rule || '')})</span>` : ''}
+          ${checklistTotal ? `<span>☑️ ${checklistDone}/${checklistTotal}</span>` : ''}
+        </div>
+        ${checklistTotal ? `
+          <div class="checklist">
+            ${t.checklist.map((c, i) => `
+              <div class="checklist-item ${c.done ? 'done' : ''}">
+                <input type="checkbox" ${c.done ? 'checked' : ''} onchange="Tasks.toggleChecklistItem(${t.id}, ${i}, this.checked)">
+                <label>${esc(c.text)}</label>
+              </div>`).join('')}
+          </div>` : ''}
+        <div class="task-actions">
+          ${t.status !== 'done' ? `<button class="btn btn-sm btn-success" onclick="Tasks.complete(${t.id})">✔️ סיום משימה</button>` : ''}
+          <button class="btn btn-sm" onclick="Tasks.openModal(${t.id})">✏️ עריכה</button>
+          <button class="btn btn-sm btn-danger" onclick="Tasks.remove(${t.id})">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+    updateBulkBar();
+  }
+
+  function updateBulkBar() {
+    const bar = document.getElementById('bulkBar');
+    const count = document.getElementById('bulkCount');
+    if (_selected.size > 0) {
+      bar.classList.add('visible');
+      count.innerText = `${_selected.size} נבחרו`;
+    } else {
+      bar.classList.remove('visible');
+    }
+  }
+
+  function applyFilters() {
+    const q = document.getElementById('filterQ').value.trim().toLowerCase();
+    const status = document.getElementById('filterStatus').value;
+    const priority = document.getElementById('filterPriority').value;
+    let list = _all;
+    if (q) list = list.filter(t => [t.title, t.description, t.assignee].some(v => (v||'').toLowerCase().includes(q)));
+    if (status) list = list.filter(t => t.status === status);
+    if (priority) list = list.filter(t => t.priority === priority);
+    render(list);
+  }
+
+  function renderChecklistEditor() {
+    const el = document.getElementById('checklistEditor');
+    el.innerHTML = _checklistDraft.map((item, i) => `
+      <div class="checklist-editor-row">
+        <input type="text" value="${esc(item.text)}" onchange="Tasks.updateChecklistDraft(${i}, this.value)">
+        <button type="button" class="btn btn-sm btn-danger" onclick="Tasks.removeChecklistItem(${i})">✕</button>
+      </div>`).join('');
+  }
+
+  return {
+    init: () => { refresh(); },
+    applyFilters,
+
+    toggleSelect: (id, checked) => {
+      if (checked) _selected.add(id); else _selected.delete(id);
+      updateBulkBar();
+    },
+    clearSelection: () => { _selected.clear(); render(_all); },
+    bulkDelete: async () => {
+      if (!_selected.size) return;
+      if (!confirm(`למחוק ${_selected.size} משימות נבחרות?`)) return;
+      try {
+        await Promise.all([..._selected].map(id => fetch(`/api/tasks/${id}`, { method: 'DELETE' })));
+        showToast(`${_selected.size} משימות נמחקו`);
+        _selected.clear();
+        refresh();
+      } catch (e) { showToast('שגיאה במחיקה קבוצתית', 'error'); }
+    },
+
+    toggleRecurrence: () => {
+      document.getElementById('taskRecurrence').style.display =
+        document.getElementById('taskRecurring').checked ? 'block' : 'none';
+    },
+
+    addChecklistItem: () => { _checklistDraft.push({text: '', done: false}); renderChecklistEditor(); },
+    removeChecklistItem: (i) => { _checklistDraft.splice(i, 1); renderChecklistEditor(); },
+    updateChecklistDraft: (i, val) => { _checklistDraft[i].text = val; },
+
+    openModal: (id) => {
+      const t = id ? _all.find(x => x.id === id) : null;
+      document.getElementById('taskModalTitle').innerText = id ? 'עריכת משימה' : 'משימה חדשה';
+      document.getElementById('taskId').value = t?.id || '';
+      document.getElementById('taskTitle').value = t?.title || '';
+      document.getElementById('taskDescription').value = t?.description || '';
+      document.getElementById('taskAssignee').value = t?.assignee || '';
+      document.getElementById('taskDueDate').value = t?.due_date || '';
+      document.getElementById('taskPriority').value = t?.priority || 'normal';
+      document.getElementById('taskStatus').value = t?.status || 'open';
+      document.getElementById('taskRecurring').checked = t?.is_recurring || false;
+      document.getElementById('taskRecurrence').value = t?.recurrence_rule || 'weekly';
+      Tasks.toggleRecurrence();
+      _checklistDraft = t?.checklist ? JSON.parse(JSON.stringify(t.checklist)) : [];
+      renderChecklistEditor();
+      document.getElementById('taskModal').classList.add('open');
+    },
+    closeModal: () => document.getElementById('taskModal').classList.remove('open'),
+
+    save: async () => {
+      const id = document.getElementById('taskId').value;
+      const payload = {
+        title: document.getElementById('taskTitle').value.trim(),
+        description: document.getElementById('taskDescription').value.trim(),
+        assignee: document.getElementById('taskAssignee').value.trim(),
+        due_date: document.getElementById('taskDueDate').value || null,
+        priority: document.getElementById('taskPriority').value,
+        status: document.getElementById('taskStatus').value,
+        is_recurring: document.getElementById('taskRecurring').checked,
+        recurrence_rule: document.getElementById('taskRecurring').checked ? document.getElementById('taskRecurrence').value : null,
+        checklist: _checklistDraft.filter(c => c.text.trim()),
+      };
+      if (!payload.title) { showToast('כותרת המשימה היא שדה חובה', 'error'); return; }
+      try {
+        const url = id ? `/api/tasks/${id}` : '/api/tasks';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'שגיאה');
+        showToast(id ? 'המשימה עודכנה' : 'המשימה נוצרה בהצלחה');
+        Tasks.closeModal();
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    toggleChecklistItem: async (taskId, index, checked) => {
+      const t = _all.find(x => x.id === taskId);
+      if (!t) return;
+      const checklist = JSON.parse(JSON.stringify(t.checklist));
+      checklist[index].done = checked;
+      try {
+        const res = await fetch(`/api/tasks/${taskId}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ checklist }) });
+        if (!res.ok) throw new Error('שגיאה בעדכון');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    complete: async (id) => {
+      try {
+        const res = await fetch(`/api/tasks/${id}/complete`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'שגיאה');
+        showToast(data.next_task ? 'המשימה הושלמה, נוצר מופע הבא' : 'המשימה הושלמה');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    remove: async (id) => {
+      if (!confirm('למחוק את המשימה?')) return;
+      try {
+        const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('שגיאה במחיקה');
+        showToast('המשימה נמחקה');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+  };
+})();
+document.addEventListener('DOMContentLoaded', Tasks.init);
+</script>
+{% endblock %}

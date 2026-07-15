@@ -1,0 +1,572 @@
+{% extends "_shell.html" %}
+{% block title %}מערכת בטיחות אש | ישיבת אוהבי ירושלים{% endblock %}
+
+{% block extra_style %}
+.page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
+.page-title-row h1 { font-size: var(--text-xl); }
+.page-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.dashboard-grid { display: grid; grid-template-columns: 100%; gap: 15px; margin-bottom: 15px; }
+@media (min-width: 992px) { .dashboard-grid { grid-template-columns: 300px 1fr; } }
+
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; margin-bottom: 15px; }
+.card-title { font-size: 1rem; font-weight: 600; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+
+.score-container { text-align: center; padding: 10px 0; }
+.score-circle { font-size: 2.8rem; font-weight: 800; color: var(--valid); margin-bottom: 5px; }
+
+.kpi-list { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+.kpi-item { display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,0,0,0.2); border-radius: 6px; font-size: 0.9rem; }
+
+.table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 6px; border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; text-align: right; font-size: 0.9rem; min-width: 600px; }
+th { background: rgba(0,0,0,0.3); color: var(--text-muted); padding: 12px; font-weight: 600; font-size: 0.8rem; }
+td { padding: 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg-hover); }
+
+.pill { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+.pill.valid { background: rgba(63,185,80,0.15); color: var(--valid); }
+.pill.warning { background: rgba(227,179,65,0.15); color: var(--warning); }
+.pill.critical { background: rgba(248,81,73,0.15); color: var(--critical); }
+.pill.missing { background: rgba(110,118,129,0.15); color: var(--text-muted); }
+.pill.archived { background: rgba(227,179,65,0.15); color: var(--warning); }
+.pill.deleted { background: rgba(248,81,73,0.15); color: var(--critical); }
+
+.filter-select { background: var(--bg); color: var(--text); border: 1px solid var(--border-mid); padding: 6px 12px; border-radius: 4px; font-size: 0.85rem; outline: none; width: 100%; }
+@media (min-width: 480px) { .filter-select { width: auto; } }
+
+.btn {
+  padding: 10px 16px; border-radius: var(--radius); font-size: 0.9rem; font-weight: 600;
+  border: 1px solid var(--border-mid); background: var(--bg-hover); color: var(--text); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s;
+}
+.btn:hover { background: rgba(255,255,255,0.05); }
+.btn-primary { background: var(--accent); color: #000; border: none; }
+.btn-primary:hover { background: #ff9e85; }
+.btn, .filter-select, table button { min-height: 38px; }
+
+.modal-overlay.open { display: flex !important; }
+{% endblock %}
+
+{% block content %}
+<div class="page-title-row">
+  <h1>🛡️ בטיחות אש - אישורים ודרישות</h1>
+  <div class="page-actions">
+    <input type="file" id="filePicker" accept=".pdf" multiple style="display:none" onchange="App.submitUpload(event)">
+    <input type="file" id="folderPicker" webkitdirectory directory multiple style="display:none" onchange="App.submitUpload(event)">
+    <button class="btn" id="btnMail" style="display:none;" onclick="App.triggerMail()">✉️ דוא"ל</button>
+    <button class="btn" onclick="document.getElementById('folderPicker').click()">🗂️ העלאת תיקייה</button>
+    <button class="btn btn-primary" onclick="document.getElementById('filePicker').click()">📁 העלאת קבצים (PDF)</button>
+  </div>
+</div>
+
+<div class="dashboard-grid">
+  <div class="sidebar-layout">
+    <div class="card">
+      <div class="card-title">📊 מדד מוכנות</div>
+      <div class="score-container">
+        <div class="score-circle" id="scoreNum">0%</div>
+        <div style="font-size:0.8rem; color:var(--text-muted)">ציון תקינות כללי בקמפוס</div>
+      </div>
+      <div class="kpi-list">
+        <div class="kpi-item"><span>תקין:</span><span id="kpiValid" style="color:var(--valid)">0</span></div>
+        <div class="kpi-item"><span>אזהרה (30 יום):</span><span id="kpiWarning" style="color:var(--warning)">0</span></div>
+        <div class="kpi-item"><span>קריטי (14 יום):</span><span id="kpiCritical" style="color:var(--accent)">0</span></div>
+        <div class="kpi-item"><span>פג תוקף / חסר:</span><span id="kpiExpired" style="color:var(--critical)">0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-layout">
+    <div class="card">
+      <div class="card-title">
+        <span>📋 סטטוס דרישות וטפסים</span>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <input type="text" id="permitSearch" class="filter-select" placeholder="🔎 חיפוש חופשי..." oninput="App.setSearch(this.value)" style="min-width:140px;">
+          <select id="filterZone" class="filter-select" onchange="App.setZoneFilter(this.value)">
+            <option value="all">כל המתחמים</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>מתחם / קוד</th>
+              <th>דרישה מערכתית</th>
+              <th>סטטוס תוקף</th>
+              <th>פעולות</th>
+            </tr>
+          </thead>
+          <tbody id="tblReqs">
+            <tr><td colspan="4" style="text-align:center;color:var(--text-muted)">טוען נתונים...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🗂️ ארכיון מסמכים (אחרונים)</div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>שם מסמך</th>
+              <th>מתחם שויך</th>
+              <th>טופס שזוהה</th>
+              <th>ניהול</th>
+            </tr>
+          </thead>
+          <tbody id="tblArchive">
+            <tr><td colspan="4" style="text-align:center;color:var(--text-muted)">אין מסמכים בארכיון</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="permitModal" style="position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:3000; padding:15px;">
+  <div class="card" style="max-width:440px; width:100%; margin:auto; max-height:90vh; overflow-y:auto;">
+    <div class="card-title">
+      <span>✏️ עריכת פרטי אישור</span>
+      <span id="permitLockBadge" class="pill missing" style="display:none;">🔒 נעול</span>
+      <span id="permitStatusBadge" class="pill" style="display:none;"></span>
+    </div>
+
+    <div id="permitDeletedInfo" style="display:none; background:rgba(248,81,73,0.08); border:1px solid var(--critical); border-radius:6px; padding:10px 12px; margin-bottom:10px; font-size:0.85rem;">
+      <div>🗑️ מסמך זה נמחק</div>
+      <div style="color:var(--text-muted); margin-top:4px;">
+        נמחק בתאריך: <span id="permitDeletedAt"></span><br>
+        נמחק על ידי: <span id="permitDeletedBy"></span>
+      </div>
+      <div style="color:var(--text-muted); margin-top:6px; font-size:0.78rem;">תצוגת מידע בלבד - לא ניתן לערוך, להחליף או להוריד מסמך שנמחק.</div>
+    </div>
+
+    <input type="hidden" id="permitDocId">
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <input type="text" id="permitNumber" class="filter-select" placeholder="מספר אישור" style="width:100%;">
+      <input type="text" id="permitIssuingBody" class="filter-select" placeholder="גוף מנפיק" style="width:100%;">
+      <input type="date" id="permitIssueDate" class="filter-select" style="width:100%;">
+      <input type="date" id="permitExpiryDate" class="filter-select" style="width:100%;">
+      <input type="text" id="permitContact" class="filter-select" placeholder="איש קשר" style="width:100%;">
+      <input type="text" id="permitCategory" class="filter-select" placeholder="קטגוריה" style="width:100%;">
+      <input type="text" id="permitTags" class="filter-select" placeholder="תגיות (מופרדות בפסיק)" style="width:100%;">
+      <textarea id="permitNotes" class="filter-select" placeholder="הערות" rows="2" style="width:100%;"></textarea>
+    </div>
+
+    <div id="permitDocActions" style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+      <button class="btn" id="permitBtnDownload" style="padding:6px 10px; font-size:0.8rem; min-height:30px;" onclick="App.downloadCurrentDoc()">⬇️ הורדה</button>
+      <button class="btn" id="permitBtnReplace" style="padding:6px 10px; font-size:0.8rem; min-height:30px;" onclick="document.getElementById('permitReplaceFile').click()">🔄 החלפת קובץ</button>
+      <input type="file" id="permitReplaceFile" accept=".pdf" style="display:none;" onchange="App.replaceCurrentDoc(event)">
+      <button class="btn" id="permitBtnLock" style="padding:6px 10px; font-size:0.8rem; min-height:30px;" onclick="App.toggleLock()">🔒 נעילה/שחרור</button>
+      <button class="btn" id="permitBtnArchive" style="padding:6px 10px; font-size:0.8rem; min-height:30px;" onclick="App.toggleArchive()">📦 ארכיון/שחזור</button>
+      <button class="btn" id="permitBtnHistory" style="padding:6px 10px; font-size:0.8rem; min-height:30px;" onclick="App.toggleHistory()">🕒 היסטוריית שינויים</button>
+      <button class="btn btn-danger" id="permitBtnDelete" style="padding:6px 10px; font-size:0.8rem; min-height:30px; color:var(--critical); border-color:var(--critical);" onclick="App.confirmDeleteDoc()">🗑️ מחיקה</button>
+    </div>
+    <div id="permitHistoryBox" style="display:none; margin-top:10px; font-size:0.78rem; color:var(--text-muted); max-height:120px; overflow-y:auto;"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="btn" style="flex:1" onclick="App.closePermitModal()">ביטול</button>
+      <button class="btn btn-primary" id="permitBtnSave" style="flex:1" onclick="App.savePermit()">שמירה</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deleteConfirmModal" style="position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:3500; padding:15px;">
+  <div class="card" style="max-width:400px; width:100%; margin:auto;">
+    <div class="card-title"><span>🗑️ אישור מחיקת מסמך</span></div>
+    <div style="font-size:0.9rem; margin-bottom:10px;">
+      האם למחוק את <b id="deleteConfirmFileName"></b>?
+    </div>
+    <ul style="font-size:0.82rem; color:var(--text-muted); margin:0 0 14px; padding-right:18px; line-height:1.6;">
+      <li>הקובץ הפיזי <b>יימחק לצמיתות</b> מהאחסון (מקומי/Supabase).</li>
+      <li>רשומת המסמך <b>תישמר</b> במסד הנתונים (מסומנת כ"נמחק", לצורך היסטוריה וביקורת).</li>
+      <li>פעולה זו <b>אינה הפיכה</b> מבחינת הקובץ הפיזי.</li>
+    </ul>
+    <div style="display:flex; gap:8px;">
+      <button class="btn" style="flex:1" onclick="App.closeDeleteConfirm()">ביטול</button>
+      <button class="btn btn-danger" style="flex:1; background:var(--critical); color:#fff; border:none;" id="deleteConfirmBtn" onclick="App.executeDeleteDoc()">מחק לצמיתות</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+const App = (() => {
+  let _data = null;
+  let _currentZone = 'all';
+  let _currentPermit = null;
+  let _currentSearch = '';
+
+  const showToast = (msg, type='success') => {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `ds-toast ${type}`;
+    t.innerText = msg;
+    c.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  };
+
+  async function refresh() {
+    try {
+      const res = await fetch('/api/dashboard');
+      _data = await res.json();
+      renderFilters();
+      renderAll();
+    } catch(e) {
+      showToast("שגיאה בחיבור לשרת", "error");
+    }
+  }
+
+  function renderFilters() {
+    const select = document.getElementById('filterZone');
+    if(select.options.length > 1 || !_data.zones) return;
+    _data.zones.forEach(z => {
+      select.innerHTML += `<option value="${z.id}">${z.zone_name}</option>`;
+    });
+  }
+
+  function renderAll() {
+    if(!_data || _data.error) return;
+
+    if(_data.outlook_enabled) {
+      document.getElementById('btnMail').style.display = 'inline-flex';
+    }
+
+    // עדכון מדדים
+    document.getElementById('scoreNum').innerText = (_data.readiness_score || 0) + '%';
+    document.getElementById('kpiValid').innerText = _data.valid_count || 0;
+
+    // סכימה של סטטוסים אם מועבר כמערך או כאובייקט ע"י השרת
+    const expiredCount = _data.alerts?.expired?.length || 0;
+    const criticalCount = _data.alerts?.critical_14?.length || 0;
+    const warningCount = _data.alerts?.warning_30?.length || 0;
+
+    document.getElementById('kpiWarning').innerText = warningCount;
+    document.getElementById('kpiCritical').innerText = criticalCount;
+    document.getElementById('kpiExpired').innerText = expiredCount;
+
+    // טבלת דרישות
+    const tblReqs = document.getElementById('tblReqs');
+    tblReqs.innerHTML = '';
+
+    if(_data.requirements && _data.requirements.length > 0) {
+      _data.requirements.forEach(r => {
+        if(_currentZone !== 'all' && r.zone_id != _currentZone) return;
+        if(_currentSearch) {
+          const hay = `${r.zone_name} ${r.file_number} ${r.system_name} ${r.required_form} ${r.file_name || ''}`.toLowerCase();
+          if(!hay.includes(_currentSearch)) return;
+        }
+
+        let statusPill = `<span class="pill missing">חסר מסמך</span>`;
+        let actionBtn = `<span style="color:var(--text-muted); font-size:0.8rem;">ממתין לקובץ</span>`;
+        let docMeta = r.doc_count > 0 ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">📎 סה"כ ${r.doc_count} קבצים</div>` : '';
+
+        if(r.file_path) {
+          statusPill = `<span class="pill ${r.status}">תוקף: ${r.expiry_date || 'לא מוגבל'}</span>`;
+          actionBtn = `<button class="btn btn-primary" style="padding:4px 12px; min-height:30px; font-size:0.85rem;" onclick="App.previewDoc('${r.file_path}')">👁 צפה</button>`;
+        }
+
+        let manageBtns = '';
+        if(r.doc_id) {
+          manageBtns = `
+            <div style="display:flex; gap:4px; margin-top:4px;">
+              <button class="btn" style="padding:4px 8px; min-height:26px; font-size:0.75rem;" onclick="App.openPermitModal(${r.doc_id})" title="עריכת פרטי אישור">✏️</button>
+              <button class="btn" style="padding:4px 8px; min-height:26px; font-size:0.75rem;" onclick="App.duplicatePermit(${r.doc_id})" title="שכפול לחידוש">📄</button>
+            </div>`;
+        }
+
+        tblReqs.innerHTML += `
+          <tr>
+            <td><strong>${r.zone_name}</strong><br><small style="color:var(--text-muted)">${r.file_number}</small></td>
+            <td><b>${r.system_name}</b><br><small style="color:var(--text-muted)">${r.required_form}</small>${docMeta}</td>
+            <td>${statusPill}</td>
+            <td>${actionBtn}${manageBtns}</td>
+          </tr>`;
+      });
+    } else {
+        tblReqs.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted)">אין דרישות במערכת</td></tr>`;
+    }
+
+    // ארכיון מסמכים
+    const tblArchive = document.getElementById('tblArchive');
+    tblArchive.innerHTML = '';
+    if(_data.recent_docs && _data.recent_docs.length > 0) {
+      _data.recent_docs.forEach(d => {
+        let cleanName = d.file_name.length > 25 ? d.file_name.substring(0, 25) + '...' : d.file_name;
+        tblArchive.innerHTML += `
+          <tr>
+            <td style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${d.file_name}">${cleanName}</td>
+            <td>${d.zone_name || 'כללי'}</td>
+            <td>${d.form_code || '-'}</td>
+            <td><button class="btn" style="padding:4px 12px; min-height:30px; font-size:0.85rem;" onclick="App.previewDoc('${d.file_path}')">👁</button></td>
+          </tr>`;
+      });
+    } else {
+      tblArchive.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted)">אין מסמכים בארכיון</td></tr>`;
+    }
+  }
+
+  return {
+    init: () => { refresh(); },
+    setZoneFilter: (val) => { _currentZone = val; renderAll(); },
+    setSearch: (val) => {
+      clearTimeout(App._searchDebounce);
+      App._searchDebounce = setTimeout(() => {
+        _currentSearch = (val || '').trim().toLowerCase();
+        renderAll();
+      }, 150);
+    },
+
+    openPermitModal: async (docId) => {
+      try {
+        const res = await fetch(`/api/permits/${docId}`);
+        const p = await res.json();
+        if(!res.ok) throw new Error(p.error || 'שגיאה בטעינת האישור');
+        _currentPermit = p;
+
+        document.getElementById('permitDocId').value = p.id;
+        document.getElementById('permitNumber').value = p.permit_number || '';
+        document.getElementById('permitIssuingBody').value = p.issuing_body || '';
+        document.getElementById('permitIssueDate').value = p.issue_date || '';
+        document.getElementById('permitExpiryDate').value = p.expiry_date || '';
+        document.getElementById('permitContact').value = p.contact_name || '';
+        document.getElementById('permitCategory').value = p.category || '';
+        document.getElementById('permitTags').value = (p.tags || []).join(', ');
+        document.getElementById('permitNotes').value = p.notes || '';
+        document.getElementById('permitLockBadge').style.display = p.locked ? 'inline-block' : 'none';
+        document.getElementById('permitHistoryBox').style.display = 'none';
+        document.getElementById('permitHistoryBox').innerHTML = '';
+
+        const statusLabel = { active: 'פעיל', archived: 'בארכיון', deleted: 'נמחק', draft: 'טיוטה' };
+        const statusBadge = document.getElementById('permitStatusBadge');
+        statusBadge.className = `pill ${p.status}`;
+        statusBadge.innerText = statusLabel[p.status] || p.status;
+        statusBadge.style.display = 'inline-block';
+
+        const isDeleted = p.status === 'deleted';
+        const isArchived = p.status === 'archived';
+
+        // --- פאנל מידע למסמך שנמחק ---
+        document.getElementById('permitDeletedInfo').style.display = isDeleted ? 'block' : 'none';
+        if (isDeleted) {
+          document.getElementById('permitDeletedAt').innerText = p.deleted_at ? new Date(p.deleted_at).toLocaleString('he-IL') : '-';
+          document.getElementById('permitDeletedBy').innerText = p.deleted_by_username || (p.deleted_by ? `משתמש #${p.deleted_by}` : '-');
+        }
+
+        // --- שדות טופס: נעולים לגמרי במסמך שנמחק (תצוגת מידע בלבד) ---
+        ['permitNumber','permitIssuingBody','permitIssueDate','permitExpiryDate','permitContact','permitCategory','permitTags','permitNotes']
+          .forEach(id => document.getElementById(id).disabled = isDeleted);
+
+        // --- כפתורי פעולה: מודעים ל-status ---
+        document.getElementById('permitBtnDownload').style.display = isDeleted ? 'none' : 'inline-flex';
+        document.getElementById('permitBtnReplace').style.display = isDeleted ? 'none' : 'inline-flex';
+        document.getElementById('permitBtnLock').style.display = isDeleted ? 'none' : 'inline-flex';
+        document.getElementById('permitBtnArchive').innerText = isArchived ? '📦 שחזור מארכיון' : '📦 ארכיון';
+        document.getElementById('permitBtnArchive').style.display = isDeleted ? 'none' : 'inline-flex';
+        document.getElementById('permitBtnDelete').style.display = isDeleted ? 'none' : 'inline-flex';
+        document.getElementById('permitBtnSave').style.display = isDeleted ? 'none' : 'inline-flex';
+
+        document.getElementById('permitModal').classList.add('open');
+      } catch(e) { showToast(e.message, 'error'); }
+    },
+
+    downloadCurrentDoc: () => {
+      if (_currentPermit && _currentPermit.file_path) App.previewDoc(_currentPermit.file_path);
+    },
+
+    toggleLock: async () => {
+      const id = document.getElementById('permitDocId').value;
+      const isLocked = document.getElementById('permitLockBadge').style.display !== 'none';
+      try {
+        const res = await fetch(`/api/permits/${id}/${isLocked ? 'unlock' : 'lock'}`, { method: 'POST' });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error || 'שגיאה');
+        document.getElementById('permitLockBadge').style.display = data.locked ? 'inline-block' : 'none';
+        showToast(data.locked ? 'האישור ננעל' : 'הנעילה שוחררה');
+      } catch(e) { showToast(e.message, 'error'); }
+    },
+
+    toggleArchive: async () => {
+      const id = document.getElementById('permitDocId').value;
+      if (!_currentPermit || _currentPermit.status === 'deleted') return; // הגנה - לא אמור לקרות, הכפתור מוסתר
+      const newStatus = _currentPermit.status === 'archived' ? 'active' : 'archived';
+      try {
+        const res = await fetch(`/api/permits/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ status: newStatus }) });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error || 'שגיאה');
+        showToast(newStatus === 'archived' ? 'האישור הועבר לארכיון' : 'האישור שוחזר מהארכיון');
+        App.closePermitModal();
+        refresh();
+      } catch(e) { showToast(e.message, 'error'); }
+    },
+
+    replaceCurrentDoc: async (event) => {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      const id = document.getElementById('permitDocId').value;
+
+      const buttons = document.querySelectorAll('#permitDocActions button, #permitBtnSave');
+      buttons.forEach(b => b.disabled = true);
+      showToast('מעלה קובץ חדש...', 'warning');
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch(`/api/permits/${id}/replace`, { method: 'POST', body: formData });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error || 'שגיאה בהחלפת הקובץ');
+        showToast('✅ הקובץ הוחלף בהצלחה');
+        App.closePermitModal();
+        refresh();
+      } catch(e) {
+        showToast(e.message, 'error');
+      } finally {
+        buttons.forEach(b => b.disabled = false);
+      }
+    },
+
+    confirmDeleteDoc: () => {
+      if (!_currentPermit) return;
+      document.getElementById('deleteConfirmFileName').innerText = _currentPermit.file_name;
+      document.getElementById('deleteConfirmModal').classList.add('open');
+    },
+
+    closeDeleteConfirm: () => document.getElementById('deleteConfirmModal').classList.remove('open'),
+
+    executeDeleteDoc: async () => {
+      if (!_currentPermit) return;
+      const id = _currentPermit.id;
+      const btn = document.getElementById('deleteConfirmBtn');
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/permits/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error || 'שגיאה במחיקת המסמך');
+        showToast('🗑️ המסמך נמחק');
+        App.closeDeleteConfirm();
+        App.closePermitModal();
+        refresh();
+      } catch(e) {
+        showToast(e.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    },
+
+    toggleHistory: async () => {
+      const id = document.getElementById('permitDocId').value;
+      const box = document.getElementById('permitHistoryBox');
+      if(box.style.display === 'block') { box.style.display = 'none'; return; }
+      try {
+        const res = await fetch(`/api/permits/${id}/history`);
+        const items = await res.json();
+        box.innerHTML = items.length ? items.map(h =>
+          `<div style="padding:4px 0; border-bottom:1px solid var(--border);">
+             ${h.field_name}: "${h.old_value ?? '—'}" → "${h.new_value ?? '—'}"
+             <div style="opacity:0.7;">${new Date(h.changed_at).toLocaleString('he-IL')}</div>
+           </div>`).join('') : 'אין שינויים רשומים';
+        box.style.display = 'block';
+      } catch(e) { showToast('שגיאה בטעינת היסטוריה', 'error'); }
+    },
+
+    closePermitModal: () => { document.getElementById('permitModal').classList.remove('open'); _currentPermit = null; },
+
+    savePermit: async () => {
+      const id = document.getElementById('permitDocId').value;
+      const payload = {
+        permit_number: document.getElementById('permitNumber').value.trim(),
+        issuing_body: document.getElementById('permitIssuingBody').value.trim(),
+        issue_date: document.getElementById('permitIssueDate').value || null,
+        expiry_date: document.getElementById('permitExpiryDate').value || null,
+        contact_name: document.getElementById('permitContact').value.trim(),
+        category: document.getElementById('permitCategory').value.trim(),
+        tags: document.getElementById('permitTags').value.trim(),
+        notes: document.getElementById('permitNotes').value.trim(),
+      };
+      try {
+        const res = await fetch(`/api/permits/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error || 'שגיאה בשמירה');
+        showToast('פרטי האישור עודכנו');
+        App.closePermitModal();
+        refresh();
+      } catch(e) { showToast(e.message, 'error'); }
+    },
+
+    duplicatePermit: async (docId) => {
+      if(!confirm('ליצור טיוטת חידוש המבוססת על אישור זה?')) return;
+      try {
+        const res = await fetch(`/api/permits/${docId}/duplicate`, { method: 'POST' });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error || 'שגיאה בשכפול');
+        showToast('נוצרה טיוטת חידוש חדשה');
+        refresh();
+      } catch(e) { showToast(e.message, 'error'); }
+    },
+
+    // פתיחת המסמך ישירות בלשונית חדשה (מותאם לנייד)
+    previewDoc: (path) => {
+      const fileName = path.split('/').pop().split('\\').pop();
+      const fileUrl = '/uploads/' + encodeURIComponent(fileName);
+      window.open(fileUrl, '_blank');
+    },
+
+    submitUpload: async (event) => {
+      const allFiles = Array.from(event.target.files);
+      const files = allFiles.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+      const skippedNonPdf = allFiles.length - files.length;
+
+      if(files.length === 0) {
+        showToast(allFiles.length ? 'לא נמצאו קבצי PDF בבחירה' : 'לא נבחרו קבצים', 'error');
+        event.target.value = '';
+        return;
+      }
+
+      showToast(`מעלה ומנתח ${files.length} מסמכים... אנא המתן`, "warning");
+
+      const formData = new FormData();
+      files.forEach(f => formData.append('file', f));
+
+      try {
+        const res = await fetch('/api/documents/upload_bulk', { method: 'POST', body: formData });
+        const resData = await res.json();
+
+        if (resData.processed > 0) {
+          let msg = `✅ נקלטו ${resData.processed} מסמכים בארכיון.`;
+          if (resData.skipped_duplicates) msg += ` (${resData.skipped_duplicates} כפילויות דולגו)`;
+          if (skippedNonPdf) msg += ` (${skippedNonPdf} קבצים לא-PDF דולגו)`;
+          showToast(msg);
+        } else if (resData.skipped_duplicates > 0 && !resData.errors.length) {
+          showToast(`כל ${resData.skipped_duplicates} הקבצים כבר קיימים בארכיון (זוהו ככפילויות)`, 'warning');
+        } else if (resData.errors && resData.errors.length) {
+          const firstErr = resData.errors[0];
+          showToast(`❌ ההעלאה נכשלה: ${firstErr.reason}. ייתכן שיש בעיית חיבור למסד הנתונים (בדוק את הגדרת ה-DB, למשל Neon).`, 'error');
+        } else {
+          showToast('לא נקלט אף מסמך', 'error');
+        }
+        refresh();
+      } catch(e) {
+          showToast("שגיאת רשת בהעלאת הקובץ", "error");
+      }
+      event.target.value = ''; // איפוס בחירת הקובץ
+    },
+
+    triggerMail: async () => {
+      try {
+        await fetch('/api/outlook', { method: 'POST', headers: {'Content-Type': 'application/json'}});
+        showToast("נפתח יישום אאוטלוק במחשב");
+      } catch(e) {
+          showToast("שגיאה בפתיחת אאוטלוק", "error");
+      }
+    }
+  };
+})();
+
+document.addEventListener('DOMContentLoaded', App.init);
+</script>
+{% endblock %}

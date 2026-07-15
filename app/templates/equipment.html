@@ -1,0 +1,233 @@
+{% extends "_shell.html" %}
+{% block title %}ציוד כיבוי אש | בטיחות אש Enterprise{% endblock %}
+
+{% block extra_style %}
+.page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
+.page-title-row h1 { font-size: var(--text-xl); }
+.btn { flex: 1; min-width: 100px; padding: 10px 16px; border-radius: var(--radius); font-size: 0.9rem; font-weight: 600; border: 1px solid var(--border-mid); background: var(--bg-hover); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s; }
+.btn:hover { background: rgba(255,255,255,0.05); }
+.btn-primary { background: var(--accent); color: #000; border: none; }
+.btn-primary:hover { background: #ff9e85; }
+.btn-sm { flex: none; min-width: 0; padding: 5px 10px; font-size: 0.8rem; min-height: 30px; }
+.btn-danger { color: var(--critical); }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; margin-bottom: 15px; }
+.card-title { font-size: 1rem; font-weight: 600; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap:wrap; gap:10px; }
+.empty-state { text-align: center; color: var(--text-muted); padding: 30px 10px; font-size: 0.9rem; }
+.filters-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.filters-row input, .filters-row select { background: var(--bg); color: var(--text); border: 1px solid var(--border-mid); border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; outline: none; }
+.filters-row input { flex: 1; min-width: 160px; }
+.eq-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 768px) { .eq-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1200px) { .eq-grid { grid-template-columns: repeat(3, 1fr); } }
+.eq-card { animation: fadeIn 0.25s ease; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; background: rgba(255,255,255,0.015); display: flex; gap: 10px; }
+.eq-info { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.eq-title { font-weight: 700; }
+.eq-row { font-size: 0.8rem; color: var(--text-muted); }
+.eq-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 6px; }
+.eq-qr img { width: 56px; height: 56px; border-radius: 4px; background: #fff; padding: 3px; }
+.pill { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; }
+.pill.ok { background: rgba(63,185,80,0.15); color: var(--valid); }
+.pill.faulty { background: rgba(248,81,73,0.15); color: var(--critical); }
+.pill.in_repair { background: rgba(227,179,65,0.15); color: var(--warning); }
+.inline-form { display: flex; flex-direction: column; gap: 8px; }
+.inline-form input, .inline-form textarea, .inline-form select { background: var(--bg); color: var(--text); border: 1px solid var(--border-mid); border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; outline: none; width: 100%; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 480px) { .form-grid { grid-template-columns: 1fr; } }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 3000; padding: 15px; overflow-y: auto; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: var(--radius); padding: 20px; width: 100%; max-width: 520px; margin: auto; }
+.modal h3 { margin-bottom: 14px; font-size: 1rem; }
+.modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+.modal-actions .btn { flex: 1; }
+.btn, table button { min-height: 38px; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
+.skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 37%, rgba(255,255,255,0.04) 63%); background-size: 400px 100%; animation: shimmer 1.4s ease infinite; border-radius: 6px; height: 70px; margin-bottom: 10px; }
+.error-state { text-align: center; color: var(--critical); padding: 20px; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.retry-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border-mid); background: var(--bg-hover); color: var(--text); cursor: pointer; font-size: 0.8rem; }
+{% endblock %}
+
+{% block content %}
+<div class="page-title-row">
+  <h1>🧯 ציוד כיבוי אש</h1>
+  <button class="btn btn-primary" onclick="Equip.openModal()">➕ ציוד חדש</button>
+</div>
+<p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:var(--space-4);">מטפים, גלגלונים, גלאים ועוד</p>
+
+<div class="card">
+  <div class="card-title"><span>🧯 רשימת ציוד</span></div>
+  <div class="filters-row">
+    <input type="text" id="filterQ" placeholder="חיפוש לפי מס' סידורי / דגם / יצרן..." oninput="clearTimeout(window._filterDebounce); window._filterDebounce = setTimeout(() => Equip.applyFilters(), 150)">
+    <select id="filterType" onchange="Equip.applyFilters()"><option value="">כל סוגי הציוד</option></select>
+    <select id="filterStatus" onchange="Equip.applyFilters()">
+      <option value="">כל הסטטוסים</option>
+      <option value="ok">תקין</option>
+      <option value="faulty">לא תקין</option>
+      <option value="in_repair">בתיקון</option>
+    </select>
+  </div>
+  <div id="eqGrid" class="eq-grid"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+</div>
+
+<div class="modal-overlay" id="eqModal">
+  <div class="modal">
+    <h3 id="eqModalTitle">ציוד חדש</h3>
+    <div class="inline-form">
+      <input type="hidden" id="eqId">
+      <input type="text" id="equipmentType" placeholder="סוג ציוד * (למשל: מטף אבקה)">
+      <div class="form-grid">
+        <input type="text" id="serialNumber" placeholder="מספר סידורי">
+        <input type="text" id="manufacturer" placeholder="יצרן">
+        <input type="text" id="model" placeholder="דגם">
+        <input type="text" id="qrCode" placeholder="קוד QR">
+        <input type="text" id="barcode" placeholder="ברקוד">
+        <select id="status">
+          <option value="ok">תקין</option>
+          <option value="faulty">לא תקין</option>
+          <option value="in_repair">בתיקון</option>
+        </select>
+        <input type="date" id="installDate" title="תאריך התקנה">
+        <input type="date" id="lastCheckDate" title="בדיקה אחרונה">
+        <input type="date" id="nextCheckDate" title="בדיקה הבאה">
+        <input type="date" id="warrantyExpiry" title="תוקף אחריות">
+      </div>
+      <textarea id="notes" placeholder="הערות" rows="2"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="Equip.closeModal()">ביטול</button>
+      <button class="btn btn-primary" onclick="Equip.save()">שמירה</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+const Equip = (() => {
+  let _all = [];
+  const showToast = (msg, type='success') => {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `ds-toast ${type}`; t.innerText = msg; c.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  };
+  const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const statusLabel = { ok: 'תקין', faulty: 'לא תקין', in_repair: 'בתיקון' };
+
+  async function refresh() {
+    try {
+      const res = await fetch('/api/equipment');
+      _all = await res.json();
+      await loadTypes();
+      render(_all);
+    } catch (e) {
+      document.getElementById('eqGrid').innerHTML = `<div class="error-state">⚠️ שגיאה בטעינת ציוד<button class="retry-btn" onclick="Equip.init()">🔄 נסה שוב</button></div>`;
+      showToast('שגיאה בחיבור לשרת', 'error');
+    }
+  }
+
+  async function loadTypes() {
+    try {
+      const res = await fetch('/api/equipment/types');
+      const types = await res.json();
+      const sel = document.getElementById('filterType');
+      const current = sel.value;
+      sel.innerHTML = '<option value="">כל סוגי הציוד</option>' + types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+      sel.value = current;
+    } catch (e) { /* לא קריטי */ }
+  }
+
+  function render(list) {
+    const el = document.getElementById('eqGrid');
+    if (!list.length) { el.innerHTML = `<div class="empty-state">לא נמצא ציוד</div>`; return; }
+    el.innerHTML = list.map(e => `
+      <div class="eq-card">
+        <div class="eq-info">
+          <div class="eq-title">${esc(e.equipment_type)}</div>
+          <span class="pill ${e.status}" style="width:fit-content">${statusLabel[e.status] || e.status}</span>
+          ${e.serial_number ? `<div class="eq-row">🔢 ${esc(e.serial_number)}</div>` : ''}
+          ${e.manufacturer || e.model ? `<div class="eq-row">🏭 ${esc(e.manufacturer || '')} ${esc(e.model || '')}</div>` : ''}
+          ${e.area_name ? `<div class="eq-row">📍 ${esc(e.area_name)}</div>` : ''}
+          ${e.next_check_date ? `<div class="eq-row">🗓️ בדיקה הבאה: ${esc(e.next_check_date)}</div>` : ''}
+          <div class="eq-actions">
+            <button class="btn btn-sm" style="flex:1" onclick="Equip.openModal(${e.id})">✏️ עריכה</button>
+            <button class="btn btn-sm btn-danger" onclick="Equip.remove(${e.id})">🗑️</button>
+          </div>
+        </div>
+        ${e.qr_code ? `<div class="eq-qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(e.qr_code)}" alt="QR" loading="lazy"></div>` : ''}
+      </div>`).join('');
+  }
+
+  function applyFilters() {
+    const q = document.getElementById('filterQ').value.trim().toLowerCase();
+    const type = document.getElementById('filterType').value;
+    const status = document.getElementById('filterStatus').value;
+    let list = _all;
+    if (q) list = list.filter(e => [e.serial_number, e.manufacturer, e.model, e.qr_code, e.barcode].some(v => (v||'').toLowerCase().includes(q)));
+    if (type) list = list.filter(e => e.equipment_type === type);
+    if (status) list = list.filter(e => e.status === status);
+    render(list);
+  }
+
+  function fillForm(e) {
+    const map = {
+      eqId: e?.id || '', equipmentType: e?.equipment_type || '', serialNumber: e?.serial_number || '',
+      manufacturer: e?.manufacturer || '', model: e?.model || '', qrCode: e?.qr_code || '', barcode: e?.barcode || '',
+      status: e?.status || 'ok', installDate: e?.install_date || '', lastCheckDate: e?.last_check_date || '',
+      nextCheckDate: e?.next_check_date || '', warrantyExpiry: e?.warranty_expiry || '', notes: e?.notes || '',
+    };
+    Object.entries(map).forEach(([id, val]) => { document.getElementById(id).value = val; });
+  }
+
+  return {
+    init: () => { refresh(); },
+    applyFilters,
+    openModal: (id) => {
+      document.getElementById('eqModalTitle').innerText = id ? 'עריכת ציוד' : 'ציוד חדש';
+      fillForm(id ? _all.find(e => e.id === id) : null);
+      document.getElementById('eqModal').classList.add('open');
+    },
+    closeModal: () => document.getElementById('eqModal').classList.remove('open'),
+    save: async () => {
+      const id = document.getElementById('eqId').value;
+      const payload = {
+        equipment_type: document.getElementById('equipmentType').value.trim(),
+        serial_number: document.getElementById('serialNumber').value.trim(),
+        manufacturer: document.getElementById('manufacturer').value.trim(),
+        model: document.getElementById('model').value.trim(),
+        qr_code: document.getElementById('qrCode').value.trim(),
+        barcode: document.getElementById('barcode').value.trim(),
+        status: document.getElementById('status').value,
+        install_date: document.getElementById('installDate').value || null,
+        last_check_date: document.getElementById('lastCheckDate').value || null,
+        next_check_date: document.getElementById('nextCheckDate').value || null,
+        warranty_expiry: document.getElementById('warrantyExpiry').value || null,
+        notes: document.getElementById('notes').value.trim(),
+      };
+      if (!payload.equipment_type) { showToast('סוג הציוד הוא שדה חובה', 'error'); return; }
+      try {
+        const url = id ? `/api/equipment/${id}` : '/api/equipment';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'שגיאה');
+        showToast(id ? 'הציוד עודכן' : 'הציוד נוצר בהצלחה');
+        Equip.closeModal();
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+    remove: async (id) => {
+      if (!confirm('למחוק את פריט הציוד?')) return;
+      try {
+        const res = await fetch(`/api/equipment/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('שגיאה במחיקה');
+        showToast('הציוד נמחק');
+        refresh();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+  };
+})();
+document.addEventListener('DOMContentLoaded', Equip.init);
+</script>
+{% endblock %}

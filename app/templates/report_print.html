@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>דוח: {{ report.label }}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Arial, sans-serif; color: #1a1a1a; padding: 30px; max-width: 900px; margin: auto; }
+  h1 { font-size: 1.3rem; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 6px; }
+  .meta { color: #666; font-size: 0.82rem; margin-bottom: 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+  th { background: #f5f5f5; }
+  tr:nth-child(even) { background: #fafafa; }
+  .print-btn { position: fixed; top: 15px; left: 15px; padding: 8px 16px; border-radius: 6px; border: none; background: #f78166; color: #000; font-weight: 700; cursor: pointer; }
+  @media print { .print-btn { display: none; } body { padding: 0; } }
+</style>
+</head>
+<body>
+<button class="print-btn" onclick="window.print()">🖨️ הדפסה / שמירה כ-PDF</button>
+<h1>דוח: {{ report.label }}</h1>
+<div class="meta">סה"כ {{ report.rows|length }} רשומות</div>
+<table>
+  <thead><tr>{% for h in report.headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+  <tbody>
+    {% for row in report.rows %}
+    <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+    {% endfor %}
+  </tbody>
+</table>
+</body>
+</html>
