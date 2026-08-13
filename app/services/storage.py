@@ -57,7 +57,6 @@ def check_connection():
 
 
 def is_supabase_path(file_path: str) -> bool:
-    """True only when the DB value is in canonical bucket/path format."""
     return bool(file_path) and file_path.startswith(f'{_bucket_name()}/')
 
 
@@ -65,11 +64,7 @@ def upload_bytes(remote_filename: str, data: bytes, content_type: str = 'applica
     client = _get_client()
     bucket = _bucket_name()
     try:
-        client.storage.from_(bucket).upload(
-            path=remote_filename,
-            file=data,
-            file_options={'content-type': content_type},
-        )
+        client.storage.from_(bucket).upload(path=remote_filename, file=data, file_options={'content-type': content_type})
     except Exception as e:
         logger.error(f'Supabase upload failed for {remote_filename}: {e}')
         raise StorageError(f'העלאה ל-Supabase Storage נכשלה: {e}')
@@ -82,22 +77,16 @@ def delete_object(stored_path: str):
     bucket = _bucket_name()
     remote_filename = stored_path[len(bucket) + 1:] if stored_path.startswith(f'{bucket}/') else os.path.basename(stored_path)
     try:
-        client = _get_client()
-        client.storage.from_(bucket).remove([remote_filename])
+        _get_client().storage.from_(bucket).remove([remote_filename])
     except Exception as e:
         logger.error(f'Supabase cleanup delete failed for {stored_path}: {e}')
 
 
 def get_signed_url(stored_path: str, expires_in: int = 300):
     bucket = _bucket_name()
-    remote_filename = (
-        stored_path[len(bucket) + 1:]
-        if stored_path.startswith(f'{bucket}/')
-        else os.path.basename(stored_path)
-    )
+    remote_filename = stored_path[len(bucket) + 1:] if stored_path.startswith(f'{bucket}/') else os.path.basename(stored_path)
     try:
-        client = _get_client()
-        res = client.storage.from_(bucket).create_signed_url(remote_filename, expires_in)
+        res = _get_client().storage.from_(bucket).create_signed_url(remote_filename, expires_in)
         if isinstance(res, dict):
             return res.get('signedURL') or res.get('signedUrl') or res.get('signed_url')
         return getattr(res, 'signed_url', None)
@@ -154,15 +143,13 @@ def build_local_basename_index(upload_folder: str) -> dict:
 
 
 def list_supabase_files() -> list:
-    """Read-only inventory of objects in the configured Supabase bucket."""
     if not is_configured():
         return []
     results = []
     bucket = _bucket_name()
     try:
         client = _get_client()
-        limit = 100
-        offset = 0
+        limit, offset = 100, 0
         while True:
             page = client.storage.from_(bucket).list(options={'limit': limit, 'offset': offset})
             if not page:
@@ -171,10 +158,8 @@ def list_supabase_files() -> list:
                 name = item.get('name') if isinstance(item, dict) else getattr(item, 'name', None)
                 if not name:
                     continue
-                size = None
                 metadata = item.get('metadata') if isinstance(item, dict) else None
-                if isinstance(metadata, dict):
-                    size = metadata.get('size')
+                size = metadata.get('size') if isinstance(metadata, dict) else None
                 results.append({'filename': name, 'size': size})
             if len(page) < limit:
                 break
@@ -185,18 +170,14 @@ def list_supabase_files() -> list:
 
 
 def find_supabase_legacy_path(file_path: str, inventory: list | None = None) -> str | None:
-    """Resolve an old local-style DB path to a unique Supabase object."""
     if not file_path or not is_configured() or is_supabase_path(file_path):
         return None
     basename = os.path.basename(file_path)
     if not basename:
         return None
-    bucket = _bucket_name()
     inventory = inventory if inventory is not None else list_supabase_files()
     matches = [item['filename'] for item in inventory if item.get('filename') == basename]
-    if len(matches) == 1:
-        return f'{bucket}/{matches[0]}'
-    return None
+    return f'{_bucket_name()}/{matches[0]}' if len(matches) == 1 else None
 
 
 def file_exists(file_path: str, upload_folder: str) -> dict:
@@ -223,10 +204,7 @@ def delete_file(file_path: str, upload_folder: str) -> dict:
             delete_object(file_path)
         except Exception as e:
             return {'status': False, 'error': f'Supabase deletion failed: {e}'}
-        still_accessible = get_signed_url(file_path) is not None
-        if still_accessible:
-            return {'status': False, 'error': 'הקובץ עדיין נגיש ב-Supabase אחרי ניסיון המחיקה'}
-        return {'status': True, 'error': None}
+        return {'status': False, 'error': 'הקובץ עדיין נגיש ב-Supabase אחרי ניסיון המחיקה'} if get_signed_url(file_path) else {'status': True, 'error': None}
     local_root = os.path.abspath(upload_folder)
     local_full_path = os.path.abspath(os.path.join(local_root, os.path.basename(file_path)))
     if os.path.commonpath([local_full_path, local_root]) != local_root:
@@ -261,7 +239,6 @@ def upload_temp(data: bytes, filename: str, upload_folder: str) -> dict:
 
 
 def verify_pdf_bytes(data: bytes) -> dict:
-    """Validate size, PDF signature and basic PDF structure."""
     if not data:
         return {'status': False, 'error': 'קובץ ריק'}
     max_bytes = int(current_app.config.get('MAX_PDF_BYTES', 100 * 1024 * 1024))
