@@ -15,6 +15,10 @@
 .table-scroll { overflow-x: auto; }
 .spin { display: inline-block; animation: ds-spin 0.8s linear infinite; }
 @keyframes ds-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.migration-card { border: 1px solid var(--color-border-strong); background: var(--color-surface); margin-bottom: var(--space-5); }
+.migration-summary { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin:12px 0; }
+@media (min-width:768px) { .migration-summary { grid-template-columns:repeat(5,1fr); } }
+.migration-note { font-size:var(--text-sm); color:var(--color-text-muted); line-height:1.6; }
 {% endblock %}
 
 {% block content %}
@@ -32,10 +36,29 @@
   <div class="ds-skeleton" style="height:76px;"></div>
 </div>
 
-<div class="ds-card" style="margin-bottom:var(--space-5);">
+<div class="ds-card migration-card">
   <div class="section-title">
-    <span>⚠️ בעיות שזוהו</span>
+    <span>🔄 שחזור והעברת מסמכים ישנים ל-Supabase</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="ds-btn ds-btn-sm" id="btnMigrationScan" onclick="StorageAdmin.runMigrationScan()">🔎 בדוק התאמה</button>
+      <button class="ds-btn ds-btn-primary ds-btn-sm" id="btnMigrationRun" onclick="StorageAdmin.runMigration()">☁️ העבר/שחזר ל-Supabase</button>
+    </div>
   </div>
+  <div class="migration-note">
+    המערכת בודקת מסמכים ישנים שהנתיב שלהם מצביע ל-Render/דיסק מקומי. מסמך יועבר רק אם הוא קיים מקומית או שנמצא ב-Supabase בדיוק לפי שם הקובץ. מסמכים חסרים או עם שם כפול לא ישונו.
+  </div>
+  <div class="migration-summary" id="migrationSummary">
+    <div class="ds-kpi-card"><div class="ds-kpi-value" id="migNative">-</div><div class="ds-kpi-label">כבר ב-Supabase</div></div>
+    <div class="ds-kpi-card good"><div class="ds-kpi-value" id="migRecoverable">-</div><div class="ds-kpi-label">ניתן לשחזור מ-Supabase</div></div>
+    <div class="ds-kpi-card warn"><div class="ds-kpi-value" id="migLocal">-</div><div class="ds-kpi-label">קיימים מקומית להעברה</div></div>
+    <div class="ds-kpi-card bad"><div class="ds-kpi-value" id="migMissing">-</div><div class="ds-kpi-label">חסרים</div></div>
+    <div class="ds-kpi-card warn"><div class="ds-kpi-value" id="migAmbiguous">-</div><div class="ds-kpi-label">שמות כפולים</div></div>
+  </div>
+  <div id="migrationResult" style="font-size:var(--text-sm);"></div>
+</div>
+
+<div class="ds-card" style="margin-bottom:var(--space-5);">
+  <div class="section-title"><span>⚠️ בעיות שזוהו</span></div>
   <div id="issuesBox"><div class="ds-skeleton" style="height:40px;"></div></div>
 </div>
 
@@ -54,31 +77,20 @@
   </div>
   <div class="table-scroll">
     <table class="ds-table" id="orphanTable" style="display:none;">
-      <thead><tr>
-        <th style="width:30px;"></th>
-        <th>שם קובץ</th>
-        <th>נתיב</th>
-        <th>גודל</th>
-        <th>עדכון אחרון</th>
-        <th>סיבה</th>
-      </tr></thead>
+      <thead><tr><th style="width:30px;"></th><th>שם קובץ</th><th>נתיב</th><th>גודל</th><th>עדכון אחרון</th><th>סיבה</th></tr></thead>
       <tbody id="orphanBody"></tbody>
     </table>
     <div id="orphanEmpty" style="display:none;" class="ds-empty-state">
-      <div class="ds-empty-icon">✅</div>
-      <div class="ds-empty-title">אין קבצים יתומים</div>
-      <div class="ds-empty-desc">כל הקבצים באחסון משויכים לרשומה במסד הנתונים.</div>
+      <div class="ds-empty-icon">✅</div><div class="ds-empty-title">אין קבצים יתומים</div><div class="ds-empty-desc">כל הקבצים באחסון משויכים לרשומה במסד הנתונים.</div>
     </div>
   </div>
 </div>
 
-<!-- Dialog אישור ניקוי -->
 <div class="ds-modal-overlay" id="cleanupConfirmModal">
   <div class="ds-modal" style="max-width:420px;">
     <h3 style="margin-bottom:10px;">🗑️ אישור ניקוי קבצים יתומים</h3>
     <p style="font-size:var(--text-sm); color:var(--color-text-muted); margin-bottom:14px;">
-      <span id="cleanupConfirmCount"></span> קבצים ימחקו לצמיתות מהאחסון (מקומי/Supabase).
-      פעולה זו נבדקת שוב ברגע האמת - קובץ שהפך רלוונטי מאז הרשימה יידלג אוטומטית ולא יימחק.
+      <span id="cleanupConfirmCount"></span> קבצים ימחקו לצמיתות מהאחסון. הפעולה נבדקת שוב ברגע האמת.
     </p>
     <div style="display:flex; gap:8px;">
       <button class="ds-btn" style="flex:1" onclick="StorageAdmin.closeCleanupConfirm()">ביטול</button>
@@ -94,8 +106,8 @@ const StorageAdmin = (() => {
   const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const showToast = (msg, type='success') => {
     const c = document.getElementById('toastContainer');
-    const t = document.createElement('div');
-    t.className = `ds-toast ${type}`; t.innerText = msg; c.appendChild(t);
+    if (!c) return;
+    const t = document.createElement('div'); t.className = `ds-toast ${type}`; t.innerText = msg; c.appendChild(t);
     setTimeout(() => t.remove(), 4000);
   };
   let _orphans = [];
@@ -112,6 +124,45 @@ const StorageAdmin = (() => {
     try { return new Date(iso).toLocaleString('he-IL'); } catch(e) { return iso; }
   }
 
+  function renderMigration(d) {
+    const c = d.counts || {};
+    document.getElementById('migNative').innerText = c.native ?? 0;
+    document.getElementById('migRecoverable').innerText = c.recoverable_supabase ?? 0;
+    document.getElementById('migLocal').innerText = c.migratable_local ?? 0;
+    document.getElementById('migMissing').innerText = c.missing ?? 0;
+    document.getElementById('migAmbiguous').innerText = c.ambiguous ?? 0;
+  }
+
+  async function runMigrationScan() {
+    const btn = document.getElementById('btnMigrationScan'); btn.disabled = true;
+    try {
+      const res = await fetch('/api/admin/storage/migration-scan');
+      const d = await res.json(); if (!res.ok) throw new Error(d.error || 'שגיאה');
+      renderMigration(d);
+      const items = d.items || [];
+      const candidates = items.filter(i => ['recoverable_supabase','migratable_local'].includes(i.state));
+      document.getElementById('migrationResult').innerHTML = `<span class="ds-badge ds-badge-success">${candidates.length} מסמכים מוכנים לשחזור/העברה</span>`;
+      showToast('בדיקת ההתאמה הושלמה');
+    } catch(e) { showToast('בדיקת האחסון נכשלה: ' + e.message, 'error'); }
+    finally { btn.disabled = false; }
+  }
+
+  async function runMigration() {
+    if (!confirm('להתחיל העברה/שחזור של כל המסמכים הבטוחים ל-Supabase? לא יימחק קובץ מקור.')) return;
+    const btn = document.getElementById('btnMigrationRun'); btn.disabled = true; btn.innerText = '⏳ מעביר...';
+    try {
+      const res = await fetch('/api/admin/storage/migration-run', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+      const d = await res.json();
+      if (!res.ok && !d.report) throw new Error(d.error || 'שגיאה');
+      const migrated = d.migrated || [], failed = d.failed || [];
+      document.getElementById('migrationResult').innerHTML = `<span class="ds-badge ds-badge-success">✅ הועברו/שוחזרו ${migrated.length}</span> ${failed.length ? `<span class="ds-badge ds-badge-danger">❌ נכשלו ${failed.length}</span>` : ''}`;
+      if (d.report) renderMigration(d.report);
+      showToast(`הפעולה הושלמה: ${migrated.length} מסמכים`, failed.length ? 'warning' : 'success');
+      loadDashboard();
+    } catch(e) { showToast('העברת המסמכים נכשלה: ' + e.message, 'error'); }
+    finally { btn.disabled = false; btn.innerText = '☁️ העבר/שחזר ל-Supabase'; }
+  }
+
   async function loadDashboard() {
     document.getElementById('btnScan').disabled = true;
     document.getElementById('btnScan').innerHTML = '<span class="spin">🔄</span> סורק...';
@@ -119,7 +170,6 @@ const StorageAdmin = (() => {
       const res = await fetch('/api/admin/storage/dashboard');
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'שגיאה'); }
       const d = await res.json();
-
       document.getElementById('kpiGrid').innerHTML = `
         <div class="ds-kpi-card"><div class="ds-kpi-value">${d.total}</div><div class="ds-kpi-label">סה"כ מסמכים</div></div>
         <div class="ds-kpi-card good"><div class="ds-kpi-value">${d.active}</div><div class="ds-kpi-label">פעילים</div></div>
@@ -128,18 +178,18 @@ const StorageAdmin = (() => {
         <div class="ds-kpi-card ${d.missing > 0 ? 'bad' : 'good'}"><div class="ds-kpi-value">${d.missing}</div><div class="ds-kpi-label">קבצים חסרים</div></div>
         <div class="ds-kpi-card ${d.orphaned > 0 ? 'warn' : 'good'}"><div class="ds-kpi-value">${d.orphaned}</div><div class="ds-kpi-label">קבצים יתומים</div></div>
         <div class="ds-kpi-card ${d.hash_errors > 0 ? 'bad' : 'good'}"><div class="ds-kpi-value">${d.hash_errors}</div><div class="ds-kpi-label">שגיאות Hash</div></div>
-        <div class="ds-kpi-card"><div class="ds-kpi-value" style="font-size:var(--text-sm);">${fmtDate(d.last_scan_at)}</div><div class="ds-kpi-label">סריקה אחרונה</div></div>
-      `;
-
+        <div class="ds-kpi-card"><div class="ds-kpi-value" style="font-size:var(--text-sm);">${fmtDate(d.last_scan_at)}</div><div class="ds-kpi-label">סריקה אחרונה</div></div>`;
+      renderMigration(d.migration || {counts:{}});
       const issuesBox = document.getElementById('issuesBox');
+      const migrationItems = (d.migration?.items || []).filter(i => i.state === 'missing' || i.state === 'ambiguous');
       const allIssues = [
-        ...(d.missing_items || []).map(i => ({ type: 'חסר', text: `Document #${i.document_id} (${esc(i.file_name)}) - הקובץ לא נמצא ב-${esc(i.file_path)}` })),
+        ...(d.missing_items || []).map(i => ({ type: 'חסר', text: `Document #${i.document_id} (${esc(i.file_name)}) - ${esc(i.file_path)}` })),
         ...(d.hash_error_items || []).map(i => ({ type: 'Hash שגוי', text: `Document #${i.document_id} (${esc(i.file_name)}) - תוכן הקובץ השתנה` })),
+        ...migrationItems.map(i => ({ type: i.state === 'ambiguous' ? 'שם כפול' : 'חסר', text: `Document #${i.document_id} (${esc(i.file_name)}) - ${esc(i.file_path || '')}` }))
       ];
       issuesBox.innerHTML = allIssues.length
         ? `<table class="ds-table"><thead><tr><th>סוג</th><th>פרטים</th></tr></thead><tbody>${allIssues.map(i => `<tr><td><span class="ds-badge ds-badge-danger">${i.type}</span></td><td>${i.text}</td></tr>`).join('')}</tbody></table>`
         : `<div class="ds-empty-state"><div class="ds-empty-icon">✅</div><div class="ds-empty-desc">לא נמצאו בעיות</div></div>`;
-
       _orphans = d.orphaned_items || [];
       renderOrphanTable();
       showToast('✅ הסריקה הושלמה');
@@ -153,103 +203,26 @@ const StorageAdmin = (() => {
   }
 
   function renderOrphanTable() {
-    const table = document.getElementById('orphanTable');
-    const empty = document.getElementById('orphanEmpty');
-    const links = document.getElementById('selectLinks');
-    _selected.clear();
-    updateCleanupBar();
-
-    if (!_orphans.length) {
-      table.style.display = 'none';
-      links.style.display = 'none';
-      empty.style.display = 'block';
-      return;
-    }
-    empty.style.display = 'none';
-    links.style.display = 'flex';
-    table.style.display = 'table';
-
-    document.getElementById('orphanBody').innerHTML = _orphans.map((o, i) => `
-      <tr>
-        <td><input type="checkbox" onchange="StorageAdmin.toggleSelect('${esc(o.path)}', this.checked)"></td>
-        <td>${esc(o.path.split('/').pop())}</td>
-        <td style="font-size:var(--text-xs); color:var(--color-text-muted);">${esc(o.path)} <span class="ds-badge ds-badge-neutral">${o.location}</span></td>
-        <td>${fmtSize(o.size)}</td>
-        <td>${fmtDate(o.modified_at)}</td>
-        <td style="font-size:var(--text-xs); color:var(--color-text-muted);">${esc(o.reason || '')}</td>
-      </tr>`).join('');
+    const table = document.getElementById('orphanTable'), empty = document.getElementById('orphanEmpty'), links = document.getElementById('selectLinks');
+    _selected.clear(); updateCleanupBar();
+    if (!_orphans.length) { table.style.display='none'; links.style.display='none'; empty.style.display='block'; return; }
+    empty.style.display='none'; links.style.display='flex'; table.style.display='table';
+    document.getElementById('orphanBody').innerHTML = _orphans.map(o => `<tr><td><input type="checkbox" onchange="StorageAdmin.toggleSelect('${esc(o.path)}', this.checked)"></td><td>${esc(o.path.split('/').pop())}</td><td style="font-size:var(--text-xs);color:var(--color-text-muted);">${esc(o.path)} <span class="ds-badge ds-badge-neutral">${o.location}</span></td><td>${fmtSize(o.size)}</td><td>${fmtDate(o.modified_at)}</td><td style="font-size:var(--text-xs);color:var(--color-text-muted);">${esc(o.reason || '')}</td></tr>`).join('');
   }
-
   function updateCleanupBar() {
-    const bar = document.getElementById('cleanupBar');
-    const count = document.getElementById('cleanupCount');
-    if (_selected.size > 0) {
-      bar.classList.add('visible');
-      count.innerText = `${_selected.size} נבחרו`;
-    } else {
-      bar.classList.remove('visible');
-    }
+    const bar=document.getElementById('cleanupBar'), count=document.getElementById('cleanupCount');
+    if (_selected.size>0) { bar.classList.add('visible'); count.innerText=`${_selected.size} נבחרו`; } else bar.classList.remove('visible');
   }
 
   return {
-    init: () => loadDashboard(),
-    runScan: () => loadDashboard(),
-
-    loadPreview: async () => {
-      try {
-        const res = await fetch('/api/admin/storage/cleanup-preview', { method: 'POST' });
-        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'שגיאה'); }
-        const d = await res.json();
-        _orphans = d.orphaned_items || [];
-        renderOrphanTable();
-        showToast('הרשימה עודכנה');
-      } catch (e) { showToast('שגיאה ברענון הרשימה: ' + e.message, 'error'); }
-    },
-
-    toggleSelect: (path, checked) => {
-      if (checked) _selected.add(path); else _selected.delete(path);
-      updateCleanupBar();
-    },
-    selectAll: () => {
-      document.querySelectorAll('#orphanBody input[type=checkbox]').forEach(cb => { cb.checked = true; });
-      _orphans.forEach(o => _selected.add(o.path));
-      updateCleanupBar();
-    },
-    selectNone: () => {
-      document.querySelectorAll('#orphanBody input[type=checkbox]').forEach(cb => { cb.checked = false; });
-      _selected.clear();
-      updateCleanupBar();
-    },
-
-    confirmCleanup: () => {
-      if (!_selected.size) return;
-      document.getElementById('cleanupConfirmCount').innerText = _selected.size;
-      document.getElementById('cleanupConfirmModal').classList.add('open');
-    },
+    init: () => loadDashboard(), runScan: () => loadDashboard(), runMigrationScan, runMigration,
+    loadPreview: async () => { try { const res=await fetch('/api/admin/storage/cleanup-preview',{method:'POST'}); const d=await res.json(); if(!res.ok) throw new Error(d.error||'שגיאה'); _orphans=d.orphaned_items||[]; renderOrphanTable(); showToast('הרשימה עודכנה'); } catch(e){showToast('שגיאה ברענון הרשימה: '+e.message,'error');} },
+    toggleSelect: (path, checked) => { if(checked)_selected.add(path); else _selected.delete(path); updateCleanupBar(); },
+    selectAll: () => { document.querySelectorAll('#orphanBody input[type=checkbox]').forEach(cb=>cb.checked=true); _orphans.forEach(o=>_selected.add(o.path)); updateCleanupBar(); },
+    selectNone: () => { document.querySelectorAll('#orphanBody input[type=checkbox]').forEach(cb=>cb.checked=false); _selected.clear(); updateCleanupBar(); },
+    confirmCleanup: () => { if(!_selected.size)return; document.getElementById('cleanupConfirmCount').innerText=_selected.size; document.getElementById('cleanupConfirmModal').classList.add('open'); },
     closeCleanupConfirm: () => document.getElementById('cleanupConfirmModal').classList.remove('open'),
-
-    executeCleanup: async () => {
-      const btn = document.getElementById('cleanupConfirmBtn');
-      btn.disabled = true;
-      try {
-        const res = await fetch('/api/admin/storage/cleanup-confirm', {
-          method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ paths: [..._selected] }),
-        });
-        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'שגיאה'); }
-        const d = await res.json();
-        StorageAdmin.closeCleanupConfirm();
-        let msg = `✅ הניקוי הושלם: ${d.deleted.length} נמחקו`;
-        if (d.skipped.length) msg += `, ${d.skipped.length} דולגו (כבר לא יתומים)`;
-        if (d.failed.length) msg += `, ${d.failed.length} נכשלו`;
-        showToast(msg, d.failed.length ? 'warning' : 'success');
-        loadDashboard();
-      } catch (e) {
-        showToast('❌ הניקוי נכשל: ' + e.message, 'error');
-      } finally {
-        btn.disabled = false;
-      }
-    },
+    executeCleanup: async () => { const btn=document.getElementById('cleanupConfirmBtn'); btn.disabled=true; try { const res=await fetch('/api/admin/storage/cleanup-confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paths:[..._selected]})}); const d=await res.json(); if(!res.ok)throw new Error(d.error||'שגיאה'); StorageAdmin.closeCleanupConfirm(); showToast(`✅ הניקוי הושלם: ${d.deleted.length} נמחקו`,d.failed.length?'warning':'success'); loadDashboard(); } catch(e){showToast('❌ הניקוי נכשל: '+e.message,'error');} finally{btn.disabled=false;} }
   };
 })();
 document.addEventListener('DOMContentLoaded', StorageAdmin.init);
