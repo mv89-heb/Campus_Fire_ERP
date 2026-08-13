@@ -103,16 +103,15 @@ const Shell = (() => {
       if (!headers.has('X-CSRF-Token')) headers.set('X-CSRF-Token', csrfToken);
       init.headers = headers;
     }
+    if (!('credentials' in init)) init.credentials = 'same-origin';
     const response = await nativeFetch(input, init);
-    if (response.status === 401) {
-      csrfToken = null;
-    }
+    if (response.status === 401) csrfToken = null;
     return response;
   };
 
   async function loadSecurityContext() {
     try {
-      const res = await nativeFetch('/api/auth/me');
+      const res = await nativeFetch('/api/auth/me', { credentials: 'same-origin', cache: 'no-store' });
       if (!res.ok) return null;
       const data = await res.json();
       csrfToken = data && data.csrf_token ? data.csrf_token : null;
@@ -152,7 +151,6 @@ const Shell = (() => {
 
   return {
     init: async () => { await loadSecurityContext(); updateThemeIcon(); refreshNotifBadge(); setInterval(refreshNotifBadge, 60000); },
-
     toggleTheme: () => {
       const current = document.documentElement.getAttribute('data-theme') || 'dark';
       const next = current === 'dark' ? 'light' : 'dark';
@@ -160,7 +158,6 @@ const Shell = (() => {
       localStorage.setItem('erp-theme', next);
       updateThemeIcon();
     },
-
     toggleSidebar: () => {
       const sidebar = document.getElementById('shellSidebar');
       const isOpen = sidebar.classList.toggle('open');
@@ -168,29 +165,17 @@ const Shell = (() => {
       const hamburger = document.querySelector('.ds-header-hamburger');
       if (hamburger) hamburger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     },
-
     toggleNotifications: async () => {
       notifPanelOpen = !notifPanelOpen;
       document.getElementById('shellNotifPanel').style.display = notifPanelOpen ? 'block' : 'none';
       if (notifPanelOpen) { const items = await refreshNotifBadge(); renderNotifList(items); }
     },
-
     markNotificationRead: async (id) => {
-      try {
-        await fetch(`/api/notifications/${id}/read`, { method: 'POST' });
-        const items = await refreshNotifBadge();
-        renderNotifList(items);
-      } catch (e) { /* לא קריטי */ }
+      try { await fetch(`/api/notifications/${id}/read`, { method: 'POST' }); const items = await refreshNotifBadge(); renderNotifList(items); } catch (e) {}
     },
-
     markAllNotificationsRead: async () => {
-      try {
-        await fetch('/api/notifications/mark_all_read', { method: 'POST' });
-        const items = await refreshNotifBadge();
-        renderNotifList(items);
-      } catch (e) { /* לא קריטי */ }
+      try { await fetch('/api/notifications/mark_all_read', { method: 'POST' }); const items = await refreshNotifBadge(); renderNotifList(items); } catch (e) {}
     },
-
     onSearchInput: (val) => {
       clearTimeout(searchTimer);
       const box = document.getElementById('shellSearchResults');
@@ -203,7 +188,7 @@ const Shell = (() => {
             ? items.map(i => `<a href="${i.url}" style="display:block; padding:10px 14px; border-bottom:1px solid var(--color-border); color:var(--color-text); text-decoration:none; font-size:0.85rem;"><span style="color:var(--color-primary);">${esc(i.type_label)}</span> · ${esc(i.label)}</a>`).join('')
             : '<div style="padding:14px; color:var(--color-text-muted); font-size:0.85rem;">אין תוצאות</div>';
           box.style.display = 'block';
-        } catch (e) { /* לא קריטי */ }
+        } catch (e) {}
       }, 300);
     },
   };
@@ -216,11 +201,58 @@ document.addEventListener('click', (e) => {
   }
   if (!e.target.closest('#shellNotifPanel') && !e.target.closest('[onclick="Shell.toggleNotifications()"]')) {
     const panel = document.getElementById('shellNotifPanel');
-    if (panel && panel.style.display === 'block' && !e.target.closest('.ds-header-actions')) {
-      panel.style.display = 'none';
-    }
+    if (panel && panel.style.display === 'block' && !e.target.closest('.ds-header-actions')) panel.style.display = 'none';
   }
 });
+
+// PDF navigation helper: first obtain a short-lived document access token
+// through the authenticated permit endpoint, then navigate to the tokenized
+// PDF URL. This avoids relying on a browser PDF navigation to carry the app
+// session cookie across every Render/browser configuration.
+(function installDocumentNavigationBridge() {
+  const nativeOpen = window.open.bind(window);
+  const matchDocument = (href) => {
+    try {
+      const u = new URL(href, window.location.origin);
+      const m = u.pathname.match(/^\/api\/documents\/(\d+)\/file$/);
+      return m ? { id: Number(m[1]), url: u } : null;
+    } catch (_) { return null; }
+  };
+
+  async function resolveDocumentUrl(id, download) {
+    const res = await fetch(`/api/permits/${id}`, { credentials: 'same-origin', cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok || !data.file_access_url) throw new Error(data.error || 'לא ניתן לאמת גישה למסמך');
+    const url = new URL(data.file_access_url, window.location.origin);
+    if (download) url.searchParams.set('download', '1');
+    return url.toString();
+  }
+
+  window.open = function(href, target, features) {
+    const info = matchDocument(href);
+    if (!info) return nativeOpen(href, target, features);
+    const popup = nativeOpen('about:blank', target || '_blank', features || 'noopener');
+    resolveDocumentUrl(info.id, info.url.searchParams.get('download') === '1')
+      .then(url => { if (popup) popup.location.href = url; })
+      .catch(err => {
+        if (popup) popup.close();
+        if (window.showToast) showToast(err.message || 'שגיאה בטעינת המסמך', 'error');
+      });
+    return popup;
+  };
+
+  document.addEventListener('click', (event) => {
+    const anchor = event.target.closest && event.target.closest('a');
+    if (!anchor) return;
+    const info = matchDocument(anchor.href);
+    if (!info) return;
+    event.preventDefault();
+    event.stopPropagation();
+    resolveDocumentUrl(info.id, anchor.searchParams?.get('download') === '1')
+      .then(url => { window.location.href = url; })
+      .catch(err => { if (window.showToast) showToast(err.message || 'שגיאה בהורדת המסמך', 'error'); });
+  }, true);
+})();
 </script>
 {% block extra_script %}{% endblock %}
 </body>
