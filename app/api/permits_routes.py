@@ -2,6 +2,8 @@
 API עבור הרחבת מודול האישורים (שלב 2).
 Blueprint נפרד מ-main_bp הקיים; לא נוגע ב-/api/dashboard או בהעלאת קבצים.
 """
+import secrets
+from itsdangerous import URLSafeTimedSerializer
 from flask import Blueprint, jsonify, request, session, current_app
 from app.services import permit_service as svc
 from app.services.permit_service import PermitServiceError
@@ -9,10 +11,17 @@ from app.services.auth_service import AuthServiceError
 from app.api.auth_routes import admin_required
 
 permits_bp = Blueprint('permits', __name__)
+DOCUMENT_TOKEN_SALT = 'campus-fire-document-access-v1'
+DOCUMENT_TOKEN_MAX_AGE = 300
 
 
 def _json_body():
     return request.get_json(silent=True) or {}
+
+
+def _document_access_token(doc_id):
+    serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'], salt=DOCUMENT_TOKEN_SALT)
+    return serializer.dumps({'doc_id': int(doc_id), 'nonce': secrets.token_urlsafe(12)})
 
 
 @permits_bp.errorhandler(PermitServiceError)
@@ -22,9 +31,6 @@ def _handle_service_error(err):
 
 @permits_bp.errorhandler(AuthServiceError)
 def _handle_auth_error(err):
-    # 403 (לא 400) - ההבחנה בין "קלט לא תקין" לבין "אין הרשאה" חשובה ללקוח.
-    # הגנת admin_required על ה-route כבר תופסת את רוב המקרים לפני שמגיעים
-    # לכאן; זו רשת ביטחון נוספת לקריאה ישירה לשירות (defense in depth).
     return jsonify({"error": str(err)}), 403
 
 
@@ -49,7 +55,12 @@ def api_list_categories():
 @permits_bp.route('/api/permits/<int:doc_id>', methods=['GET'])
 def api_get_permit(doc_id):
     doc = svc.get_document_or_404(doc_id)
-    return jsonify(svc.serialize_permit(doc))
+    payload = svc.serialize_permit(doc)
+    if doc.file_path and doc.status != 'deleted':
+        payload['file_access_url'] = f"/api/documents/{doc.id}/file?access_token={_document_access_token(doc.id)}"
+    else:
+        payload['file_access_url'] = None
+    return jsonify(payload)
 
 
 @permits_bp.route('/api/permits/<int:doc_id>', methods=['PUT'])
