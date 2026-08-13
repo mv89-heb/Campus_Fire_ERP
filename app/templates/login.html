@@ -13,32 +13,69 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
 <style>
 body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: var(--space-5); }
-.login-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-8); width: 100%; max-width: 380px; }
+.login-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-8); width: 100%; max-width: 420px; }
 .login-title { font-size: var(--text-lg); font-weight: 700; margin-bottom: 6px; text-align: center; }
 .login-subtitle { font-size: var(--text-sm); color: var(--color-text-muted); text-align: center; margin-bottom: var(--space-6); }
 .error-msg { color: var(--color-danger); font-size: var(--text-sm); text-align: center; min-height: 18px; margin-bottom: 8px; }
+.setup-panel { display:none; margin-top:18px; padding-top:18px; border-top:1px solid var(--color-border); }
+.setup-panel.visible { display:block; }
+.setup-note { font-size:var(--text-sm); color:var(--color-text-muted); line-height:1.55; margin-bottom:14px; text-align:center; }
+.setup-title { font-weight:700; text-align:center; margin-bottom:6px; }
+.form-actions { display:flex; flex-direction:column; gap:8px; }
 </style>
 </head>
 <body>
-
 <div class="login-card">
   <div class="login-title">🛡️ בטיחות אש Enterprise</div>
-  <div class="login-subtitle">התחברות למערכת</div>
-  <div class="ds-field">
-    <input class="ds-input" type="text" id="username" placeholder="שם משתמש" autocomplete="username">
-  </div>
-  <div class="ds-field">
-    <input class="ds-input" type="password" id="password" placeholder="סיסמה" autocomplete="current-password">
-  </div>
-  <div class="error-msg" id="errorMsg" role="alert" aria-live="polite"></div>
-  <button class="ds-btn ds-btn-primary" id="submitBtn" onclick="Login.submit()" style="width:100%;">התחברות</button>
-</div>
+  <div class="login-subtitle" id="loginSubtitle">התחברות למערכת</div>
 
+  <div id="loginForm">
+    <div class="ds-field"><input class="ds-input" type="text" id="username" placeholder="שם משתמש" autocomplete="username"></div>
+    <div class="ds-field"><input class="ds-input" type="password" id="password" placeholder="סיסמה" autocomplete="current-password"></div>
+    <div class="error-msg" id="errorMsg" role="alert" aria-live="polite"></div>
+    <button class="ds-btn ds-btn-primary" id="submitBtn" onclick="Login.submit()" style="width:100%;">התחברות</button>
+  </div>
+
+  <div class="setup-panel" id="setupPanel" aria-live="polite">
+    <div class="setup-title">הגדרת מנהל ראשוני</div>
+    <div class="setup-note">לא נמצא עדיין משתמש במערכת. צור כאן את חשבון המנהל הראשי.<br>המשתמש הראשון יקבל הרשאת <strong>Super Admin</strong>. לאחר יצירתו אפשרות זו תיסגר.</div>
+    <div class="ds-field"><input class="ds-input" type="text" id="setupUsername" placeholder="שם משתמש למנהל" autocomplete="username"></div>
+    <div class="ds-field"><input class="ds-input" type="password" id="setupPassword" placeholder="סיסמה (לפחות 12 תווים)" autocomplete="new-password"></div>
+    <div class="ds-field"><input class="ds-input" type="password" id="setupPasswordConfirm" placeholder="אימות סיסמה" autocomplete="new-password"></div>
+    <div class="error-msg" id="setupError" role="alert" aria-live="polite"></div>
+    <div class="form-actions">
+      <button class="ds-btn ds-btn-primary" id="setupBtn" onclick="Login.bootstrap()">יצירת מנהל ראשי</button>
+      <button class="ds-btn" onclick="Login.showLogin()">חזרה להתחברות</button>
+    </div>
+  </div>
+</div>
 <script>
 const Login = (() => {
   let busy = false;
-
+  const json = async (res) => {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'אירעה שגיאה');
+    return data;
+  };
   return {
+    showSetup: () => {
+      document.getElementById('setupPanel').classList.add('visible');
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('loginSubtitle').innerText = 'הגדרה ראשונית — נדרשת פעם אחת בלבד';
+      document.getElementById('setupUsername').focus();
+    },
+    showLogin: () => {
+      document.getElementById('setupPanel').classList.remove('visible');
+      document.getElementById('loginForm').style.display = 'block';
+      document.getElementById('loginSubtitle').innerText = 'התחברות למערכת';
+    },
+    checkBootstrap: async () => {
+      try {
+        const res = await fetch('/api/auth/bootstrap_status', { method:'GET', credentials:'same-origin', cache:'no-store' });
+        const data = await json(res);
+        if (!data.has_users) Login.showSetup();
+      } catch (e) { console.warn('Bootstrap status unavailable:', e); }
+    },
     submit: async () => {
       if (busy) return;
       const username = document.getElementById('username').value.trim();
@@ -47,30 +84,41 @@ const Login = (() => {
       const btn = document.getElementById('submitBtn');
       errEl.innerText = '';
       if (!username || !password) { errEl.innerText = 'יש למלא שם משתמש וסיסמה'; return; }
-
-      busy = true;
-      btn.disabled = true;
+      busy = true; btn.disabled = true;
       try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ username, password })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'שגיאה בהתחברות');
-        window.location.href = '/';
-      } catch (e) {
-        errEl.innerText = e.message || 'שגיאה בהתחברות';
-      } finally {
-        busy = false;
-        btn.disabled = false;
-      }
+        const res = await fetch('/api/auth/login', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password}) });
+        await json(res); window.location.href = '/';
+      } catch (e) { errEl.innerText = e.message || 'שגיאה בהתחברות'; }
+      finally { busy = false; btn.disabled = false; }
     },
+    bootstrap: async () => {
+      if (busy) return;
+      const username = document.getElementById('setupUsername').value.trim();
+      const password = document.getElementById('setupPassword').value;
+      const confirm = document.getElementById('setupPasswordConfirm').value;
+      const errEl = document.getElementById('setupError');
+      const btn = document.getElementById('setupBtn');
+      errEl.innerText = '';
+      if (!username || !password || !confirm) { errEl.innerText = 'יש למלא את כל השדות'; return; }
+      if (password !== confirm) { errEl.innerText = 'הסיסמאות אינן תואמות'; return; }
+      if (password.length < 12) { errEl.innerText = 'הסיסמה חייבת להכיל לפחות 12 תווים'; return; }
+      busy = true; btn.disabled = true;
+      try {
+        const res = await fetch('/api/users', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password}) });
+        await json(res);
+        const loginRes = await fetch('/api/auth/login', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password}) });
+        await json(loginRes); window.location.href = '/';
+      } catch (e) { errEl.innerText = e.message || 'לא ניתן ליצור את המנהל הראשי'; }
+      finally { busy = false; btn.disabled = false; }
+    }
   };
 })();
-
-document.getElementById('username').addEventListener('keydown', (e) => { if (e.key === 'Enter') Login.submit(); });
-document.getElementById('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') Login.submit(); });
+document.getElementById('username').addEventListener('keydown', e => { if (e.key === 'Enter') Login.submit(); });
+document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') Login.submit(); });
+document.getElementById('setupUsername').addEventListener('keydown', e => { if (e.key === 'Enter') Login.bootstrap(); });
+document.getElementById('setupPassword').addEventListener('keydown', e => { if (e.key === 'Enter') Login.bootstrap(); });
+document.getElementById('setupPasswordConfirm').addEventListener('keydown', e => { if (e.key === 'Enter') Login.bootstrap(); });
+Login.checkBootstrap();
 </script>
 </body>
 </html>
