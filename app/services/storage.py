@@ -57,17 +57,8 @@ def check_connection():
 
 
 def is_supabase_path(file_path: str) -> bool:
-    if not file_path or not is_configured():
-        return False
-    bucket = _bucket_name()
-    if file_path.startswith(f'{bucket}/'):
-        return True
-    upload_folder = current_app.config.get('UPLOAD_FOLDER')
-    if upload_folder:
-        local_path = os.path.abspath(os.path.join(upload_folder, os.path.basename(file_path)))
-        if os.path.isfile(local_path):
-            return False
-    return not os.path.isabs(file_path)
+    """True only when the DB value is in canonical bucket/path format."""
+    return bool(file_path) and file_path.startswith(f'{_bucket_name()}/')
 
 
 def upload_bytes(remote_filename: str, data: bytes, content_type: str = 'application/pdf') -> str:
@@ -162,9 +153,40 @@ def build_local_basename_index(upload_folder: str) -> dict:
     return index
 
 
+def list_supabase_files() -> list:
+    """Read-only inventory of objects in the configured Supabase bucket."""
+    if not is_configured():
+        return []
+    results = []
+    bucket = _bucket_name()
+    try:
+        client = _get_client()
+        limit = 100
+        offset = 0
+        while True:
+            page = client.storage.from_(bucket).list(options={'limit': limit, 'offset': offset})
+            if not page:
+                break
+            for item in page:
+                name = item.get('name') if isinstance(item, dict) else getattr(item, 'name', None)
+                if not name:
+                    continue
+                size = None
+                metadata = item.get('metadata') if isinstance(item, dict) else None
+                if isinstance(metadata, dict):
+                    size = metadata.get('size')
+                results.append({'filename': name, 'size': size})
+            if len(page) < limit:
+                break
+            offset += limit
+    except Exception as e:
+        logger.error(f'list_supabase_files failed: {e}')
+    return results
+
+
 def find_supabase_legacy_path(file_path: str, inventory: list | None = None) -> str | None:
     """Resolve an old local-style DB path to a unique Supabase object."""
-    if not file_path or not is_configured():
+    if not file_path or not is_configured() or is_supabase_path(file_path):
         return None
     basename = os.path.basename(file_path)
     if not basename:
@@ -184,11 +206,9 @@ def file_exists(file_path: str, upload_folder: str) -> dict:
         signed_url = get_signed_url(file_path)
         if signed_url:
             return {'status': True, 'location': 'supabase', 'error': None, 'resolved_path': file_path}
-
     legacy_supabase_path = find_supabase_legacy_path(file_path)
     if legacy_supabase_path:
         return {'status': True, 'location': 'supabase_legacy', 'error': None, 'resolved_path': legacy_supabase_path}
-
     local_full_path = os.path.join(upload_folder, os.path.basename(file_path))
     if os.path.isfile(local_full_path):
         return {'status': True, 'location': 'local', 'error': None, 'resolved_path': local_full_path}
@@ -207,7 +227,6 @@ def delete_file(file_path: str, upload_folder: str) -> dict:
         if still_accessible:
             return {'status': False, 'error': 'הקובץ עדיין נגיש ב-Supabase אחרי ניסיון המחיקה'}
         return {'status': True, 'error': None}
-
     local_root = os.path.abspath(upload_folder)
     local_full_path = os.path.abspath(os.path.join(local_root, os.path.basename(file_path)))
     if os.path.commonpath([local_full_path, local_root]) != local_root:
@@ -262,34 +281,3 @@ def verify_pdf_bytes(data: bytes) -> dict:
         logger.warning(f'PDF structural validation failed: {exc}')
         return {'status': False, 'error': 'לא ניתן לפרש את הקובץ כ-PDF תקין'}
     return {'status': True, 'error': None}
-
-
-def list_supabase_files() -> list:
-    """Read-only inventory of objects in the configured Supabase bucket."""
-    if not is_configured():
-        return []
-    results = []
-    bucket = _bucket_name()
-    try:
-        client = _get_client()
-        limit = 100
-        offset = 0
-        while True:
-            page = client.storage.from_(bucket).list(options={'limit': limit, 'offset': offset})
-            if not page:
-                break
-            for item in page:
-                name = item.get('name') if isinstance(item, dict) else getattr(item, 'name', None)
-                if not name:
-                    continue
-                size = None
-                metadata = item.get('metadata') if isinstance(item, dict) else None
-                if isinstance(metadata, dict):
-                    size = metadata.get('size')
-                results.append({'filename': name, 'size': size})
-            if len(page) < limit:
-                break
-            offset += limit
-    except Exception as e:
-        logger.error(f'list_supabase_files failed: {e}')
-    return results
