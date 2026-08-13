@@ -1,9 +1,10 @@
+import hmac
 import os
 from urllib.parse import urlparse
 
 from flask import Flask, jsonify, request, session
 
-from .extensions import db, migrate
+from .extensions import db, migrate, limiter
 from .config import Config
 from .services.permissions import can_write
 
@@ -39,6 +40,12 @@ def _same_origin_allowed(app) -> bool:
     return origin_value in trusted
 
 
+def _csrf_valid() -> bool:
+    expected = session.get('csrf_token')
+    supplied = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+    return bool(expected and supplied and hmac.compare_digest(str(expected), str(supplied)))
+
+
 def _is_bootstrap_user_creation() -> bool:
     if request.path != '/api/users' or request.method != 'POST':
         return False
@@ -59,6 +66,8 @@ def _install_security_guards(app):
         if path == '/api/auth/logout':
             if not _same_origin_allowed(app):
                 return jsonify({'error': 'Cross-origin request blocked'}), 403
+            if session.get('user_id') and not _csrf_valid():
+                return jsonify({'error': 'CSRF token חסר או לא תקין'}), 403
             return None
 
         if _is_bootstrap_user_creation():
@@ -78,8 +87,11 @@ def _install_security_guards(app):
         session['username'] = user.username
         session['role'] = user.role
 
-        if request.method in WRITE_METHODS and not can_write(user.role, path):
-            return jsonify({'error': 'אין הרשאה לבצע פעולה זו עבור התפקיד הנוכחי'}), 403
+        if request.method in WRITE_METHODS:
+            if not _csrf_valid():
+                return jsonify({'error': 'CSRF token חסר או לא תקין'}), 403
+            if not can_write(user.role, path):
+                return jsonify({'error': 'אין הרשאה לבצע פעולה זו עבור התפקיד הנוכחי'}), 403
 
         if not _same_origin_allowed(app):
             return jsonify({'error': 'Cross-origin request blocked'}), 403
@@ -94,6 +106,7 @@ def create_app(config_class=Config):
 
     db.init_app(app)
     migrate.init_app(app, db)
+    limiter.init_app(app)
 
     try:
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
