@@ -8,11 +8,40 @@ from datetime import date
 import io
 import platform
 import os
+import secrets
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from urllib.request import Request, urlopen
 
 main_bp = Blueprint('main', __name__)
 
 OUTLOOK_ENABLED = platform.system() == 'Windows'
+DOCUMENT_TOKEN_SALT = 'campus-fire-document-access-v1'
+DOCUMENT_TOKEN_MAX_AGE = 300
+
+
+def _document_token_serializer():
+    return URLSafeTimedSerializer(current_app.config['SECRET_KEY'], salt=DOCUMENT_TOKEN_SALT)
+
+
+def _issue_document_access_token(doc_id):
+    return _document_token_serializer().dumps({'doc_id': int(doc_id), 'nonce': secrets.token_urlsafe(12)})
+
+
+def _document_token_valid(token, doc_id):
+    if not token:
+        return False
+    try:
+        payload = _document_token_serializer().loads(token, max_age=DOCUMENT_TOKEN_MAX_AGE)
+        return int(payload.get('doc_id')) == int(doc_id)
+    except (BadSignature, SignatureExpired, TypeError, ValueError, AttributeError):
+        return False
+
+
+def _document_access_allowed(doc_id):
+    if session.get('user_id'):
+        return True
+    token = request.args.get('access_token') or request.headers.get('X-Document-Access-Token')
+    return _document_token_valid(token, doc_id)
 
 
 @main_bp.route('/')
@@ -52,13 +81,14 @@ def document_file(doc_id):
     doc = db.session.get(Document, doc_id)
     if not doc or doc.status == 'deleted' or not doc.file_path:
         return jsonify({'error': 'File not found'}), 404
+    if not _document_access_allowed(doc_id):
+        return jsonify({'error': 'נדרשת התחברות'}), 401
 
     download = request.args.get('download', '').lower() in {'1', 'true', 'yes'}
     filename = os.path.basename(doc.file_name or '') or f'document-{doc_id}.pdf'
     if not filename.lower().endswith('.pdf'):
         filename += '.pdf'
 
-    # Canonical Supabase path.
     resolved_path = doc.file_path if storage.is_supabase_path(doc.file_path) else storage.find_supabase_legacy_path(doc.file_path)
     if resolved_path and storage.is_configured():
         signed_url = storage.get_signed_url(resolved_path, expires_in=120)
@@ -70,7 +100,9 @@ def document_file(doc_id):
                 data = response.read()
             if not data:
                 return jsonify({'error': 'המסמך ריק או לא זמין'}), 404
-            return send_file(io.BytesIO(data), mimetype='application/pdf', as_attachment=download, download_name=filename, max_age=0)
+            response = send_file(io.BytesIO(data), mimetype='application/pdf', as_attachment=download, download_name=filename, max_age=0)
+            response.headers['Cache-Control'] = 'private, no-store, max-age=0'
+            return response
         except Exception:
             current_app.logger.exception('Supabase document fetch failed for document %s', doc_id)
             return jsonify({'error': 'לא ניתן לטעון את המסמך מאחסון הקבצים'}), 502
@@ -81,7 +113,9 @@ def document_file(doc_id):
         return jsonify({'error': 'Invalid file path'}), 400
     if not os.path.isfile(full_path):
         return jsonify({'error': f'File not found. Looking in: {full_path}'}), 404
-    return send_file(full_path, mimetype='application/pdf', as_attachment=download, download_name=filename, max_age=0)
+    response = send_file(full_path, mimetype='application/pdf', as_attachment=download, download_name=filename, max_age=0)
+    response.headers['Cache-Control'] = 'private, no-store, max-age=0'
+    return response
 
 
 @main_bp.route('/api/dashboard')
