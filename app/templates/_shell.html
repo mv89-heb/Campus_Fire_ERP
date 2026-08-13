@@ -92,7 +92,33 @@ const Shell = (() => {
   const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   let searchTimer = null;
   let notifPanelOpen = false;
+  let csrfToken = null;
   const notifTypeIcon = { permit: '📋', task: '✅', audit: '🔍', equipment: '🧯' };
+
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async (input, init = {}) => {
+    const method = (init.method || (input && input.method) || 'GET').toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD' && csrfToken) {
+      const headers = new Headers(init.headers || {});
+      if (!headers.has('X-CSRF-Token')) headers.set('X-CSRF-Token', csrfToken);
+      init.headers = headers;
+    }
+    const response = await nativeFetch(input, init);
+    if (response.status === 401) {
+      csrfToken = null;
+    }
+    return response;
+  };
+
+  async function loadSecurityContext() {
+    try {
+      const res = await nativeFetch('/api/auth/me');
+      if (!res.ok) return null;
+      const data = await res.json();
+      csrfToken = data && data.csrf_token ? data.csrf_token : null;
+      return data;
+    } catch (e) { return null; }
+  }
 
   function updateThemeIcon() {
     const theme = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -120,12 +146,12 @@ const Shell = (() => {
     el.innerHTML = items.map(n => `
       <div style="padding:8px 10px; border-radius:6px; margin-bottom:4px; background:${n.read_at ? 'transparent' : 'var(--tint-primary)'}; cursor:pointer;" onclick="Shell.markNotificationRead(${n.id})">
         <div style="font-size:0.85rem;">${notifTypeIcon[n.ref_type] || '🔔'} ${esc(n.title)}</div>
-        <div style="font-size:0.75rem; color:var(--color-text-muted); margin-top:2px;">${esc(n.message || '')} ${n.window_days === 0 ? '· <span style="color:var(--color-danger)">דחוף</span>' : ''}</div>
+        <div style="font-size:0.75rem; color:var(--color-text-muted); margin-top:2px;">${esc(n.message || '')}</div>
       </div>`).join('');
   }
 
   return {
-    init: () => { updateThemeIcon(); refreshNotifBadge(); setInterval(refreshNotifBadge, 60000); },
+    init: async () => { await loadSecurityContext(); updateThemeIcon(); refreshNotifBadge(); setInterval(refreshNotifBadge, 60000); },
 
     toggleTheme: () => {
       const current = document.documentElement.getAttribute('data-theme') || 'dark';
