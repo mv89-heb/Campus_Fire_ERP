@@ -1,12 +1,11 @@
-"""
-API עבור תשתית אימות (login/logout/session) וניהול משתמשים.
-חשוב: אף route קיים אינו מוגן ב-login_required/admin_required בשלב זה.
-זו תשתית מוכנה (Commit 1 - Permissions Foundation) שתופעל במפורש בהמשך
-על endpoints מסוכנים ספציפיים (למשל מחיקת/ניקוי אחסון) - לא באופן גורף.
-"""
+"""Authentication, sessions and user administration."""
+import secrets
 from functools import wraps
 
 from flask import Blueprint, jsonify, request, session, render_template
+
+from app.extensions import db
+from app.models import User
 from app.services import auth_service as svc
 from app.services.auth_service import AuthServiceError
 
@@ -19,38 +18,46 @@ def _json_body():
 
 @auth_bp.errorhandler(AuthServiceError)
 def _handle_error(err):
-    return jsonify({"error": str(err)}), 400
+    return jsonify({'error': str(err)}), 400
+
+
+def _current_user():
+    user_id = session.get('user_id')
+    if not user_id:
+        return None
+    user = db.session.get(User, user_id)
+    if not user or not user.active:
+        session.clear()
+        return None
+    return user
+
+
+def _ensure_csrf_token():
+    token = session.get('csrf_token')
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session['csrf_token'] = token
+    return token
 
 
 def login_required(view_func):
-    """
-    Decorator מוכן לשימוש עתידי. לא מיושם על אף route קיים כרגע בכוונה
-    (ראו הערה למעלה) - זמין למי שירצה להגן ידנית על route חדש.
-    """
     @wraps(view_func)
     def wrapped(*args, **kwargs):
-        if not session.get('user_id'):
-            return jsonify({"error": "נדרשת התחברות"}), 401
+        user = _current_user()
+        if not user:
+            return jsonify({'error': 'נדרשת התחברות'}), 401
         return view_func(*args, **kwargs)
     return wrapped
 
 
 def admin_required(view_func):
-    """
-    Decorator להגנת route ברמת Admin. Commit 1 (Permissions Foundation) -
-    מוגדר כאן אך *לא* מיושם על אף route קיים. ייושם במפורש בהמשך (Commit 4
-    ואילך) על endpoints מסוכנים חדשים (מחיקה/ניקוי אחסון) בלבד.
-
-    401 אם אין session פעיל בכלל, 403 אם יש session אך התפקיד אינו
-    admin/super_admin. משתמש ב-session['role'] הקיים (נקבע ב-api_login),
-    לא בודק שוב מול ה-DB בכל בקשה - עקבי עם login_required.
-    """
     @wraps(view_func)
     def wrapped(*args, **kwargs):
-        if not session.get('user_id'):
-            return jsonify({"error": "נדרשת התחברות"}), 401
-        if session.get('role') not in ('admin', 'super_admin'):
-            return jsonify({"error": "הפעולה דורשת הרשאת מנהל (Admin)"}), 403
+        user = _current_user()
+        if not user:
+            return jsonify({'error': 'נדרשת התחברות'}), 401
+        if user.role not in ('admin', 'super_admin'):
+            return jsonify({'error': 'הפעולה דורשת הרשאת מנהל (Admin)'}), 403
         return view_func(*args, **kwargs)
     return wrapped
 
@@ -63,6 +70,7 @@ def login_page():
 
 
 @auth_bp.route('/users')
+@admin_required
 def users_page():
     return render_template('users.html', active_nav='settings')
 
@@ -73,52 +81,81 @@ def users_page():
 def api_login():
     data = _json_body()
     user = svc.authenticate(data.get('username'), data.get('password'))
+
+    # Rotate the Flask session on successful authentication to reduce session-fixation risk.
+    session.clear()
+    session.permanent = True
     session['user_id'] = user.id
     session['username'] = user.username
     session['role'] = user.role
-    return jsonify(svc.serialize_user(user))
+    session['csrf_token'] = secrets.token_urlsafe(32)
+
+    response = svc.serialize_user(user)
+    response['csrf_token'] = session['csrf_token']
+    return jsonify(response)
 
 
 @auth_bp.route('/api/auth/logout', methods=['POST'])
 def api_logout():
     session.clear()
-    return jsonify({"success": True})
+    return jsonify({'success': True})
 
 
 @auth_bp.route('/api/auth/me', methods=['GET'])
 def api_me():
-    if not session.get('user_id'):
+    user = _current_user()
+    if not user:
         return jsonify(None)
-    user = svc.get_user_or_404(session['user_id'])
-    return jsonify(svc.serialize_user(user))
+    response = svc.serialize_user(user)
+    response['csrf_token'] = _ensure_csrf_token()
+    return jsonify(response)
 
 
 @auth_bp.route('/api/auth/bootstrap_status', methods=['GET'])
 def api_bootstrap_status():
-    """מאפשר לממשק לדעת אם זו הפעלה ראשונה (אין עדיין אף משתמש במערכת)."""
-    return jsonify({"has_users": svc.has_any_users()})
+    return jsonify({'has_users': svc.has_any_users()})
 
 
 # ---------- Users management API ----------
 
 @auth_bp.route('/api/users', methods=['GET'])
+@admin_required
 def api_list_users():
     return jsonify([svc.serialize_user(u) for u in svc.list_users()])
 
 
 @auth_bp.route('/api/users', methods=['POST'])
 def api_create_user():
-    user = svc.create_user(_json_body())
+    # The global security guard permits this endpoint only for first-time bootstrap.
+    # Once an account exists, user creation requires an admin/super-admin session.
+    current = _current_user()
+    if svc.has_any_users() and (not current or current.role not in ('admin', 'super_admin')):
+        return jsonify({'error': 'יצירת משתמש דורשת הרשאת מנהל'}), 403
+
+    data = _json_body()
+    if not svc.has_any_users():
+        data['role'] = 'super_admin'
+        data['active'] = True
+
+    user = svc.create_user(data)
     return jsonify(svc.serialize_user(user)), 201
 
 
 @auth_bp.route('/api/users/<int:user_id>', methods=['PUT'])
+@admin_required
 def api_update_user(user_id):
+    current = _current_user()
+    if current.id == user_id and _json_body().get('active') is False:
+        return jsonify({'error': 'לא ניתן להשבית את המשתמש המחובר'}), 400
     user = svc.update_user(user_id, _json_body())
     return jsonify(svc.serialize_user(user))
 
 
 @auth_bp.route('/api/users/<int:user_id>', methods=['DELETE'])
+@admin_required
 def api_delete_user(user_id):
+    current = _current_user()
+    if current.id == user_id:
+        return jsonify({'error': 'לא ניתן למחוק את המשתמש המחובר'}), 400
     svc.delete_user(user_id)
-    return jsonify({"success": True})
+    return jsonify({'success': True})

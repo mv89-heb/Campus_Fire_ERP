@@ -157,6 +157,7 @@ tr:hover td { background: var(--bg-hover); }
     </div>
 
     <div id="permitDocActions" style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+      <button class="btn btn-primary" id="permitBtnPreview" style="padding:6px 10px; font-size:0.8rem; min-height:30px;" onclick="App.previewCurrentDoc()">👁 תצוגה מקדימה</button>
       <button class="btn" id="permitBtnDownload" style="padding:6px 10px; font-size:0.8rem; min-height:30px;" onclick="App.downloadCurrentDoc()">⬇️ הורדה</button>
       <button class="btn" id="permitBtnReplace" style="padding:6px 10px; font-size:0.8rem; min-height:30px;" onclick="document.getElementById('permitReplaceFile').click()">🔄 החלפת קובץ</button>
       <input type="file" id="permitReplaceFile" accept=".pdf" style="display:none;" onchange="App.replaceCurrentDoc(event)">
@@ -235,11 +236,9 @@ const App = (() => {
       document.getElementById('btnMail').style.display = 'inline-flex';
     }
 
-    // עדכון מדדים
     document.getElementById('scoreNum').innerText = (_data.readiness_score || 0) + '%';
     document.getElementById('kpiValid').innerText = _data.valid_count || 0;
 
-    // סכימה של סטטוסים אם מועבר כמערך או כאובייקט ע"י השרת
     const expiredCount = _data.alerts?.expired?.length || 0;
     const criticalCount = _data.alerts?.critical_14?.length || 0;
     const warningCount = _data.alerts?.warning_30?.length || 0;
@@ -248,7 +247,6 @@ const App = (() => {
     document.getElementById('kpiCritical').innerText = criticalCount;
     document.getElementById('kpiExpired').innerText = expiredCount;
 
-    // טבלת דרישות
     const tblReqs = document.getElementById('tblReqs');
     tblReqs.innerHTML = '';
 
@@ -264,9 +262,9 @@ const App = (() => {
         let actionBtn = `<span style="color:var(--text-muted); font-size:0.8rem;">ממתין לקובץ</span>`;
         let docMeta = r.doc_count > 0 ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">📎 סה"כ ${r.doc_count} קבצים</div>` : '';
 
-        if(r.file_path) {
+        if(r.doc_id) {
           statusPill = `<span class="pill ${r.status}">תוקף: ${r.expiry_date || 'לא מוגבל'}</span>`;
-          actionBtn = `<button class="btn btn-primary" style="padding:4px 12px; min-height:30px; font-size:0.85rem;" onclick="App.previewDoc('${r.file_path}')">👁 צפה</button>`;
+          actionBtn = `<button class="btn btn-primary" style="padding:4px 12px; min-height:30px; font-size:0.85rem;" onclick="App.previewDoc(${r.doc_id})">👁 צפה</button>`;
         }
 
         let manageBtns = '';
@@ -290,7 +288,6 @@ const App = (() => {
         tblReqs.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted)">אין דרישות במערכת</td></tr>`;
     }
 
-    // ארכיון מסמכים
     const tblArchive = document.getElementById('tblArchive');
     tblArchive.innerHTML = '';
     if(_data.recent_docs && _data.recent_docs.length > 0) {
@@ -301,7 +298,12 @@ const App = (() => {
             <td style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${d.file_name}">${cleanName}</td>
             <td>${d.zone_name || 'כללי'}</td>
             <td>${d.form_code || '-'}</td>
-            <td><button class="btn" style="padding:4px 12px; min-height:30px; font-size:0.85rem;" onclick="App.previewDoc('${d.file_path}')">👁</button></td>
+            <td>
+              <div style="display:flex; gap:4px;">
+                <button class="btn btn-primary" style="padding:4px 10px; min-height:30px; font-size:0.8rem;" onclick="App.previewDoc(${d.doc_id})">👁</button>
+                <button class="btn" style="padding:4px 10px; min-height:30px; font-size:0.8rem;" onclick="App.downloadDoc(${d.doc_id})">⬇️</button>
+              </div>
+            </td>
           </tr>`;
       });
     } else {
@@ -349,19 +351,18 @@ const App = (() => {
         const isDeleted = p.status === 'deleted';
         const isArchived = p.status === 'archived';
 
-        // --- פאנל מידע למסמך שנמחק ---
         document.getElementById('permitDeletedInfo').style.display = isDeleted ? 'block' : 'none';
         if (isDeleted) {
           document.getElementById('permitDeletedAt').innerText = p.deleted_at ? new Date(p.deleted_at).toLocaleString('he-IL') : '-';
           document.getElementById('permitDeletedBy').innerText = p.deleted_by_username || (p.deleted_by ? `משתמש #${p.deleted_by}` : '-');
         }
 
-        // --- שדות טופס: נעולים לגמרי במסמך שנמחק (תצוגת מידע בלבד) ---
         ['permitNumber','permitIssuingBody','permitIssueDate','permitExpiryDate','permitContact','permitCategory','permitTags','permitNotes']
           .forEach(id => document.getElementById(id).disabled = isDeleted);
 
-        // --- כפתורי פעולה: מודעים ל-status ---
-        document.getElementById('permitBtnDownload').style.display = isDeleted ? 'none' : 'inline-flex';
+        const hasFile = Boolean(p.file_path) && !isDeleted && p.status !== 'draft';
+        document.getElementById('permitBtnPreview').style.display = hasFile ? 'inline-flex' : 'none';
+        document.getElementById('permitBtnDownload').style.display = hasFile ? 'inline-flex' : 'none';
         document.getElementById('permitBtnReplace').style.display = isDeleted ? 'none' : 'inline-flex';
         document.getElementById('permitBtnLock').style.display = isDeleted ? 'none' : 'inline-flex';
         document.getElementById('permitBtnArchive').innerText = isArchived ? '📦 שחזור מארכיון' : '📦 ארכיון';
@@ -373,8 +374,27 @@ const App = (() => {
       } catch(e) { showToast(e.message, 'error'); }
     },
 
+    previewDoc: (docId) => {
+      if (!docId) return;
+      window.open(`/api/documents/${encodeURIComponent(docId)}/file`, '_blank', 'noopener');
+    },
+
+    previewCurrentDoc: () => {
+      if (_currentPermit?.id) App.previewDoc(_currentPermit.id);
+    },
+
+    downloadDoc: (docId) => {
+      if (!docId) return;
+      const link = document.createElement('a');
+      link.href = `/api/documents/${encodeURIComponent(docId)}/file?download=1`;
+      link.download = '';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    },
+
     downloadCurrentDoc: () => {
-      if (_currentPermit && _currentPermit.file_path) App.previewDoc(_currentPermit.file_path);
+      if (_currentPermit?.id) App.downloadDoc(_currentPermit.id);
     },
 
     toggleLock: async () => {
@@ -391,7 +411,7 @@ const App = (() => {
 
     toggleArchive: async () => {
       const id = document.getElementById('permitDocId').value;
-      if (!_currentPermit || _currentPermit.status === 'deleted') return; // הגנה - לא אמור לקרות, הכפתור מוסתר
+      if (!_currentPermit || _currentPermit.status === 'deleted') return;
       const newStatus = _currentPermit.status === 'archived' ? 'active' : 'archived';
       try {
         const res = await fetch(`/api/permits/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ status: newStatus }) });
@@ -509,13 +529,6 @@ const App = (() => {
       } catch(e) { showToast(e.message, 'error'); }
     },
 
-    // פתיחת המסמך ישירות בלשונית חדשה (מותאם לנייד)
-    previewDoc: (path) => {
-      const fileName = path.split('/').pop().split('\\').pop();
-      const fileUrl = '/uploads/' + encodeURIComponent(fileName);
-      window.open(fileUrl, '_blank');
-    },
-
     submitUpload: async (event) => {
       const allFiles = Array.from(event.target.files);
       const files = allFiles.filter(f => f.name.toLowerCase().endsWith('.pdf'));
@@ -553,7 +566,7 @@ const App = (() => {
       } catch(e) {
           showToast("שגיאת רשת בהעלאת הקובץ", "error");
       }
-      event.target.value = ''; // איפוס בחירת הקובץ
+      event.target.value = '';
     },
 
     triggerMail: async () => {
