@@ -4,7 +4,7 @@ Blueprint נפרד מ-main_bp הקיים; לא נוגע ב-/api/dashboard או �
 """
 import secrets
 from itsdangerous import URLSafeTimedSerializer
-from flask import Blueprint, jsonify, request, session, current_app
+from flask import Blueprint, jsonify, request, session, current_app, redirect
 from app.services import permit_service as svc
 from app.services.permit_service import PermitServiceError
 from app.services.auth_service import AuthServiceError
@@ -59,10 +59,6 @@ def api_get_permit(doc_id):
     if doc.file_path and doc.status != 'deleted':
         token = _document_access_token(doc.id)
         response = jsonify({**payload, 'file_access_url': f"/api/documents/{doc.id}/file?access_token={token}"})
-        # Keep the short-lived document token available to the exact document
-        # endpoint and its nested navigation paths. This also makes direct
-        # window.open() preview/download resilient when the session cookie is
-        # unavailable in a newly opened browser tab.
         response.set_cookie(
             f'doc_access_{doc.id}', token,
             max_age=DOCUMENT_TOKEN_MAX_AGE,
@@ -73,6 +69,26 @@ def api_get_permit(doc_id):
         )
         return response
     return jsonify({**payload, 'file_access_url': None})
+
+
+@permits_bp.route('/api/permits/<int:doc_id>/preview', methods=['GET'])
+def api_preview_permit(doc_id):
+    """Open a document through an authenticated same-origin redirect.
+
+    The browser can navigate directly to this endpoint from a user click,
+    avoiding asynchronous popup-blocker issues. The endpoint verifies the
+    current session, creates a short-lived signed token, then redirects to
+    the existing protected document endpoint.
+    """
+    if not session.get('user_id'):
+        return jsonify({"error": "נדרשת התחברות"}), 401
+
+    doc = svc.get_document_or_404(doc_id)
+    if not doc.file_path or doc.status in ('deleted', 'draft'):
+        return jsonify({"error": "למסמך אין קובץ זמין לצפייה"}), 404
+
+    token = _document_access_token(doc.id)
+    return redirect(f"/api/documents/{doc.id}/file?access_token={token}", code=302)
 
 
 @permits_bp.route('/api/permits/<int:doc_id>', methods=['PUT'])
@@ -127,3 +143,43 @@ def api_unlock_permit(doc_id):
 def api_permit_history(doc_id):
     history = svc.get_history(doc_id)
     return jsonify([svc.serialize_history(h) for h in history])
+
+
+@permits_bp.after_app_request
+def _inject_direct_preview_override(response):
+    """Replace the fragile async popup flow with a synchronous same-origin URL."""
+    if request.path not in {'/', '/index.html'}:
+        return response
+    content_type = response.headers.get('Content-Type', '')
+    if not content_type.startswith('text/html'):
+        return response
+
+    script = '''<script>
+(function () {
+  function installDirectPermitPreview() {
+    if (typeof App === 'undefined') return;
+    App.previewDoc = function (docId) {
+      if (!docId) return;
+      const url = '/api/permits/' + encodeURIComponent(docId) + '/preview';
+      // This navigation happens directly from the click handler, so the
+      // browser cannot classify it as an asynchronously-created popup.
+      window.open(url, '_blank');
+    };
+    App.previewCurrentDoc = function () {
+      const id = document.getElementById('permitDocId')?.value;
+      if (id) App.previewDoc(id);
+    };
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', installDirectPermitPreview);
+  } else {
+    installDirectPermitPreview();
+  }
+})();
+</script>'''
+    body = response.get_data(as_text=True)
+    marker = '</body>'
+    if marker in body:
+        response.set_data(body.replace(marker, script + marker, 1))
+    return response
+'''
