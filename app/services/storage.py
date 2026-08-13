@@ -230,3 +230,34 @@ def verify_pdf_bytes(data: bytes) -> dict:
         logger.warning(f'PDF structural validation failed: {exc}')
         return {'status': False, 'error': 'לא ניתן לפרש את הקובץ כ-PDF תקין'}
     return {'status': True, 'error': None}
+
+
+def list_supabase_files() -> list:
+    """Read-only inventory of objects in the configured Supabase bucket."""
+    if not is_configured():
+        return []
+    results = []
+    bucket = _bucket_name()
+    try:
+        client = _get_client()
+        limit = 100
+        offset = 0
+        while True:
+            page = client.storage.from_(bucket).list(options={'limit': limit, 'offset': offset})
+            if not page:
+                break
+            for item in page:
+                name = item.get('name') if isinstance(item, dict) else getattr(item, 'name', None)
+                if not name:
+                    continue
+                size = None
+                metadata = item.get('metadata') if isinstance(item, dict) else None
+                if isinstance(metadata, dict):
+                    size = metadata.get('size')
+                results.append({'filename': name, 'size': size})
+            if len(page) < limit:
+                break
+            offset += limit
+    except Exception as e:
+        logger.error(f'list_supabase_files failed: {e}')
+    return results
