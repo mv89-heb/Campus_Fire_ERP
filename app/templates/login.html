@@ -18,7 +18,6 @@ body { min-height: 100vh; display: flex; align-items: center; justify-content: c
 .login-subtitle { font-size: var(--text-sm); color: var(--color-text-muted); text-align: center; margin-bottom: var(--space-6); }
 .error-msg { color: var(--color-danger); font-size: var(--text-sm); text-align: center; min-height: 18px; }
 .hint { font-size: var(--text-xs); color: var(--color-text-muted); text-align: center; margin-top: var(--space-4); }
-.hint a { color: var(--color-primary); }
 </style>
 </head>
 <body>
@@ -34,9 +33,7 @@ body { min-height: 100vh; display: flex; align-items: center; justify-content: c
   </div>
   <div class="error-msg" id="errorMsg"></div>
   <button class="ds-btn ds-btn-primary" id="submitBtn" onclick="Login.submit()" style="width:100%;">התחברות</button>
-  <div class="hint">
-    <a href="/">← המשך ללא התחברות (המערכת עדיין פתוחה לכולם בשלב זה)</a>
-  </div>
+  <div class="hint">הגישה למערכת מוגנת ודורשת חשבון פעיל והרשאות מתאימות.</div>
 </div>
 
 <script>
