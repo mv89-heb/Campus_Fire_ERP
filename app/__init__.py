@@ -75,6 +75,14 @@ def _install_security_guards(app):
                 return jsonify({'error': 'Cross-origin request blocked'}), 403
             return None
 
+        # Document file delivery performs its own authentication: either the
+        # normal Flask session or a short-lived, document-specific signed token.
+        # This is required because a browser PDF viewer / download navigation
+        # cannot attach our X-CSRF header, and may not reliably carry the app
+        # session across a newly opened document navigation.
+        if path.startswith('/api/documents/') and path.endswith('/file') and request.method == 'GET':
+            return None
+
         if path == '/api/auth/logout':
             if not _same_origin_allowed(app):
                 return jsonify({'error': 'Cross-origin request blocked'}), 403
@@ -201,9 +209,6 @@ def create_app(config_class=Config):
     from .api.admin_storage_routes import admin_storage_bp
     app.register_blueprint(admin_storage_bp)
 
-    # Install the global authorization guard only after all blueprints are
-    # registered, so page/API routes are protected while public auth routes
-    # remain explicitly allow-listed.
     _install_security_guards(app)
     _install_route_limits(app)
     return app
@@ -240,7 +245,7 @@ def seed_data():
                 (zones[4].id, 'גילוי אש', 'טופס 4')
             ]
             for zid, sname, form in reqs:
-                db.session.add(SystemRequirement(zone_id=zid, system_name=sname, required_form=form))
+                db.session.add(SystemRequirement(zone_id=zid, system_name=sname, required_form=form)
             db.session.commit()
     except Exception as e:
         db.session.rollback()
