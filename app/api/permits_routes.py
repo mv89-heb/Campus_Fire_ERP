@@ -56,11 +56,21 @@ def api_list_categories():
 def api_get_permit(doc_id):
     doc = svc.get_document_or_404(doc_id)
     payload = svc.serialize_permit(doc)
+    response = jsonify(payload)
     if doc.file_path and doc.status != 'deleted':
-        payload['file_access_url'] = f"/api/documents/{doc.id}/file?access_token={_document_access_token(doc.id)}"
+        token = _document_access_token(doc.id)
+        response = jsonify({**payload, 'file_access_url': f"/api/documents/{doc.id}/file?access_token={token}"})
+        response.set_cookie(
+            f'doc_access_{doc.id}', token,
+            max_age=DOCUMENT_TOKEN_MAX_AGE,
+            httponly=True,
+            secure=current_app.config.get('SESSION_COOKIE_SECURE', False),
+            samesite=current_app.config.get('SESSION_COOKIE_SAMESITE', 'Lax'),
+            path=f'/api/documents/{doc.id}/file',
+        )
     else:
-        payload['file_access_url'] = None
-    return jsonify(payload)
+        response = jsonify({**payload, 'file_access_url': None})
+    return response
 
 
 @permits_bp.route('/api/permits/<int:doc_id>', methods=['PUT'])
