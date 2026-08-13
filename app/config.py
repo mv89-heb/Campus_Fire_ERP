@@ -16,8 +16,6 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 
 class Config:
-    # Explicitly mark production deployments with FLASK_ENV=production or ENV=production.
-    # Development gets a per-process random key rather than a predictable default.
     ENV = os.environ.get('FLASK_ENV', os.environ.get('ENV', 'development')).strip().lower()
     IS_PRODUCTION = ENV in {'production', 'prod'}
     SECRET_KEY = os.environ.get('SECRET_KEY') or (
@@ -51,6 +49,10 @@ class Config:
 
     MAX_PDF_BYTES = int(os.environ.get('MAX_PDF_BYTES', str(100 * 1024 * 1024)))
     ALLOWED_PDF_MIME_TYPES = ('application/pdf', 'application/x-pdf')
+
+    # Development remains convenient and backwards compatible. Production must
+    # use Flask-Migrate/Alembic explicitly; schema creation is never implicit.
+    AUTO_CREATE_DB = _env_bool('AUTO_CREATE_DB', not IS_PRODUCTION)
 
     @classmethod
     def validate(cls):
