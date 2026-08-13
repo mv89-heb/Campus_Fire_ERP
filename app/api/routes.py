@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, current_app, render_template, send_file, redirect
+from flask import Blueprint, jsonify, request, current_app, render_template, send_file, redirect, session
 from app.extensions import db
 from app.models import Zone, SystemRequirement, Document
 from app.services.dms_service import DMSService
@@ -21,10 +21,6 @@ DOCUMENT_TOKEN_MAX_AGE = 300
 
 def _document_token_serializer():
     return URLSafeTimedSerializer(current_app.config['SECRET_KEY'], salt=DOCUMENT_TOKEN_SALT)
-
-
-def _issue_document_access_token(doc_id):
-    return _document_token_serializer().dumps({'doc_id': int(doc_id), 'nonce': secrets.token_urlsafe(12)})
 
 
 def _document_token_valid(token, doc_id):
