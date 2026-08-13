@@ -6,6 +6,9 @@ from app.extensions import db
 from app.services.permissions import can_write
 
 
+TEST_PASSWORD = 'Strong-Test-1234'
+
+
 class TestConfig:
     ENV = 'testing'
     IS_PRODUCTION = False
@@ -20,6 +23,7 @@ class TestConfig:
     SESSION_COOKIE_SAMESITE = 'Lax'
     PERMANENT_SESSION_LIFETIME = 3600
     TRUSTED_ORIGINS = ()
+    RATELIMIT_STORAGE_URI = 'memory://'
     AUTO_CREATE_DB = True
 
     @classmethod
@@ -45,15 +49,22 @@ class SecurityGuardTests(unittest.TestCase):
     def test_first_user_bootstrap_forces_super_admin(self):
         response = self.client.post(
             '/api/users',
-            json={'username': 'root', 'password': 'strong-test-password', 'role': 'viewer'},
+            json={'username': 'root', 'password': TEST_PASSWORD, 'role': 'viewer'},
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.get_json()['role'], 'super_admin')
 
+    def test_weak_bootstrap_password_is_rejected(self):
+        response = self.client.post(
+            '/api/users',
+            json={'username': 'root', 'password': 'weak-password'},
+        )
+        self.assertEqual(response.status_code, 400)
+
     def test_viewer_cannot_write(self):
         self.client.post(
             '/api/users',
-            json={'username': 'root', 'password': 'strong-test-password'},
+            json={'username': 'root', 'password': TEST_PASSWORD},
         )
         with self.app.app_context():
             from app.models import User
@@ -63,41 +74,59 @@ class SecurityGuardTests(unittest.TestCase):
             sess['user_id'] = user.id
             sess['username'] = user.username
             sess['role'] = 'viewer'
+            sess['csrf_token'] = 'viewer-csrf'
 
-        response = self.client.post('/api/sites', json={'name': 'Blocked'})
+        response = self.client.post(
+            '/api/sites',
+            json={'name': 'Blocked'},
+            headers={'X-CSRF-Token': 'viewer-csrf'},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_missing_csrf_is_rejected(self):
+        self.client.post(
+            '/api/users',
+            json={'username': 'root', 'password': TEST_PASSWORD},
+        )
+        self.client.post(
+            '/api/auth/login',
+            json={'username': 'root', 'password': TEST_PASSWORD},
+        )
+        response = self.client.post('/api/sites', json={'name': 'Missing CSRF'})
         self.assertEqual(response.status_code, 403)
 
     def test_admin_can_write_after_login(self):
         self.client.post(
             '/api/users',
-            json={'username': 'root', 'password': 'strong-test-password'},
+            json={'username': 'root', 'password': TEST_PASSWORD},
         )
         response = self.client.post(
             '/api/auth/login',
-            json={'username': 'root', 'password': 'strong-test-password'},
+            json={'username': 'root', 'password': TEST_PASSWORD},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.get_json().get('csrf_token'))
+        csrf_token = response.get_json().get('csrf_token')
+        self.assertTrue(csrf_token)
 
-        response = self.client.post('/api/sites', json={'name': 'Protected Site'})
+        response = self.client.post(
+            '/api/sites',
+            json={'name': 'Protected Site'},
+            headers={'X-CSRF-Token': csrf_token},
+        )
         self.assertEqual(response.status_code, 201)
 
     def test_rbac_matrix(self):
-        # Inspectors own the inspection workflow but not organization/master data.
         self.assertTrue(can_write('inspector', '/api/audits'))
         self.assertTrue(can_write('inspector', '/api/deficiencies/12'))
         self.assertFalse(can_write('inspector', '/api/sites'))
         self.assertFalse(can_write('inspector', '/api/users'))
 
-        # Technicians may update field equipment and complete tasks, but cannot
-        # create/delete master records through the generic endpoints.
         self.assertTrue(can_write('technician', '/api/equipment/12'))
         self.assertTrue(can_write('technician', '/api/tasks/12/complete'))
         self.assertFalse(can_write('technician', '/api/equipment'))
         self.assertFalse(can_write('technician', '/api/tasks'))
         self.assertFalse(can_write('technician', '/api/sites'))
 
-        # Viewer remains read-only; managers/admins retain broad write access.
         self.assertFalse(can_write('viewer', '/api/audits'))
         self.assertTrue(can_write('manager', '/api/sites'))
         self.assertTrue(can_write('admin', '/api/users/12'))
