@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, current_app, render_template, send_file, redirect, session
+from flask import Blueprint, jsonify, request, current_app, render_template, send_file, redirect, session, make_response
 from app.extensions import db
 from app.models import Zone, SystemRequirement, Document
 from app.services.dms_service import DMSService
@@ -44,6 +44,37 @@ def _document_access_allowed(doc_id):
     return _document_token_valid(token, doc_id)
 
 
+def _safe_pdf_filename(doc, doc_id):
+    filename = os.path.basename(doc.file_name or '') or f'document-{doc_id}.pdf'
+    if not filename.lower().endswith('.pdf'):
+        filename += '.pdf'
+    return filename
+
+
+def _pdf_response(data, filename, download=False):
+    """Return a browser-safe PDF response with explicit inline/attachment semantics."""
+    if not data or not data.startswith(b'%PDF-'):
+        raise ValueError('אחסון המסמך החזיר תוכן שאינו PDF תקין')
+
+    response = send_file(
+        io.BytesIO(data),
+        mimetype='application/pdf',
+        as_attachment=download,
+        download_name=filename,
+        max_age=0,
+        conditional=False,
+    )
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Length'] = str(len(data))
+    response.headers['Cache-Control'] = 'private, no-store, max-age=0, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    if not download:
+        # Be explicit: the browser must render the PDF instead of downloading it.
+        response.headers['Content-Disposition'] = f"inline; filename*=UTF-8''{filename}"
+    return response
+
+
 @main_bp.route('/')
 def index():
     if not session.get('user_id'):
@@ -62,6 +93,8 @@ def serve_upload(filename):
     doc = Document.query.filter(db.or_(Document.file_path == fname, Document.file_path.like(f'%/{fname}'))).first()
     if not doc or doc.status == 'deleted' or not doc.file_path:
         return jsonify({'error': 'File not found'}), 404
+    if not _document_access_allowed(doc.id):
+        return jsonify({'error': 'נדרשת התחברות'}), 401
 
     resolved = storage.find_supabase_legacy_path(doc.file_path)
     if resolved and storage.is_configured():
@@ -79,8 +112,11 @@ def serve_upload(filename):
     if os.path.commonpath([full_path, base_dir]) != base_dir:
         return jsonify({'error': 'Invalid file path'}), 400
     if os.path.isfile(full_path):
-        return send_file(full_path, mimetype='application/pdf', max_age=0)
-    return jsonify({'error': 'File not found'}), 404
+        response = send_file(full_path, mimetype='application/pdf', as_attachment=False, max_age=0)
+        response.headers['Cache-Control'] = 'private, no-store, max-age=0, must-revalidate'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
+    return jsonify({'error': f'File not found. Looking in: {full_path}'}), 404
 
 
 @main_bp.route('/api/documents/<int:doc_id>/file', methods=['GET'])
@@ -92,9 +128,7 @@ def document_file(doc_id):
         return jsonify({'error': 'נדרשת התחברות'}), 401
 
     download = request.args.get('download', '').lower() in {'1', 'true', 'yes'}
-    filename = os.path.basename(doc.file_name or '') or f'document-{doc_id}.pdf'
-    if not filename.lower().endswith('.pdf'):
-        filename += '.pdf'
+    filename = _safe_pdf_filename(doc, doc_id)
 
     resolved_path = doc.file_path if storage.is_supabase_path(doc.file_path) else storage.find_supabase_legacy_path(doc.file_path)
     if resolved_path and storage.is_configured():
@@ -102,14 +136,24 @@ def document_file(doc_id):
         if not signed_url:
             return jsonify({'error': 'לא ניתן ליצור קישור מאובטח למסמך'}), 502
         try:
-            req = Request(signed_url, headers={'User-Agent': 'Campus-Fire-ERP/1.0'})
-            with urlopen(req, timeout=30) as response:
-                data = response.read()
+            req = Request(signed_url, headers={'User-Agent': 'Campus-Fire-ERP/1.0', 'Accept': 'application/pdf,*/*'})
+            with urlopen(req, timeout=30) as upstream:
+                data = upstream.read()
+                upstream_type = upstream.headers.get('Content-Type', '')
+
             if not data:
                 return jsonify({'error': 'המסמך ריק או לא זמין'}), 404
-            response = send_file(io.BytesIO(data), mimetype='application/pdf', as_attachment=download, download_name=filename, max_age=0)
-            response.headers['Cache-Control'] = 'private, no-store, max-age=0'
-            return response
+            if not data.startswith(b'%PDF-'):
+                current_app.logger.error(
+                    'Supabase document %s returned non-PDF content-type=%s first_bytes=%r',
+                    doc_id, upstream_type, data[:32]
+                )
+                return jsonify({'error': 'הקובץ המאוחסן אינו PDF תקין. יש לבדוק את המסמך ב-Supabase Storage.'}), 502
+
+            return _pdf_response(data, filename, download=download)
+        except ValueError as exc:
+            current_app.logger.exception('Invalid PDF returned for document %s', doc_id)
+            return jsonify({'error': str(exc)}), 502
         except Exception:
             current_app.logger.exception('Supabase document fetch failed for document %s', doc_id)
             return jsonify({'error': 'לא ניתן לטעון את המסמך מאחסון הקבצים'}), 502
@@ -120,9 +164,13 @@ def document_file(doc_id):
         return jsonify({'error': 'Invalid file path'}), 400
     if not os.path.isfile(full_path):
         return jsonify({'error': f'File not found. Looking in: {full_path}'}), 404
-    response = send_file(full_path, mimetype='application/pdf', as_attachment=download, download_name=filename, max_age=0)
-    response.headers['Cache-Control'] = 'private, no-store, max-age=0'
-    return response
+
+    try:
+        with open(full_path, 'rb') as local_file:
+            data = local_file.read()
+        return _pdf_response(data, filename, download=download)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 502
 
 
 @main_bp.route('/api/dashboard')
