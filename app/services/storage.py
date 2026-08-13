@@ -57,9 +57,25 @@ def check_connection():
 
 
 def is_supabase_path(file_path: str) -> bool:
-    if not file_path:
+    """Return True for native Supabase paths and legacy local paths whose
+    local copy is missing. Legacy documents are stored in Supabase under their
+    basename after migration, so this allows old DB rows to remain readable.
+    """
+    if not file_path or not is_configured():
         return False
-    return file_path.startswith(f'{_bucket_name()}/')
+    bucket = _bucket_name()
+    if file_path.startswith(f'{bucket}/'):
+        return True
+
+    # Legacy rows historically stored only the filename (or an uploads/ prefix)
+    # in Document.file_path. On Render the ephemeral local copy may disappear,
+    # while the same object still exists in Supabase.
+    upload_folder = current_app.config.get('UPLOAD_FOLDER')
+    if upload_folder:
+        local_path = os.path.abspath(os.path.join(upload_folder, os.path.basename(file_path)))
+        if os.path.isfile(local_path):
+            return False
+    return not os.path.isabs(file_path)
 
 
 def upload_bytes(remote_filename: str, data: bytes, content_type: str = 'application/pdf') -> str:
@@ -81,7 +97,7 @@ def delete_object(stored_path: str):
     if not stored_path:
         return
     bucket = _bucket_name()
-    remote_filename = stored_path[len(bucket) + 1:] if stored_path.startswith(f'{bucket}/') else stored_path
+    remote_filename = stored_path[len(bucket) + 1:] if stored_path.startswith(f'{bucket}/') else os.path.basename(stored_path)
     try:
         client = _get_client()
         client.storage.from_(bucket).remove([remote_filename])
@@ -91,7 +107,13 @@ def delete_object(stored_path: str):
 
 def get_signed_url(stored_path: str, expires_in: int = 300):
     bucket = _bucket_name()
-    remote_filename = stored_path[len(bucket) + 1:] if stored_path.startswith(f'{bucket}/') else stored_path
+    # Native Supabase paths include the bucket prefix. Legacy rows contain only
+    # a filename; those objects were uploaded at the bucket root.
+    remote_filename = (
+        stored_path[len(bucket) + 1:]
+        if stored_path.startswith(f'{bucket}/')
+        else os.path.basename(stored_path)
+    )
     try:
         client = _get_client()
         res = client.storage.from_(bucket).create_signed_url(remote_filename, expires_in)
