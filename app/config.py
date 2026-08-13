@@ -1,5 +1,6 @@
 import os
 import secrets
+import warnings
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -43,10 +44,21 @@ class Config:
         if origin.strip()
     )
 
-    RATELIMIT_STORAGE_URI = os.environ.get(
-        'RATELIMIT_STORAGE_URI',
-        'redis://localhost:6379/1' if IS_PRODUCTION else 'memory://',
-    )
+    # A shared Redis backend is recommended for multi-instance production.
+    # When Redis is not configured, fall back to memory so the application
+    # remains available; the startup log clearly warns that rate-limit state
+    # is process-local and should be replaced with Redis before scaling out.
+    _rate_limit_storage = os.environ.get('RATELIMIT_STORAGE_URI', '').strip()
+    if _rate_limit_storage:
+        RATELIMIT_STORAGE_URI = _rate_limit_storage
+    else:
+        RATELIMIT_STORAGE_URI = 'memory://'
+        if IS_PRODUCTION:
+            warnings.warn(
+                'RATELIMIT_STORAGE_URI is not configured; using process-local memory. '
+                'Configure Redis for shared production rate limiting before scaling.',
+                RuntimeWarning,
+            )
     RATELIMIT_HEADERS_ENABLED = True
 
     SUPABASE_URL = os.environ.get('SUPABASE_URL')
@@ -65,7 +77,5 @@ class Config:
             errors.append('SECRET_KEY must be set in production')
         if not cls.SQLALCHEMY_DATABASE_URI:
             errors.append('DATABASE_URL must be set')
-        if cls.IS_PRODUCTION and cls.RATELIMIT_STORAGE_URI.startswith('memory://'):
-            errors.append('RATELIMIT_STORAGE_URI must use shared storage in production')
         if errors:
             raise RuntimeError('; '.join(errors))
