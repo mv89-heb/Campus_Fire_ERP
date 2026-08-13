@@ -116,7 +116,6 @@ def _install_security_guards(app):
 
 
 def _install_route_limits(app):
-    """Apply stricter limits without coupling individual blueprints to the limiter."""
     for endpoint, limit in {
         'auth.api_login': '5 per minute;20 per hour',
         'auth.api_create_user': '10 per hour',
@@ -124,6 +123,18 @@ def _install_route_limits(app):
         view = app.view_functions.get(endpoint)
         if view:
             app.view_functions[endpoint] = limiter.limit(limit)(view)
+
+
+def _install_security_headers(app):
+    @app.after_request
+    def security_headers(response):
+        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        response.headers.setdefault('X-Frame-Options', 'DENY')
+        response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+        response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+        if app.config.get('IS_PRODUCTION'):
+            response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+        return response
 
 
 def create_app(config_class=Config):
@@ -134,6 +145,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     limiter.init_app(app)
+    _install_security_headers(app)
 
     try:
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
