@@ -8,6 +8,7 @@ from datetime import date
 import io
 import platform
 import os
+from urllib.request import Request, urlopen
 
 main_bp = Blueprint('main', __name__)
 
@@ -34,9 +35,7 @@ def serve_upload(filename):
         signed_url = storage.get_signed_url(stored_path)
         if signed_url:
             return redirect(signed_url)
-        current_app.logger.warning(
-            f'Supabase signed URL failed for {stored_path}, falling back to local disk'
-        )
+        current_app.logger.warning('Supabase signed URL failed for %s', stored_path)
 
     base_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     full_path = os.path.abspath(os.path.join(base_dir, fname))
@@ -44,47 +43,52 @@ def serve_upload(filename):
         return jsonify({'error': 'Invalid file path'}), 400
 
     if os.path.isfile(full_path):
-        return send_file(full_path, mimetype='application/pdf')
+        return send_file(full_path, mimetype='application/pdf', max_age=0)
     return jsonify({'error': 'File not found'}), 404
 
 
-@main_bp.route('/api/documents/<int:doc_id>/file')
+@main_bp.route('/api/documents/<int:doc_id>/file', methods=['GET'])
 def document_file(doc_id):
-    """Authenticated preview/download endpoint addressed by document ID.
+    """Authenticated document endpoint for both inline preview and download.
 
-    Using the document ID instead of a client-supplied filename prevents
-    filename/path ambiguity and lets us enforce document status before access.
-    For Supabase, the server fetches the object and streams it with the desired
-    Content-Disposition so the Download action works consistently.
+    The browser never receives a storage path. The document is resolved by DB id,
+    deleted documents are rejected, and Supabase objects are proxied through the
+    Flask server so preview and download behave identically on desktop/mobile.
     """
     doc = db.session.get(Document, doc_id)
     if not doc or doc.status == 'deleted' or not doc.file_path:
         return jsonify({'error': 'File not found'}), 404
 
     download = request.args.get('download', '').lower() in {'1', 'true', 'yes'}
-    filename = os.path.basename(doc.file_name or doc.file_path) or f'document-{doc_id}.pdf'
+    filename = os.path.basename(doc.file_name or '') or f'document-{doc_id}.pdf'
     if not filename.lower().endswith('.pdf'):
-        filename = f'{filename}.pdf'
+        filename += '.pdf'
 
+    # Supabase: create a short-lived signed URL, fetch it server-side, and
+    # return the actual PDF bytes. This avoids browser redirect/CORS/download
+    # inconsistencies with Supabase Storage.
     if storage.is_supabase_path(doc.file_path) and storage.is_configured():
+        signed_url = storage.get_signed_url(doc.file_path, expires_in=120)
+        if not signed_url:
+            return jsonify({'error': 'לא ניתן ליצור קישור מאובטח למסמך'}), 502
         try:
-            bucket = storage.get_bucket_name()
-            remote_path = doc.file_path[len(bucket) + 1:]
-            data = storage._get_client().storage.from_(bucket).download(remote_path)
-            if data:
-                return send_file(
-                    io.BytesIO(data),
-                    mimetype='application/pdf',
-                    as_attachment=download,
-                    download_name=filename,
-                    max_age=0,
-                )
-        except Exception as exc:
-            current_app.logger.warning('Supabase document streaming failed for %s: %s', doc_id, exc)
-            signed_url = storage.get_signed_url(doc.file_path)
-            if signed_url and not download:
-                return redirect(signed_url)
+            req = Request(signed_url, headers={'User-Agent': 'Campus-Fire-ERP/1.0'})
+            with urlopen(req, timeout=30) as response:
+                data = response.read()
+            if not data:
+                return jsonify({'error': 'המסמך ריק או לא זמין'}), 404
+            return send_file(
+                io.BytesIO(data),
+                mimetype='application/pdf',
+                as_attachment=download,
+                download_name=filename,
+                max_age=0,
+            )
+        except Exception:
+            current_app.logger.exception('Supabase document fetch failed for document %s', doc_id)
+            return jsonify({'error': 'לא ניתן לטעון את המסמך מאחסון הקבצים'}), 502
 
+    # Local storage fallback.
     base_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     full_path = os.path.abspath(os.path.join(base_dir, os.path.basename(doc.file_path)))
     if os.path.commonpath([full_path, base_dir]) != base_dir:
@@ -187,7 +191,7 @@ def dashboard():
             'outlook_enabled': OUTLOOK_ENABLED,
             'zones': [{'id': z.id, 'zone_name': z.zone_name} for z in zones],
         })
-    except Exception as e:
+    except Exception:
         current_app.logger.exception('Dashboard Error')
         return jsonify({'error': 'אירעה שגיאה פנימית'}), 500
 
@@ -289,6 +293,6 @@ def outlook():
             return jsonify({'success': True})
         finally:
             pythoncom.CoUninitialize()
-    except Exception as e:
+    except Exception:
         current_app.logger.exception('Outlook integration failed')
         return jsonify({'error': 'שגיאת Outlook'}), 500
