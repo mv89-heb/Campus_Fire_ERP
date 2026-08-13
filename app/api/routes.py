@@ -5,6 +5,7 @@ from app.services.dms_service import DMSService
 from app.services import storage
 from app.utils.security import validate_and_save_pdf
 from datetime import date
+import io
 import platform
 import os
 
@@ -20,13 +21,15 @@ def index():
 
 @main_bp.route('/uploads/<path:filename>')
 def serve_upload(filename):
-    """Serve a document through Supabase signed URLs or the legacy local store."""
+    """Legacy document route kept for compatibility; requires authentication via global guard."""
     fname = os.path.basename(filename)
     doc = Document.query.filter(
         db.or_(Document.file_path == fname, Document.file_path.like(f'%/{fname}'))
     ).first()
-    stored_path = doc.file_path if doc else fname
+    if not doc or doc.status == 'deleted' or not doc.file_path:
+        return jsonify({'error': 'File not found'}), 404
 
+    stored_path = doc.file_path
     if storage.is_supabase_path(stored_path) and storage.is_configured():
         signed_url = storage.get_signed_url(stored_path)
         if signed_url:
@@ -35,7 +38,7 @@ def serve_upload(filename):
             f'Supabase signed URL failed for {stored_path}, falling back to local disk'
         )
 
-    base_dir = os.path.abspath(os.path.join(current_app.root_path, '..', 'uploads'))
+    base_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     full_path = os.path.abspath(os.path.join(base_dir, fname))
     if os.path.commonpath([full_path, base_dir]) != base_dir:
         return jsonify({'error': 'Invalid file path'}), 400
@@ -43,6 +46,59 @@ def serve_upload(filename):
     if os.path.isfile(full_path):
         return send_file(full_path, mimetype='application/pdf')
     return jsonify({'error': 'File not found'}), 404
+
+
+@main_bp.route('/api/documents/<int:doc_id>/file')
+def document_file(doc_id):
+    """Authenticated preview/download endpoint addressed by document ID.
+
+    Using the document ID instead of a client-supplied filename prevents
+    filename/path ambiguity and lets us enforce document status before access.
+    For Supabase, the server fetches the object and streams it with the desired
+    Content-Disposition so the Download action works consistently.
+    """
+    doc = db.session.get(Document, doc_id)
+    if not doc or doc.status == 'deleted' or not doc.file_path:
+        return jsonify({'error': 'File not found'}), 404
+
+    download = request.args.get('download', '').lower() in {'1', 'true', 'yes'}
+    filename = os.path.basename(doc.file_name or doc.file_path) or f'document-{doc_id}.pdf'
+    if not filename.lower().endswith('.pdf'):
+        filename = f'{filename}.pdf'
+
+    if storage.is_supabase_path(doc.file_path) and storage.is_configured():
+        try:
+            bucket = storage.get_bucket_name()
+            remote_path = doc.file_path[len(bucket) + 1:]
+            data = storage._get_client().storage.from_(bucket).download(remote_path)
+            if data:
+                return send_file(
+                    io.BytesIO(data),
+                    mimetype='application/pdf',
+                    as_attachment=download,
+                    download_name=filename,
+                    max_age=0,
+                )
+        except Exception as exc:
+            current_app.logger.warning('Supabase document streaming failed for %s: %s', doc_id, exc)
+            signed_url = storage.get_signed_url(doc.file_path)
+            if signed_url and not download:
+                return redirect(signed_url)
+
+    base_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
+    full_path = os.path.abspath(os.path.join(base_dir, os.path.basename(doc.file_path)))
+    if os.path.commonpath([full_path, base_dir]) != base_dir:
+        return jsonify({'error': 'Invalid file path'}), 400
+    if not os.path.isfile(full_path):
+        return jsonify({'error': 'File not found'}), 404
+
+    return send_file(
+        full_path,
+        mimetype='application/pdf',
+        as_attachment=download,
+        download_name=filename,
+        max_age=0,
+    )
 
 
 @main_bp.route('/api/dashboard')
@@ -113,6 +169,7 @@ def dashboard():
             z_name = d.zone.zone_name if d.zone else 'לא משויך'
             r_form = d.requirement.required_form if d.requirement else '-'
             recent_docs.append({
+                'doc_id': d.id,
                 'file_name': d.file_name,
                 'zone_name': z_name,
                 'form_code': r_form,
