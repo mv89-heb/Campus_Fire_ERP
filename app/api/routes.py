@@ -36,9 +36,6 @@ def _document_token_valid(token, doc_id):
 def _document_access_allowed(doc_id):
     if session.get('user_id'):
         return True
-
-    # Prefer the explicit short-lived token in the URL/header. The cookie is
-    # a fallback for browser PDF navigations that may omit query parameters.
     token = (
         request.args.get('access_token')
         or request.headers.get('X-Document-Access-Token')
@@ -49,13 +46,13 @@ def _document_access_allowed(doc_id):
 
 @main_bp.route('/')
 def index():
+    if not session.get('user_id'):
+        return redirect('/login')
     return render_template('index.html', active_nav='permits')
 
 
 @main_bp.route('/favicon.ico')
 def favicon():
-    # Browsers request this automatically. It must not be treated as an
-    # authenticated application/API request.
     return '', 204
 
 
@@ -110,13 +107,7 @@ def document_file(doc_id):
                 data = response.read()
             if not data:
                 return jsonify({'error': 'המסמך ריק או לא זמין'}), 404
-            response = send_file(
-                io.BytesIO(data),
-                mimetype='application/pdf',
-                as_attachment=download,
-                download_name=filename,
-                max_age=0,
-            )
+            response = send_file(io.BytesIO(data), mimetype='application/pdf', as_attachment=download, download_name=filename, max_age=0)
             response.headers['Cache-Control'] = 'private, no-store, max-age=0'
             return response
         except Exception:
@@ -129,13 +120,7 @@ def document_file(doc_id):
         return jsonify({'error': 'Invalid file path'}), 400
     if not os.path.isfile(full_path):
         return jsonify({'error': f'File not found. Looking in: {full_path}'}), 404
-    response = send_file(
-        full_path,
-        mimetype='application/pdf',
-        as_attachment=download,
-        download_name=filename,
-        max_age=0,
-    )
+    response = send_file(full_path, mimetype='application/pdf', as_attachment=download, download_name=filename, max_age=0)
     response.headers['Cache-Control'] = 'private, no-store, max-age=0'
     return response
 
