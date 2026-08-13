@@ -201,6 +201,10 @@ def create_app(config_class=Config):
     from .api.admin_storage_routes import admin_storage_bp
     app.register_blueprint(admin_storage_bp)
 
+    # Install the global authorization guard only after all blueprints are
+    # registered, so page/API routes are protected while public auth routes
+    # remain explicitly allow-listed.
+    _install_security_guards(app)
     _install_route_limits(app)
     return app
 
