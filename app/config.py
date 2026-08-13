@@ -43,6 +43,12 @@ class Config:
         if origin.strip()
     )
 
+    RATELIMIT_STORAGE_URI = os.environ.get(
+        'RATELIMIT_STORAGE_URI',
+        'redis://localhost:6379/1' if IS_PRODUCTION else 'memory://',
+    )
+    RATELIMIT_HEADERS_ENABLED = True
+
     SUPABASE_URL = os.environ.get('SUPABASE_URL')
     SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY')
     SUPABASE_BUCKET = os.environ.get('SUPABASE_BUCKET', 'documents')
@@ -50,8 +56,6 @@ class Config:
     MAX_PDF_BYTES = int(os.environ.get('MAX_PDF_BYTES', str(100 * 1024 * 1024)))
     ALLOWED_PDF_MIME_TYPES = ('application/pdf', 'application/x-pdf')
 
-    # Development remains convenient and backwards compatible. Production must
-    # use Flask-Migrate/Alembic explicitly; schema creation is never implicit.
     AUTO_CREATE_DB = _env_bool('AUTO_CREATE_DB', not IS_PRODUCTION)
 
     @classmethod
@@ -61,5 +65,7 @@ class Config:
             errors.append('SECRET_KEY must be set in production')
         if not cls.SQLALCHEMY_DATABASE_URI:
             errors.append('DATABASE_URL must be set')
+        if cls.IS_PRODUCTION and cls.RATELIMIT_STORAGE_URI.startswith('memory://'):
+            errors.append('RATELIMIT_STORAGE_URI must use shared storage in production')
         if errors:
             raise RuntimeError('; '.join(errors))
