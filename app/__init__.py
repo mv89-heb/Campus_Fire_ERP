@@ -7,6 +7,7 @@ from flask import Flask, jsonify, request, session
 from .extensions import db, migrate, limiter
 from .config import Config
 from .services.permissions import can_write
+from .services.security_policy import validate_password
 
 
 PUBLIC_EXACT_PATHS = {
@@ -21,18 +22,14 @@ WRITE_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
 
 
 def _same_origin_allowed(app) -> bool:
-    """Reject cross-origin browser writes while allowing non-browser API clients."""
     if request.method not in WRITE_METHODS:
         return True
-
     fetch_site = request.headers.get('Sec-Fetch-Site')
     if fetch_site == 'cross-site':
         return False
-
     origin = request.headers.get('Origin')
     if not origin:
         return True
-
     parsed = urlparse(origin)
     origin_value = f'{parsed.scheme}://{parsed.netloc}'.rstrip('/')
     trusted = set(app.config.get('TRUSTED_ORIGINS', ()))
@@ -51,6 +48,21 @@ def _is_bootstrap_user_creation() -> bool:
         return False
     from app.models import User
     return db.session.query(User.id).first() is None
+
+
+def _validate_account_password_request():
+    if request.path == '/api/auth/login' or request.method not in {'POST', 'PUT', 'PATCH'}:
+        return None
+    if not request.path.startswith('/api/users'):
+        return None
+    data = request.get_json(silent=True) or {}
+    if 'password' not in data:
+        return None
+    try:
+        validate_password(data.get('password'))
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return None
 
 
 def _install_security_guards(app):
@@ -73,7 +85,8 @@ def _install_security_guards(app):
         if _is_bootstrap_user_creation():
             if not _same_origin_allowed(app):
                 return jsonify({'error': 'Cross-origin request blocked'}), 403
-            return None
+            password_error = _validate_account_password_request()
+            return password_error
 
         if not session.get('user_id'):
             return jsonify({'error': 'נדרשת התחברות'}), 401
@@ -96,7 +109,21 @@ def _install_security_guards(app):
         if not _same_origin_allowed(app):
             return jsonify({'error': 'Cross-origin request blocked'}), 403
 
+        password_error = _validate_account_password_request()
+        if password_error:
+            return password_error
         return None
+
+
+def _install_route_limits(app):
+    """Apply stricter limits without coupling individual blueprints to the limiter."""
+    for endpoint, limit in {
+        'auth.api_login': '5 per minute;20 per hour',
+        'auth.api_create_user': '10 per hour',
+    }.items():
+        view = app.view_functions.get(endpoint)
+        if view:
+            app.view_functions[endpoint] = limiter.limit(limit)(view)
 
 
 def create_app(config_class=Config):
@@ -162,6 +189,7 @@ def create_app(config_class=Config):
     from .api.admin_storage_routes import admin_storage_bp
     app.register_blueprint(admin_storage_bp)
 
+    _install_route_limits(app)
     return app
 
 
