@@ -3,8 +3,9 @@ from urllib.parse import urlparse
 
 from flask import Flask, jsonify, request, session
 
-from .extensions import db
+from .extensions import db, migrate
 from .config import Config
+from .services.permissions import can_write
 
 
 PUBLIC_EXACT_PATHS = {
@@ -16,7 +17,6 @@ PUBLIC_EXACT_PATHS = {
 }
 PUBLIC_PREFIXES = ('/static/',)
 WRITE_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
-WRITE_ROLES = {'admin', 'super_admin', 'manager'}
 
 
 def _same_origin_allowed(app) -> bool:
@@ -51,20 +51,16 @@ def _install_security_guards(app):
     def security_guard():
         path = request.path
 
-        # Public read-only/authentication endpoints.
         if path in PUBLIC_EXACT_PATHS or any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
             if request.method in WRITE_METHODS and not _same_origin_allowed(app):
                 return jsonify({'error': 'Cross-origin request blocked'}), 403
             return None
 
-        # Logout intentionally stays available without an active session, but
-        # still receives the browser-origin check above.
         if path == '/api/auth/logout':
             if not _same_origin_allowed(app):
                 return jsonify({'error': 'Cross-origin request blocked'}), 403
             return None
 
-        # The first account may be created only when the database has no users.
         if _is_bootstrap_user_creation():
             if not _same_origin_allowed(app):
                 return jsonify({'error': 'Cross-origin request blocked'}), 403
@@ -73,7 +69,6 @@ def _install_security_guards(app):
         if not session.get('user_id'):
             return jsonify({'error': 'נדרשת התחברות'}), 401
 
-        # Refresh authorization from the DB instead of trusting a stale role in the session.
         from app.models import User
         user = db.session.get(User, session.get('user_id'))
         if not user or not user.active:
@@ -83,8 +78,8 @@ def _install_security_guards(app):
         session['username'] = user.username
         session['role'] = user.role
 
-        if request.method in WRITE_METHODS and user.role not in WRITE_ROLES:
-            return jsonify({'error': 'הפעולה דורשת הרשאת מנהל'}), 403
+        if request.method in WRITE_METHODS and not can_write(user.role, path):
+            return jsonify({'error': 'אין הרשאה לבצע פעולה זו עבור התפקיד הנוכחי'}), 403
 
         if not _same_origin_allowed(app):
             return jsonify({'error': 'Cross-origin request blocked'}), 403
@@ -98,7 +93,7 @@ def create_app(config_class=Config):
     config_class.validate()
 
     db.init_app(app)
-    _install_security_guards(app)
+    migrate.init_app(app, db)
 
     try:
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -113,13 +108,15 @@ def create_app(config_class=Config):
     )
 
     with app.app_context():
-        try:
-            db.create_all()
-            seed_data()
-        except Exception as e:
-            app.logger.error(
-                f'Database initialization failed; DB operations may fail: {e}'
-            )
+        auto_create_db = app.config.get('AUTO_CREATE_DB', not app.config.get('IS_PRODUCTION', False))
+        if auto_create_db:
+            try:
+                db.create_all()
+                seed_data()
+            except Exception as e:
+                app.logger.error(
+                    f'Database initialization failed; DB operations may fail: {e}'
+                )
 
     from .api.routes import main_bp
     app.register_blueprint(main_bp)
