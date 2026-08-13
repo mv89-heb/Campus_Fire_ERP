@@ -1,9 +1,9 @@
-import os
 import tempfile
 import unittest
 
 from app import create_app
 from app.extensions import db
+from app.services.permissions import can_write
 
 
 class TestConfig:
@@ -20,6 +20,7 @@ class TestConfig:
     SESSION_COOKIE_SAMESITE = 'Lax'
     PERMANENT_SESSION_LIFETIME = 3600
     TRUSTED_ORIGINS = ()
+    AUTO_CREATE_DB = True
 
     @classmethod
     def validate(cls):
@@ -56,7 +57,6 @@ class SecurityGuardTests(unittest.TestCase):
         )
         with self.app.app_context():
             from app.models import User
-            from flask import session
             user = User.query.filter_by(username='root').first()
 
         with self.client.session_transaction() as sess:
@@ -81,6 +81,27 @@ class SecurityGuardTests(unittest.TestCase):
 
         response = self.client.post('/api/sites', json={'name': 'Protected Site'})
         self.assertEqual(response.status_code, 201)
+
+    def test_rbac_matrix(self):
+        # Inspectors own the inspection workflow but not organization/master data.
+        self.assertTrue(can_write('inspector', '/api/audits'))
+        self.assertTrue(can_write('inspector', '/api/deficiencies/12'))
+        self.assertFalse(can_write('inspector', '/api/sites'))
+        self.assertFalse(can_write('inspector', '/api/users'))
+
+        # Technicians may update field equipment and complete tasks, but cannot
+        # create/delete master records through the generic endpoints.
+        self.assertTrue(can_write('technician', '/api/equipment/12'))
+        self.assertTrue(can_write('technician', '/api/tasks/12/complete'))
+        self.assertFalse(can_write('technician', '/api/equipment'))
+        self.assertFalse(can_write('technician', '/api/tasks'))
+        self.assertFalse(can_write('technician', '/api/sites'))
+
+        # Viewer remains read-only; managers/admins retain broad write access.
+        self.assertFalse(can_write('viewer', '/api/audits'))
+        self.assertTrue(can_write('manager', '/api/sites'))
+        self.assertTrue(can_write('admin', '/api/users/12'))
+        self.assertTrue(can_write('super_admin', '/api/admin/storage'))
 
 
 if __name__ == '__main__':
