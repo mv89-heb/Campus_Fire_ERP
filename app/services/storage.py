@@ -57,19 +57,11 @@ def check_connection():
 
 
 def is_supabase_path(file_path: str) -> bool:
-    """Return True for native Supabase paths and legacy local paths whose
-    local copy is missing. Legacy documents are stored in Supabase under their
-    basename after migration, so this allows old DB rows to remain readable.
-    """
     if not file_path or not is_configured():
         return False
     bucket = _bucket_name()
     if file_path.startswith(f'{bucket}/'):
         return True
-
-    # Legacy rows historically stored only the filename (or an uploads/ prefix)
-    # in Document.file_path. On Render the ephemeral local copy may disappear,
-    # while the same object still exists in Supabase.
     upload_folder = current_app.config.get('UPLOAD_FOLDER')
     if upload_folder:
         local_path = os.path.abspath(os.path.join(upload_folder, os.path.basename(file_path)))
@@ -107,8 +99,6 @@ def delete_object(stored_path: str):
 
 def get_signed_url(stored_path: str, expires_in: int = 300):
     bucket = _bucket_name()
-    # Native Supabase paths include the bucket prefix. Legacy rows contain only
-    # a filename; those objects were uploaded at the bucket root.
     remote_filename = (
         stored_path[len(bucket) + 1:]
         if stored_path.startswith(f'{bucket}/')
@@ -135,19 +125,6 @@ def calculate_file_hash(local_path: str) -> str:
         for chunk in iter(lambda: f.read(65536), b''):
             h.update(chunk)
     return h.hexdigest()
-
-
-def file_exists(file_path: str, upload_folder: str) -> dict:
-    if not file_path:
-        return {'status': False, 'location': None, 'error': 'file_path ריק'}
-    if is_supabase_path(file_path) and is_configured():
-        signed_url = get_signed_url(file_path)
-        if signed_url:
-            return {'status': True, 'location': 'supabase', 'error': None}
-    local_full_path = os.path.join(upload_folder, os.path.basename(file_path))
-    if os.path.isfile(local_full_path):
-        return {'status': True, 'location': 'local', 'error': None}
-    return {'status': False, 'location': None, 'error': 'לא נמצא לא ב-Supabase ולא מקומית'}
 
 
 def list_local_files(upload_folder: str) -> list:
@@ -183,6 +160,39 @@ def build_local_basename_index(upload_folder: str) -> dict:
     for entry in list_local_files(upload_folder):
         index.setdefault(entry['filename'], []).append(entry['path'])
     return index
+
+
+def find_supabase_legacy_path(file_path: str, inventory: list | None = None) -> str | None:
+    """Resolve an old local-style DB path to a unique Supabase object."""
+    if not file_path or not is_configured():
+        return None
+    basename = os.path.basename(file_path)
+    if not basename:
+        return None
+    bucket = _bucket_name()
+    inventory = inventory if inventory is not None else list_supabase_files()
+    matches = [item['filename'] for item in inventory if item.get('filename') == basename]
+    if len(matches) == 1:
+        return f'{bucket}/{matches[0]}'
+    return None
+
+
+def file_exists(file_path: str, upload_folder: str) -> dict:
+    if not file_path:
+        return {'status': False, 'location': None, 'error': 'file_path ריק'}
+    if is_supabase_path(file_path) and is_configured():
+        signed_url = get_signed_url(file_path)
+        if signed_url:
+            return {'status': True, 'location': 'supabase', 'error': None, 'resolved_path': file_path}
+
+    legacy_supabase_path = find_supabase_legacy_path(file_path)
+    if legacy_supabase_path:
+        return {'status': True, 'location': 'supabase_legacy', 'error': None, 'resolved_path': legacy_supabase_path}
+
+    local_full_path = os.path.join(upload_folder, os.path.basename(file_path))
+    if os.path.isfile(local_full_path):
+        return {'status': True, 'location': 'local', 'error': None, 'resolved_path': local_full_path}
+    return {'status': False, 'location': None, 'error': 'לא נמצא לא ב-Supabase ולא מקומית'}
 
 
 def delete_file(file_path: str, upload_folder: str) -> dict:
