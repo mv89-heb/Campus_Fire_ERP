@@ -120,46 +120,32 @@ def create_app(config_class=Config):
 
     from .api.routes import main_bp
     app.register_blueprint(main_bp)
-
     from .api.sites_routes import sites_bp
     app.register_blueprint(sites_bp)
-
     from .api.permits_routes import permits_bp
     app.register_blueprint(permits_bp)
-
     from .api.suppliers_routes import suppliers_bp
     app.register_blueprint(suppliers_bp)
-
     from .api.equipment_routes import equipment_bp
     app.register_blueprint(equipment_bp)
-
     from .api.tasks_routes import tasks_bp
     app.register_blueprint(tasks_bp)
-
     from .api.audits_routes import audits_bp
     app.register_blueprint(audits_bp)
-
     from .api.org_dashboard_routes import org_dashboard_bp
     app.register_blueprint(org_dashboard_bp)
-
     from .api.auth_routes import auth_bp
     app.register_blueprint(auth_bp)
-
     from .api.notifications_routes import notifications_bp
     app.register_blueprint(notifications_bp)
-
     from .api.audit_log_routes import audit_log_bp
     app.register_blueprint(audit_log_bp)
-
     from .api.reports_routes import reports_bp
     app.register_blueprint(reports_bp)
-
     from .api.search_routes import search_bp
     app.register_blueprint(search_bp)
-
     from .api.design_system_routes import design_system_bp
     app.register_blueprint(design_system_bp)
-
     from .api.admin_storage_routes import admin_storage_bp
     app.register_blueprint(admin_storage_bp)
 
@@ -197,9 +183,7 @@ def seed_data():
                 (zones[4].id, 'גילוי אש', 'טופס 4')
             ]
             for zid, sname, form in reqs:
-                db.session.add(
-                    SystemRequirement(zone_id=zid, system_name=sname, required_form=form)
-                )
+                db.session.add(SystemRequirement(zone_id=zid, system_name=sname, required_form=form))
             db.session.commit()
     except Exception as e:
         db.session.rollback()
