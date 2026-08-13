@@ -70,7 +70,6 @@ def _pdf_response(data, filename, download=False):
     response.headers['Pragma'] = 'no-cache'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     if not download:
-        # Be explicit: the browser must render the PDF instead of downloading it.
         response.headers['Content-Disposition'] = f"inline; filename*=UTF-8''{filename}"
     return response
 
@@ -189,7 +188,7 @@ def dashboard():
                     elif days_left <= 14: label = 'critical'
                     elif days_left <= 30: label = 'warning'
                     else: label = 'valid'
-                entry = {'req_id': req.id, 'zone_id': zone.id, 'zone_name': zone.zone_name, 'file_number': zone.file_number, 'system_name': req.system_name, 'required_form': req.required_form, 'doc_id': latest.id if latest else None, 'file_path': latest.file_path if latest else None, 'file_name': latest.file_name if latest else None, 'expiry_date': str(latest.expiry_date) if latest else None, 'status': label, 'doc_count': len(docs), 'doc_names': [d.file_name for d in docs]}
+                entry = {'req_id': req.id, 'zone_id': zone.id, 'zone_name': zone.zone_name, 'file_number': zone.file_number, 'system_name': req.system_name, 'required_form': req.required_form, 'doc_id': latest.id if latest else None, 'file_path': latest.file_path if latest else None, 'file_name': latest.file_name if latest else None, 'file_access_url': f'/api/documents/{latest.id}/file' if latest and latest.file_path else None, 'expiry_date': str(latest.expiry_date) if latest else None, 'status': label, 'doc_count': len(docs), 'doc_names': [d.file_name for d in docs]}
                 requirements_processed.append(entry)
                 if label == 'valid': valid_count += 1
                 elif label == 'expired': alerts['expired'].append(entry)
@@ -197,7 +196,7 @@ def dashboard():
                 elif label == 'warning': alerts['warning_30'].append(entry)
         recent_docs = []
         for d in Document.query.filter(Document.status.notin_(['deleted', 'archived'])).order_by(Document.uploaded_at.desc()).limit(50).all():
-            recent_docs.append({'doc_id': d.id, 'file_name': d.file_name, 'zone_name': d.zone.zone_name if d.zone else 'לא משויך', 'form_code': d.requirement.required_form if d.requirement else '-', 'expiry_date': str(d.expiry_date) if d.expiry_date else '', 'file_path': d.file_path})
+            recent_docs.append({'doc_id': d.id, 'file_name': d.file_name, 'zone_name': d.zone.zone_name if d.zone else 'לא משויך', 'form_code': d.requirement.required_form if d.requirement else '-', 'expiry_date': str(d.expiry_date) if d.expiry_date else '', 'file_path': d.file_path, 'file_access_url': f'/api/documents/{d.id}/file' if d.file_path else None})
         score = round((valid_count / total_reqs * 100) if total_reqs else 0, 1)
         return jsonify({'readiness_score': score, 'valid_count': valid_count, 'alerts': alerts, 'requirements': requirements_processed, 'recent_docs': recent_docs, 'outlook_enabled': OUTLOOK_ENABLED, 'zones': [{'id': z.id, 'zone_name': z.zone_name} for z in zones]})
     except Exception:
