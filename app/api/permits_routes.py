@@ -56,21 +56,23 @@ def api_list_categories():
 def api_get_permit(doc_id):
     doc = svc.get_document_or_404(doc_id)
     payload = svc.serialize_permit(doc)
-    response = jsonify(payload)
     if doc.file_path and doc.status != 'deleted':
         token = _document_access_token(doc.id)
         response = jsonify({**payload, 'file_access_url': f"/api/documents/{doc.id}/file?access_token={token}"})
+        # Keep the short-lived document token available to the exact document
+        # endpoint and its nested navigation paths. This also makes direct
+        # window.open() preview/download resilient when the session cookie is
+        # unavailable in a newly opened browser tab.
         response.set_cookie(
             f'doc_access_{doc.id}', token,
             max_age=DOCUMENT_TOKEN_MAX_AGE,
             httponly=True,
             secure=current_app.config.get('SESSION_COOKIE_SECURE', False),
             samesite=current_app.config.get('SESSION_COOKIE_SAMESITE', 'Lax'),
-            path=f'/api/documents/{doc.id}/file',
+            path='/api/documents/',
         )
-    else:
-        response = jsonify({**payload, 'file_access_url': None})
-    return response
+        return response
+    return jsonify({**payload, 'file_access_url': None})
 
 
 @permits_bp.route('/api/permits/<int:doc_id>', methods=['PUT'])
