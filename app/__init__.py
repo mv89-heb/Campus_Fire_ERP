@@ -1,21 +1,101 @@
 import os
-from flask import Flask
+from urllib.parse import urlparse
+
+from flask import Flask, jsonify, request, session
+
 from .extensions import db
 from .config import Config
+
+
+PUBLIC_EXACT_PATHS = {
+    '/login',
+    '/api/auth/login',
+    '/api/auth/logout',
+    '/api/auth/me',
+    '/api/auth/bootstrap_status',
+    '/api/system/health',
+}
+PUBLIC_PREFIXES = ('/static/',)
+WRITE_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
+WRITE_ROLES = {'admin', 'super_admin', 'manager'}
+
+
+def _same_origin_allowed(app) -> bool:
+    """Reject cross-origin browser writes while allowing non-browser API clients."""
+    if request.method not in WRITE_METHODS:
+        return True
+
+    fetch_site = request.headers.get('Sec-Fetch-Site')
+    if fetch_site == 'cross-site':
+        return False
+
+    origin = request.headers.get('Origin')
+    if not origin:
+        return True
+
+    parsed = urlparse(origin)
+    origin_value = f'{parsed.scheme}://{parsed.netloc}'.rstrip('/')
+    trusted = set(app.config.get('TRUSTED_ORIGINS', ()))
+    trusted.add(request.host_url.rstrip('/'))
+    return origin_value in trusted
+
+
+def _is_bootstrap_user_creation() -> bool:
+    if request.path != '/api/users' or request.method != 'POST':
+        return False
+    from app.models import User
+    return db.session.query(User.id).first() is None
+
+
+def _install_security_guards(app):
+    @app.before_request
+    def security_guard():
+        path = request.path
+
+        if path in PUBLIC_EXACT_PATHS or any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
+            return None
+
+        # The first account may be created only when the database has no users.
+        if _is_bootstrap_user_creation():
+            return None
+
+        if not session.get('user_id'):
+            if path.startswith('/api/'):
+                return jsonify({'error': 'נדרשת התחברות'}), 401
+            return jsonify({'error': 'נדרשת התחברות'}), 401
+
+        # Refresh authorization from the DB instead of trusting a stale role in the session.
+        from app.models import User
+        user = db.session.get(User, session.get('user_id'))
+        if not user or not user.active:
+            session.clear()
+            return jsonify({'error': 'החשבון אינו פעיל או אינו קיים'}), 401
+
+        session['username'] = user.username
+        session['role'] = user.role
+
+        if request.method in WRITE_METHODS and user.role not in WRITE_ROLES:
+            return jsonify({'error': 'הפעולה דורשת הרשאת מנהל'}), 403
+
+        if not _same_origin_allowed(app):
+            return jsonify({'error': 'Cross-origin request blocked'}), 403
+
+        return None
+
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    config_class.validate()
 
     db.init_app(app)
+    _install_security_guards(app)
 
-    # וידוא ארכיטקטוני שתיקיית ה-uploads קיימת בענן כדי למנוע קריסות פתאומיות
     try:
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     except Exception as e:
-        print(f"Warning: Could not create upload folder: {e}")
+        app.logger.warning(f'Could not create upload folder: {e}')
 
-    # יבוא המודלים להקשר של האפליקציה
     from app.models import (
         Zone, SystemRequirement, Document,
         Site, Building, Floor, Area,
@@ -28,11 +108,11 @@ def create_app(config_class=Config):
             db.create_all()
             seed_data()
         except Exception as e:
-            # מניעת נפילת שרת (502) אם יש שגיאת מסד נתונים זמנית באתחול.
-            # שים לב: אם זו לא שגיאה זמנית (למשל DATABASE_URL שגוי מול Neon),
-            # האפליקציה תמשיך לרוץ אך כל פעולת DB (כולל העלאת מסמכים) תיכשל.
-            # אבחון: GET /api/system/health
-            app.logger.error(f"CRITICAL: Database initialization failed - app will run but DB operations may fail. Error: {e}")
+            # Do not hide database failures from health monitoring, but keep the
+            # process alive long enough for the readiness endpoint to report them.
+            app.logger.error(
+                f'Database initialization failed; DB operations may fail: {e}'
+            )
 
     from .api.routes import main_bp
     app.register_blueprint(main_bp)
@@ -81,13 +161,15 @@ def create_app(config_class=Config):
 
     return app
 
+
 def seed_data():
     from .models import Zone, SystemRequirement
     try:
         if not Zone.query.first():
             zones_data = [
-                ("תשתיות כלליות", "ראשי"), ("מגורים (פנימייה)", "8855-7"), 
-                ("מטבח וחדר אוכל", "8859-7"), ("אולם ספורט", "8853-7"), ("בית מדרש", "8860-7")
+                ('תשתיות כלליות', 'ראשי'), ('מגורים (פנימייה)', '8855-7'),
+                ('מטבח וחדר אוכל', '8859-7'), ('אולם ספורט', '8853-7'),
+                ('בית מדרש', '8860-7')
             ]
             zones = []
             for name, fn in zones_data:
@@ -97,15 +179,24 @@ def seed_data():
             db.session.commit()
 
             reqs = [
-                (zones[1].id, "ציוד כיבוי", "טופס 1"), (zones[1].id, "תחזוקת מטפים", "טופס 2"),
-                (zones[1].id, "חשמל", "טופס 3"), (zones[1].id, "גילוי אש", "טופס 4"),
-                (zones[1].id, "לוחות חשמל", "טופס 5"), (zones[1].id, "כריזה", "טופס 6"),
-                (zones[1].id, "ספרינקלרים", "טופס 7"), (zones[1].id, "תיק שטח", "טופס 13"),
-                (zones[1].id, "הדרכת עובדים", "טופס 14"), (zones[2].id, "מערכת גז", "טופס 18"),
-                (zones[3].id, "שחרור עשן", "טופס 10"), (zones[4].id, "גילוי אש", "טופס 4")
+                (zones[1].id, 'ציוד כיבוי', 'טופס 1'),
+                (zones[1].id, 'תחזוקת מטפים', 'טופס 2'),
+                (zones[1].id, 'חשמל', 'טופס 3'),
+                (zones[1].id, 'גילוי אש', 'טופס 4'),
+                (zones[1].id, 'לוחות חשמל', 'טופס 5'),
+                (zones[1].id, 'כריזה', 'טופס 6'),
+                (zones[1].id, 'ספרינקלרים', 'טופס 7'),
+                (zones[1].id, 'תיק שטח', 'טופס 13'),
+                (zones[1].id, 'הדרכת עובדים', 'טופס 14'),
+                (zones[2].id, 'מערכת גז', 'טופס 18'),
+                (zones[3].id, 'שחרור עשן', 'טופס 10'),
+                (zones[4].id, 'גילוי אש', 'טופס 4')
             ]
             for zid, sname, form in reqs:
-                db.session.add(SystemRequirement(zone_id=zid, system_name=sname, required_form=form))
+                db.session.add(
+                    SystemRequirement(zone_id=zid, system_name=sname, required_form=form)
+                )
             db.session.commit()
     except Exception as e:
-        print(f"Seeding skipped or failed: {e}")
+        db.session.rollback()
+        print(f'Seeding skipped or failed: {e}')
