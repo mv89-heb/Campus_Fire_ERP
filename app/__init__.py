@@ -10,7 +10,6 @@ from .config import Config
 PUBLIC_EXACT_PATHS = {
     '/login',
     '/api/auth/login',
-    '/api/auth/logout',
     '/api/auth/me',
     '/api/auth/bootstrap_status',
     '/api/system/health',
@@ -52,16 +51,26 @@ def _install_security_guards(app):
     def security_guard():
         path = request.path
 
+        # Public read-only/authentication endpoints.
         if path in PUBLIC_EXACT_PATHS or any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
+            if request.method in WRITE_METHODS and not _same_origin_allowed(app):
+                return jsonify({'error': 'Cross-origin request blocked'}), 403
+            return None
+
+        # Logout intentionally stays available without an active session, but
+        # still receives the browser-origin check above.
+        if path == '/api/auth/logout':
+            if not _same_origin_allowed(app):
+                return jsonify({'error': 'Cross-origin request blocked'}), 403
             return None
 
         # The first account may be created only when the database has no users.
         if _is_bootstrap_user_creation():
+            if not _same_origin_allowed(app):
+                return jsonify({'error': 'Cross-origin request blocked'}), 403
             return None
 
         if not session.get('user_id'):
-            if path.startswith('/api/'):
-                return jsonify({'error': 'נדרשת התחברות'}), 401
             return jsonify({'error': 'נדרשת התחברות'}), 401
 
         # Refresh authorization from the DB instead of trusting a stale role in the session.
@@ -108,8 +117,6 @@ def create_app(config_class=Config):
             db.create_all()
             seed_data()
         except Exception as e:
-            # Do not hide database failures from health monitoring, but keep the
-            # process alive long enough for the readiness endpoint to report them.
             app.logger.error(
                 f'Database initialization failed; DB operations may fail: {e}'
             )
