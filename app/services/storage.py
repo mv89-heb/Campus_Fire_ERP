@@ -84,7 +84,7 @@ def delete_object(stored_path: str):
 
 def get_signed_url(stored_path: str, expires_in: int = 300):
     bucket = _bucket_name()
-    remote_filename = stored_path[len(bucket) + 1:] if stored_path.startswith(f'{bucket}/') else os.path.basename(stored_path)
+    remote_filename = stored_path[len(bucket) + 1:] if stored_path.startswith(f'{bucket}/') else stored_path
     try:
         res = _get_client().storage.from_(bucket).create_signed_url(remote_filename, expires_in)
         if isinstance(res, dict):
@@ -143,40 +143,61 @@ def build_local_basename_index(upload_folder: str) -> dict:
 
 
 def list_supabase_files() -> list:
+    """Return files from the whole bucket, including nested folders."""
     if not is_configured():
         return []
     results = []
     bucket = _bucket_name()
+    client = _get_client()
+    visited = set()
+    queue = ['']
     try:
-        client = _get_client()
-        limit, offset = 100, 0
-        while True:
-            page = client.storage.from_(bucket).list(options={'limit': limit, 'offset': offset})
-            if not page:
-                break
-            for item in page:
-                name = item.get('name') if isinstance(item, dict) else getattr(item, 'name', None)
-                if not name:
-                    continue
-                metadata = item.get('metadata') if isinstance(item, dict) else None
-                size = metadata.get('size') if isinstance(metadata, dict) else None
-                results.append({'filename': name, 'size': size})
-            if len(page) < limit:
-                break
-            offset += limit
+        while queue:
+            prefix = queue.pop(0)
+            if prefix in visited:
+                continue
+            visited.add(prefix)
+            limit, offset = 100, 0
+            while True:
+                page = client.storage.from_(bucket).list(
+                    path=prefix,
+                    options={'limit': limit, 'offset': offset, 'sortBy': {'column': 'name', 'order': 'asc'}},
+                )
+                if not page:
+                    break
+                for item in page:
+                    name = item.get('name') if isinstance(item, dict) else getattr(item, 'name', None)
+                    if not name:
+                        continue
+                    metadata = item.get('metadata') if isinstance(item, dict) else None
+                    size = metadata.get('size') if isinstance(metadata, dict) else None
+                    item_path = f'{prefix.rstrip("/")}/{name}' if prefix else name
+                    if not metadata:
+                        queue.append(item_path)
+                    else:
+                        results.append({'filename': item_path, 'basename': name, 'size': size})
+                if len(page) < limit:
+                    break
+                offset += limit
     except Exception as e:
         logger.error(f'list_supabase_files failed: {e}')
     return results
 
 
 def find_supabase_legacy_path(file_path: str, inventory: list | None = None) -> str | None:
+    """Resolve old local DB paths to an actual Supabase object path."""
     if not file_path or not is_configured() or is_supabase_path(file_path):
         return None
     basename = os.path.basename(file_path)
     if not basename:
         return None
     inventory = inventory if inventory is not None else list_supabase_files()
-    matches = [item['filename'] for item in inventory if item.get('filename') == basename]
+    matches = []
+    for item in inventory:
+        object_name = item.get('filename') or ''
+        item_basename = item.get('basename') or os.path.basename(object_name)
+        if item_basename == basename:
+            matches.append(object_name)
     return f'{_bucket_name()}/{matches[0]}' if len(matches) == 1 else None
 
 
