@@ -11,6 +11,7 @@ from .services.security_policy import validate_password
 
 
 PUBLIC_EXACT_PATHS = {
+    '/',
     '/login',
     '/favicon.ico',
     '/api/auth/login',
