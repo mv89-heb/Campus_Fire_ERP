@@ -2,6 +2,7 @@
 API עבור הרחבת מודול האישורים (שלב 2).
 Blueprint נפרד מ-main_bp הקיים; לא נוגע ב-/api/dashboard או בהעלאת קבצים.
 """
+import os
 import secrets
 from itsdangerous import URLSafeTimedSerializer
 from flask import Blueprint, jsonify, request, session, current_app, redirect
@@ -9,6 +10,7 @@ from app.services import permit_service as svc
 from app.services.permit_service import PermitServiceError
 from app.services.auth_service import AuthServiceError
 from app.api.auth_routes import admin_required
+from app.services import storage
 
 permits_bp = Blueprint('permits', __name__)
 DOCUMENT_TOKEN_SALT = 'campus-fire-document-access-v1'
@@ -83,6 +85,100 @@ def api_preview_permit(doc_id):
 
     token = _document_access_token(doc.id)
     return redirect(f"/api/documents/{doc.id}/file?access_token={token}", code=302)
+
+
+@permits_bp.route('/api/admin/storage/health/documents', methods=['GET'])
+@admin_required
+def api_storage_health_documents():
+    """Admin-only runtime check: resolve and actually download stored PDFs.
+
+    This intentionally verifies bytes, not just signed-URL creation, so it can
+    distinguish a DB path mismatch from a missing/corrupt object in Storage.
+    """
+    raw_ids = request.args.get('ids', '').strip()
+    ids = []
+    if raw_ids:
+        for value in raw_ids.split(','):
+            value = value.strip()
+            if value.isdigit():
+                ids.append(int(value))
+    if not ids:
+        ids = [doc.id for doc in svc.Document.query.order_by(svc.Document.id.asc()).limit(50).all()]
+
+    inventory = storage.list_supabase_files()
+    results = []
+    bucket = storage.get_bucket_name()
+    client = None
+
+    for doc_id in ids:
+        try:
+            doc = svc.get_document_or_404(doc_id)
+            result = {
+                'id': doc.id,
+                'file_name': doc.file_name,
+                'db_file_path': doc.file_path,
+                'status': doc.status,
+                'storage_exists': False,
+                'storage_location': None,
+                'resolved_path': None,
+                'download_ok': False,
+                'bytes': None,
+                'sha256': None,
+                'pdf_valid': False,
+                'error': None,
+            }
+
+            if not doc.file_path:
+                result['error'] = 'file_path ריק'
+                results.append(result)
+                continue
+
+            resolved = doc.file_path if storage.is_supabase_path(doc.file_path) else storage.find_supabase_legacy_path(doc.file_path, inventory)
+            if resolved:
+                remote_path = resolved[len(bucket) + 1:] if resolved.startswith(f'{bucket}/') else resolved
+                result['storage_location'] = 'supabase' if storage.is_supabase_path(doc.file_path) else 'supabase_legacy'
+                result['resolved_path'] = resolved
+                if client is None:
+                    client = storage._get_client()
+                data = client.storage.from_(bucket).download(remote_path)
+                if data:
+                    result['storage_exists'] = True
+                    result['download_ok'] = True
+                    result['bytes'] = len(data)
+                    result['sha256'] = storage.calculate_hash(data)
+                    validation = storage.verify_pdf_bytes(data)
+                    result['pdf_valid'] = validation['status']
+                    if not validation['status']:
+                        result['error'] = validation['error']
+                else:
+                    result['error'] = 'Supabase download returned empty data'
+            else:
+                local_path = os.path.abspath(os.path.join(current_app.config['UPLOAD_FOLDER'], os.path.basename(doc.file_path)))
+                root = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
+                if os.path.isfile(local_path) and os.path.commonpath([local_path, root]) == root:
+                    result['storage_location'] = 'local'
+                    result['resolved_path'] = local_path
+                    with open(local_path, 'rb') as fh:
+                        data = fh.read()
+                    result['storage_exists'] = True
+                    result['download_ok'] = True
+                    result['bytes'] = len(data)
+                    result['sha256'] = storage.calculate_hash(data)
+                    validation = storage.verify_pdf_bytes(data)
+                    result['pdf_valid'] = validation['status']
+                    if not validation['status']:
+                        result['error'] = validation['error']
+                else:
+                    result['error'] = 'לא נמצא לא ב-Supabase ולא מקומית'
+        except Exception as exc:
+            result['error'] = str(exc)
+        results.append(result)
+
+    return jsonify({
+        'bucket': bucket,
+        'checked': len(results),
+        'results': results,
+    })
 
 
 @permits_bp.route('/api/permits/<int:doc_id>', methods=['PUT'])
