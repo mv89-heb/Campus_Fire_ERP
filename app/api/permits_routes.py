@@ -73,13 +73,7 @@ def api_get_permit(doc_id):
 
 @permits_bp.route('/api/permits/<int:doc_id>/preview', methods=['GET'])
 def api_preview_permit(doc_id):
-    """Open a document through an authenticated same-origin redirect.
-
-    The browser can navigate directly to this endpoint from a user click,
-    avoiding asynchronous popup-blocker issues. The endpoint verifies the
-    current session, creates a short-lived signed token, then redirects to
-    the existing protected document endpoint.
-    """
+    """Open a document through an authenticated same-origin redirect."""
     if not session.get('user_id'):
         return jsonify({"error": "נדרשת התחברות"}), 401
 
@@ -143,43 +137,3 @@ def api_unlock_permit(doc_id):
 def api_permit_history(doc_id):
     history = svc.get_history(doc_id)
     return jsonify([svc.serialize_history(h) for h in history])
-
-
-@permits_bp.after_app_request
-def _inject_direct_preview_override(response):
-    """Replace the fragile async popup flow with a synchronous same-origin URL."""
-    if request.path not in {'/', '/index.html'}:
-        return response
-    content_type = response.headers.get('Content-Type', '')
-    if not content_type.startswith('text/html'):
-        return response
-
-    script = '''<script>
-(function () {
-  function installDirectPermitPreview() {
-    if (typeof App === 'undefined') return;
-    App.previewDoc = function (docId) {
-      if (!docId) return;
-      const url = '/api/permits/' + encodeURIComponent(docId) + '/preview';
-      // This navigation happens directly from the click handler, so the
-      // browser cannot classify it as an asynchronously-created popup.
-      window.open(url, '_blank');
-    };
-    App.previewCurrentDoc = function () {
-      const id = document.getElementById('permitDocId')?.value;
-      if (id) App.previewDoc(id);
-    };
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', installDirectPermitPreview);
-  } else {
-    installDirectPermitPreview();
-  }
-})();
-</script>'''
-    body = response.get_data(as_text=True)
-    marker = '</body>'
-    if marker in body:
-        response.set_data(body.replace(marker, script + marker, 1))
-    return response
-'''
