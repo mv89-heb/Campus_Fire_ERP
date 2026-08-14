@@ -6,6 +6,7 @@ import os
 import secrets
 from itsdangerous import URLSafeTimedSerializer
 from flask import Blueprint, jsonify, request, session, current_app, redirect
+from app.models import Document
 from app.services import permit_service as svc
 from app.services.permit_service import PermitServiceError
 from app.services.auth_service import AuthServiceError
@@ -90,11 +91,7 @@ def api_preview_permit(doc_id):
 @permits_bp.route('/api/admin/storage/health/documents', methods=['GET'])
 @admin_required
 def api_storage_health_documents():
-    """Admin-only runtime check: resolve and actually download stored PDFs.
-
-    This intentionally verifies bytes, not just signed-URL creation, so it can
-    distinguish a DB path mismatch from a missing/corrupt object in Storage.
-    """
+    """Admin-only runtime check that actually downloads and validates PDFs."""
     raw_ids = request.args.get('ids', '').strip()
     ids = []
     if raw_ids:
@@ -103,7 +100,7 @@ def api_storage_health_documents():
             if value.isdigit():
                 ids.append(int(value))
     if not ids:
-        ids = [doc.id for doc in svc.Document.query.order_by(svc.Document.id.asc()).limit(50).all()]
+        ids = [doc.id for doc in Document.query.order_by(Document.id.asc()).limit(50).all()]
 
     inventory = storage.list_supabase_files()
     results = []
@@ -171,14 +168,10 @@ def api_storage_health_documents():
                 else:
                     result['error'] = 'לא נמצא לא ב-Supabase ולא מקומית'
         except Exception as exc:
-            result['error'] = str(exc)
+            result = {'id': doc_id, 'error': str(exc)}
         results.append(result)
 
-    return jsonify({
-        'bucket': bucket,
-        'checked': len(results),
-        'results': results,
-    })
+    return jsonify({'bucket': bucket, 'checked': len(results), 'results': results})
 
 
 @permits_bp.route('/api/permits/<int:doc_id>', methods=['PUT'])
