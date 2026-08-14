@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, current_app, render_template, send_file, redirect, session, make_response
+from flask import Blueprint, jsonify, request, current_app, render_template, send_file, redirect, session
 from app.extensions import db
 from app.models import Zone, SystemRequirement, Document
 from app.services.dms_service import DMSService
@@ -8,9 +8,7 @@ from datetime import date
 import io
 import platform
 import os
-import secrets
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-from urllib.request import Request, urlopen
 
 main_bp = Blueprint('main', __name__)
 
@@ -74,6 +72,37 @@ def _pdf_response(data, filename, download=False):
     return response
 
 
+def _supabase_remote_path(resolved_path):
+    bucket = storage.get_bucket_name()
+    prefix = f'{bucket}/'
+    return resolved_path[len(prefix):] if resolved_path.startswith(prefix) else resolved_path
+
+
+def _download_supabase_pdf(resolved_path, doc_id):
+    """Download the actual object bytes from Supabase; do not rely on signed URL redirects."""
+    if not storage.is_configured():
+        return None, 'Supabase אינו מוגדר'
+    try:
+        client = storage._get_client()
+        remote_path = _supabase_remote_path(resolved_path)
+        data = client.storage.from_(storage.get_bucket_name()).download(remote_path)
+        if not data:
+            return None, 'Supabase החזיר קובץ ריק'
+        validation = storage.verify_pdf_bytes(data)
+        if not validation['status']:
+            current_app.logger.error(
+                'Document %s resolved to %s but PDF validation failed: %s',
+                doc_id, resolved_path, validation['error']
+            )
+            return None, validation['error']
+        return data, None
+    except Exception as exc:
+        current_app.logger.exception(
+            'Direct Supabase download failed for document %s path=%s', doc_id, resolved_path
+        )
+        return None, str(exc)
+
+
 @main_bp.route('/')
 def index():
     if not session.get('user_id'):
@@ -97,24 +126,30 @@ def serve_upload(filename):
 
     resolved = storage.find_supabase_legacy_path(doc.file_path)
     if resolved and storage.is_configured():
-        signed_url = storage.get_signed_url(resolved)
-        if signed_url:
-            return redirect(signed_url)
+        data, error = _download_supabase_pdf(resolved, doc.id)
+        if data:
+            return _pdf_response(data, _safe_pdf_filename(doc, doc.id), download=False)
+        if error:
+            current_app.logger.warning('Legacy upload route could not load document %s: %s', doc.id, error)
 
     if storage.is_supabase_path(doc.file_path) and storage.is_configured():
-        signed_url = storage.get_signed_url(doc.file_path)
-        if signed_url:
-            return redirect(signed_url)
+        data, error = _download_supabase_pdf(doc.file_path, doc.id)
+        if data:
+            return _pdf_response(data, _safe_pdf_filename(doc, doc.id), download=False)
+        if error:
+            current_app.logger.warning('Supabase upload route could not load document %s: %s', doc.id, error)
 
     base_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     full_path = os.path.abspath(os.path.join(base_dir, fname))
     if os.path.commonpath([full_path, base_dir]) != base_dir:
         return jsonify({'error': 'Invalid file path'}), 400
     if os.path.isfile(full_path):
-        response = send_file(full_path, mimetype='application/pdf', as_attachment=False, max_age=0)
-        response.headers['Cache-Control'] = 'private, no-store, max-age=0, must-revalidate'
-        response.headers['X-Content-Type-Options'] = 'nosniff'
-        return response
+        with open(full_path, 'rb') as local_file:
+            data = local_file.read()
+        try:
+            return _pdf_response(data, _safe_pdf_filename(doc, doc.id), download=False)
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 502
     return jsonify({'error': f'File not found. Looking in: {full_path}'}), 404
 
 
@@ -129,40 +164,37 @@ def document_file(doc_id):
     download = request.args.get('download', '').lower() in {'1', 'true', 'yes'}
     filename = _safe_pdf_filename(doc, doc_id)
 
+    # First resolve the DB path against the actual Supabase inventory. This
+    # supports both current bucket/path references and legacy local filenames.
     resolved_path = doc.file_path if storage.is_supabase_path(doc.file_path) else storage.find_supabase_legacy_path(doc.file_path)
     if resolved_path and storage.is_configured():
-        signed_url = storage.get_signed_url(resolved_path, expires_in=120)
-        if not signed_url:
-            return jsonify({'error': 'לא ניתן ליצור קישור מאובטח למסמך'}), 502
-        try:
-            req = Request(signed_url, headers={'User-Agent': 'Campus-Fire-ERP/1.0', 'Accept': 'application/pdf,*/*'})
-            with urlopen(req, timeout=30) as upstream:
-                data = upstream.read()
-                upstream_type = upstream.headers.get('Content-Type', '')
-
-            if not data:
-                return jsonify({'error': 'המסמך ריק או לא זמין'}), 404
-            if not data.startswith(b'%PDF-'):
-                current_app.logger.error(
-                    'Supabase document %s returned non-PDF content-type=%s first_bytes=%r',
-                    doc_id, upstream_type, data[:32]
-                )
-                return jsonify({'error': 'הקובץ המאוחסן אינו PDF תקין. יש לבדוק את המסמך ב-Supabase Storage.'}), 502
-
+        data, error = _download_supabase_pdf(resolved_path, doc_id)
+        if data:
             return _pdf_response(data, filename, download=download)
-        except ValueError as exc:
-            current_app.logger.exception('Invalid PDF returned for document %s', doc_id)
-            return jsonify({'error': str(exc)}), 502
-        except Exception:
-            current_app.logger.exception('Supabase document fetch failed for document %s', doc_id)
-            return jsonify({'error': 'לא ניתן לטעון את המסמך מאחסון הקבצים'}), 502
+        current_app.logger.error(
+            'Document %s resolved in Supabase but could not be downloaded. db_path=%s resolved=%s error=%s',
+            doc_id, doc.file_path, resolved_path, error
+        )
+        return jsonify({
+            'error': 'המסמך נמצא ב-Supabase אך לא ניתן להוריד אותו',
+            'document_id': doc_id,
+            'resolved_path': resolved_path,
+            'details': error,
+        }), 502
 
+    # Local fallback for documents stored before Supabase migration.
     base_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     full_path = os.path.abspath(os.path.join(base_dir, os.path.basename(doc.file_path)))
     if os.path.commonpath([full_path, base_dir]) != base_dir:
         return jsonify({'error': 'Invalid file path'}), 400
     if not os.path.isfile(full_path):
-        return jsonify({'error': f'File not found. Looking in: {full_path}'}), 404
+        return jsonify({
+            'error': 'File not found',
+            'document_id': doc_id,
+            'db_file_path': doc.file_path,
+            'looking_in': full_path,
+            'supabase_resolved': False,
+        }), 404
 
     try:
         with open(full_path, 'rb') as local_file:
