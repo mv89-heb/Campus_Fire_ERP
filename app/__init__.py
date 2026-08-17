@@ -3,6 +3,7 @@ import os
 from urllib.parse import urlparse
 
 from flask import Flask, jsonify, request, session
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from .extensions import db, migrate, limiter
 from .config import Config
@@ -43,18 +44,11 @@ def _same_origin_allowed(app) -> bool:
 def _csrf_valid() -> bool:
     expected = session.get('csrf_token')
     supplied = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
-
-    # Browser navigation/fetch requests can race with the shell's asynchronous
-    # /api/auth/me security-context load. Keep the normal header/form token as
-    # the primary mechanism, but allow the same server-issued token from a
-    # Strict, HttpOnly cookie when the browser has already proven same-origin.
-    # This preserves the origin check while removing the startup race.
     if not supplied:
         fetch_site = request.headers.get('Sec-Fetch-Site')
         origin = request.headers.get('Origin')
         if fetch_site in {'same-origin', 'same-site'} or origin:
             supplied = request.cookies.get(CSRF_COOKIE_NAME)
-
     return bool(expected and supplied and hmac.compare_digest(str(expected), str(supplied)))
 
 
@@ -90,8 +84,6 @@ def _install_security_guards(app):
                 return jsonify({'error': 'Cross-origin request blocked'}), 403
             return None
 
-        # PDF preview/download authenticates inside the route using either the
-        # normal Flask session or a short-lived document-specific signed token.
         if path.startswith('/api/documents/') and path.endswith('/file') and request.method == 'GET':
             return None
 
@@ -154,12 +146,6 @@ def _install_security_headers(app):
         response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
         if app.config.get('IS_PRODUCTION'):
             response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
-
-        # Mirror the session CSRF token into a server-issued, Strict and
-        # HttpOnly cookie. The cookie is only accepted as a fallback after
-        # same-origin evidence is present, so the existing origin protection
-        # remains in force while the frontend can no longer lose the token
-        # because of an initialization race.
         csrf_token = session.get('csrf_token')
         if csrf_token:
             response.set_cookie(
@@ -175,6 +161,35 @@ def _install_security_headers(app):
         return response
 
 
+def _install_api_error_handlers(app):
+    """Keep API failures JSON even when Flask/Werkzeug raises outside a route."""
+    @app.errorhandler(RequestEntityTooLarge)
+    def handle_request_too_large(exc):
+        if request.path.startswith('/api/'):
+            return jsonify({
+                'success': False,
+                'error': 'קובץ הבקשה גדול מהמגבלה המותרת',
+                'http_status': 413,
+                'max_bytes': app.config.get('MAX_CONTENT_LENGTH'),
+            }), 413
+        return exc
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_exception(exc):
+        app.logger.exception('Unhandled application exception on %s %s', request.method, request.path)
+        if request.path.startswith('/api/'):
+            payload = {
+                'success': False,
+                'error': 'שגיאה פנימית בשרת',
+                'http_status': 500,
+                'exception_type': type(exc).__name__,
+            }
+            if app.config.get('DEBUG') or app.config.get('IS_PRODUCTION') is False:
+                payload['details'] = str(exc)
+            return jsonify(payload), 500
+        raise exc
+
+
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -184,6 +199,7 @@ def create_app(config_class=Config):
     migrate.init_app(app, db)
     limiter.init_app(app)
     _install_security_headers(app)
+    _install_api_error_handlers(app)
 
     try:
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
