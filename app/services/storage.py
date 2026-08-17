@@ -76,10 +76,15 @@ def upload_bytes(remote_filename: str, data: bytes, content_type: str = 'applica
     original_remote_filename = remote_filename
     remote_filename = _restore_safe_remote_filename(remote_filename)
     try:
+        # supabase-storage-py passes file_options through to HTTP headers.
+        # Therefore values such as `upsert` must be strings/bytes, not Python bools.
         client.storage.from_(bucket).upload(
             path=remote_filename,
             file=data,
-            file_options={'content-type': content_type, 'upsert': True},
+            file_options={
+                'content-type': str(content_type),
+                'upsert': 'true',
+            },
         )
     except Exception as e:
         logger.error(f'Supabase upload failed for {original_remote_filename} -> {remote_filename}: {e}')
