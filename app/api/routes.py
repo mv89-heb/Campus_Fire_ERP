@@ -12,7 +12,6 @@ import os
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 main_bp = Blueprint('main', __name__)
-
 OUTLOOK_ENABLED = platform.system() == 'Windows'
 DOCUMENT_TOKEN_SALT = 'campus-fire-document-access-v1'
 DOCUMENT_TOKEN_MAX_AGE = 300
@@ -35,11 +34,7 @@ def _document_token_valid(token, doc_id):
 def _document_access_allowed(doc_id):
     if session.get('user_id'):
         return True
-    token = (
-        request.args.get('access_token')
-        or request.headers.get('X-Document-Access-Token')
-        or request.cookies.get(f'doc_access_{int(doc_id)}')
-    )
+    token = request.args.get('access_token') or request.headers.get('X-Document-Access-Token') or request.cookies.get(f'doc_access_{int(doc_id)}')
     return _document_token_valid(token, doc_id)
 
 
@@ -119,7 +114,6 @@ def serve_upload(filename):
         return jsonify({'error': 'File not found'}), 404
     if not _document_access_allowed(doc.id):
         return jsonify({'error': 'נדרשת התחברות'}), 401
-
     resolved = storage.find_supabase_legacy_path(doc.file_path)
     if resolved and storage.is_configured():
         data, error = _download_supabase_pdf(resolved, doc.id)
@@ -130,7 +124,6 @@ def serve_upload(filename):
             fallback = _supabase_signed_redirect(resolved, doc.id)
             if fallback:
                 return fallback
-
     if storage.is_supabase_path(doc.file_path) and storage.is_configured():
         data, error = _download_supabase_pdf(doc.file_path, doc.id)
         if data:
@@ -140,7 +133,6 @@ def serve_upload(filename):
             fallback = _supabase_signed_redirect(doc.file_path, doc.id)
             if fallback:
                 return fallback
-
     base_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     full_path = os.path.abspath(os.path.join(base_dir, fname))
     if os.path.commonpath([full_path, base_dir]) != base_dir:
@@ -176,15 +168,13 @@ def document_file(doc_id):
                 return fallback
         return jsonify({'error': 'המסמך נמצא ב-Supabase אך לא ניתן להוריד אותו', 'document_id': doc_id,
                         'resolved_path': resolved_path, 'details': error}), 502
-
     base_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     full_path = os.path.abspath(os.path.join(base_dir, os.path.basename(doc.file_path)))
     if os.path.commonpath([full_path, base_dir]) != base_dir:
         return jsonify({'error': 'Invalid file path'}), 400
     if not os.path.isfile(full_path):
-        return jsonify({'error': 'File not found', 'document_id': doc_id,
-                        'db_file_path': doc.file_path, 'looking_in': full_path,
-                        'supabase_resolved': False}), 404
+        return jsonify({'error': 'File not found', 'document_id': doc_id, 'db_file_path': doc.file_path,
+                        'looking_in': full_path, 'supabase_resolved': False}), 404
     try:
         with open(full_path, 'rb') as local_file:
             data = local_file.read()
@@ -206,15 +196,18 @@ def dashboard():
                 total_reqs += 1
                 docs = Document.query.filter_by(req_id=req.id, status='active').order_by(Document.uploaded_at.desc()).all()
                 latest = docs[0] if docs else None
-                label = validity_status(latest.expiry_date) if latest and latest.expiry_date else 'needs_review'
-                if latest and latest.expiry_date:
+                if not latest or not latest.expiry_date:
+                    label = 'needs_review' if latest else 'missing'
+                else:
                     days_left = (latest.expiry_date - date.today()).days
-                    if days_left <= 14 and days_left >= 0:
-                        label = 'critical'
-                    elif days_left <= 30 and days_left >= 0:
-                        label = 'warning'
-                    elif days_left < 0:
+                    if days_left <= 0:
                         label = 'expired'
+                    elif days_left <= 14:
+                        label = 'critical'
+                    elif days_left <= 30:
+                        label = 'warning'
+                    else:
+                        label = 'valid'
                 entry = {
                     'req_id': req.id, 'zone_id': zone.id, 'zone_name': zone.zone_name,
                     'file_number': zone.file_number, 'system_name': req.system_name,
@@ -240,7 +233,7 @@ def dashboard():
                                 'form_code': d.requirement.required_form if d.requirement else '-',
                                 'issue_date': str(d.issue_date) if d.issue_date else '',
                                 'expiry_date': str(d.expiry_date) if d.expiry_date else '',
-                                'validity_status': validity_status(d.expiry_date),
+                                'validity_status': ('missing' if not d.file_path else validity_status(d.expiry_date)),
                                 'file_path': d.file_path,
                                 'file_access_url': f'/api/documents/{d.id}/file' if d.file_path else None})
         score = round((valid_count / total_reqs * 100) if total_reqs else 0, 1)
