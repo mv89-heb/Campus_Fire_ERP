@@ -6,7 +6,7 @@ import re
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from app.services.document_validity_rules import resolve_validity
+from app.services.document_validity_rules import requirement_cycle, resolve_validity
 
 _DATE_RE = re.compile(r"(?<!\d)(\d{1,2})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{2,4})(?!\d)")
 _FORM_RE = re.compile(r"\bטופס\s*(?:מס[\u05f3']?\s*)?(\d{1,2})\b", re.I)
@@ -61,7 +61,8 @@ def validity_status(expiry_date, today=None):
     if expiry_date is None:
         return "needs_review"
     today = today or _today_israel()
-    if today >= expiry_date:
+    # The expiry date itself is still valid; it expires after that date.
+    if today > expiry_date:
         return "expired"
     days = (expiry_date - today).days
     return "critical" if days <= 14 else "warning" if days <= 30 else "valid"
@@ -113,12 +114,6 @@ def _semantic_expiry_candidates(text):
 
 
 def extract_explicit_expiry(text):
-    """Extract the date immediately attached to an explicit expiry label.
-
-    This intentionally does not choose the earliest date in a nearby block,
-    because a certificate can contain both an inspection date and a later
-    expiry date on the same line/table row.
-    """
     candidates = _semantic_expiry_candidates(text)
     if not candidates:
         return None
@@ -254,6 +249,7 @@ def analyze_pdf_bytes(data: bytes, filename=""):
     validity_source = validity.get("source") or "unknown"
     validity_status_value = validity_status(effective_expiry)
     status = "analyzed" if effective_expiry else "needs_review"
+    catalog = requirement_cycle(form)
 
     notes = []
     if explicit_expiry:
@@ -264,6 +260,11 @@ def analyze_pdf_bytes(data: bytes, filename=""):
         notes.append(f"התוקף חושב לפי כלל דרישה מוגדר: {validity.get('rule_label')} -> {effective_expiry.isoformat()}.")
     else:
         notes.append("לא נמצא בתוכן המסמך תוקף מפורש או כלל תדירות מספיק אמין לחישוב תוקף. נדרש עיון ידני.")
+
+    if catalog:
+        notes.append(f"מחזור דרישה לכרטיס אישור זה: {catalog.cycle}.")
+        if catalog.note:
+            notes.append(f"הערת דרישה: {catalog.note}")
     if inspection_evidence:
         notes.append(f"מקור תאריך הבדיקה: {inspection_evidence['context']}")
     if zone_code:
@@ -293,6 +294,9 @@ def analyze_pdf_bytes(data: bytes, filename=""):
         "validity_rule": validity.get("rule_key"),
         "validity_rule_label": validity.get("rule_label"),
         "validity_rule_evidence": validity.get("rule_evidence"),
+        "requirement_cycle": validity.get("requirement_cycle"),
+        "requirement_source": validity.get("requirement_source"),
+        "requirement_note": validity.get("requirement_note"),
         "validity_status": validity_status_value,
         "confidence": confidence,
         "all_dates": [d.isoformat() for d in extract_dates(text)],
@@ -316,6 +320,9 @@ def analyze_pdf_bytes(data: bytes, filename=""):
         "validity_rule": validity.get("rule_key"),
         "validity_rule_label": validity.get("rule_label"),
         "validity_rule_evidence": validity.get("rule_evidence"),
+        "requirement_cycle": validity.get("requirement_cycle"),
+        "requirement_source": validity.get("requirement_source"),
+        "requirement_note": validity.get("requirement_note"),
         "validity_status": validity_status_value,
         "confidence": confidence,
         "analysis_notes": " ".join(notes),
@@ -327,6 +334,8 @@ def analyze_pdf_bytes(data: bytes, filename=""):
 
 
 def apply_analysis_to_document(doc, analysis):
+    # Safe re-analysis: never erase a known DB date merely because the new
+    # parser could not recover it. A manual review can explicitly change it.
     if analysis.get("inspection_date"):
         doc.issue_date = analysis["inspection_date"]
     if analysis.get("expiry_date"):
@@ -339,6 +348,7 @@ def apply_analysis_to_document(doc, analysis):
         f"zone:{analysis['zone_code']}" if analysis.get("zone_code") else None,
         f"validity:{analysis.get('validity_source')}" if analysis.get("validity_source") else None,
         f"validity_rule:{analysis.get('validity_rule')}" if analysis.get("validity_rule") else None,
+        f"requirement_cycle:{analysis.get('requirement_cycle')}" if analysis.get("requirement_cycle") else None,
         f"analysis:{analysis.get('status')}" if analysis.get("status") else None,
         f"validity_status:{analysis.get('validity_status')}" if analysis.get("validity_status") else None,
         f"confidence:{analysis.get('confidence'):.2f}" if isinstance(analysis.get('confidence'), (int, float)) else None,
