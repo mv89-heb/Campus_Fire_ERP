@@ -28,7 +28,6 @@ class Document(db.Model):
     expiry_date = db.Column(db.Date, nullable=True)
     status = db.Column(db.String(20), default='active', nullable=False)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
-
     permit_number = db.Column(db.String(80), nullable=True)
     issuing_body = db.Column(db.String(150), nullable=True)
     issue_date = db.Column(db.Date, nullable=True)
@@ -37,13 +36,11 @@ class Document(db.Model):
     category = db.Column(db.String(80), nullable=True)
     tags = db.Column(db.String(255), nullable=True)
     locked = db.Column(db.Boolean, default=False, nullable=False)
-
     file_size = db.Column(db.Integer, nullable=True)
     deleted_at = db.Column(db.DateTime, nullable=True)
     deleted_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
-    # Content-analysis truth is kept separately from manually/previously entered
-    # permit metadata. A failed analysis must never masquerade as a valid permit.
+    # Content-analysis truth is stored separately from the effective/manual expiry.
     analysis_expiry_date = db.Column(db.Date, nullable=True)
     analysis_issue_date = db.Column(db.Date, nullable=True)
     analysis_validity_status = db.Column(db.String(30), nullable=True)
@@ -58,7 +55,6 @@ class Document(db.Model):
     analysis_review_required = db.Column(db.Boolean, default=False, nullable=False)
     previous_expiry_date = db.Column(db.Date, nullable=True)
     previous_issue_date = db.Column(db.Date, nullable=True)
-
 
 class Site(db.Model):
     __tablename__ = 'sites'
@@ -187,3 +183,57 @@ class Deficiency(db.Model):
     severity = db.Column(db.String(20), default='medium', nullable=False)
     responsible = db.Column(db.String(120), nullable=True)
     opened_at = db.Column(db.Date, nullable=True)
+    due_date = db.Column(db.Date, nullable=True)
+    status = db.Column(db.String(20), default='open', nullable=False)
+    task_id = db.Column(db.Integer, db.ForeignKey('tasks.id'), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class DocumentHistory(db.Model):
+    __tablename__ = 'document_history'
+    id = db.Column(db.Integer, primary_key=True)
+    document_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=False)
+    field_name = db.Column(db.String(50), nullable=False)
+    old_value = db.Column(db.Text, nullable=True)
+    new_value = db.Column(db.Text, nullable=True)
+    changed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class User(db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    full_name = db.Column(db.String(120), nullable=True)
+    role = db.Column(db.String(30), default='viewer', nullable=False)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime, nullable=True)
+
+class Notification(db.Model):
+    __tablename__ = 'notifications'
+    id = db.Column(db.Integer, primary_key=True)
+    ref_type = db.Column(db.String(30), nullable=False)
+    ref_id = db.Column(db.Integer, nullable=False)
+    window_days = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    read_at = db.Column(db.DateTime, nullable=True)
+    dismissed = db.Column(db.Boolean, default=False, nullable=False)
+
+class AuditLog(db.Model):
+    __tablename__ = 'audit_log'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    username_snapshot = db.Column(db.String(80), nullable=True)
+    action = db.Column(db.String(20), nullable=False)
+    entity_type = db.Column(db.String(40), nullable=False)
+    entity_id = db.Column(db.Integer, nullable=True)
+    entity_label = db.Column(db.String(200), nullable=True)
+    old_value = db.Column(db.Text, nullable=True)
+    new_value = db.Column(db.Text, nullable=True)
+    ip_address = db.Column(db.String(64), nullable=True)
+    user_agent = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
