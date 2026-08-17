@@ -96,6 +96,24 @@ def _norm(value: str) -> str:
     return value.lower()
 
 
+def _path_variants(value: str) -> set[str]:
+    """Return comparable path forms used by legacy uploads and ZIP backups."""
+    normalized = _norm(value)
+    if not normalized:
+        return set()
+
+    variants = {normalized}
+    for prefix in ('uploads/', './uploads/', 'upload/', './upload/'):
+        if normalized.startswith(prefix):
+            variants.add(normalized[len(prefix):])
+
+    marker = '/uploads/'
+    if marker in normalized:
+        variants.add(normalized.split(marker, 1)[1])
+
+    return {v.strip('/') for v in variants if v.strip('/')}
+
+
 def _zip_entries(zip_bytes: bytes) -> list[dict]:
     """Read safe metadata/content from a ZIP without extracting to disk."""
     entries = []
@@ -119,20 +137,22 @@ def _zip_entries(zip_bytes: bytes) -> list[dict]:
 
 
 def _match_document(doc: Document, entries: list[dict]) -> tuple[dict | None, str, list[str]]:
-    """Match by exact original path first, then basename, refusing ambiguity."""
-    doc_name = _norm(doc.file_name or '')
-    db_path = _norm(doc.file_path or '')
-    candidates = []
+    """Match by original path, tolerating the legacy uploads/ prefix, then basename."""
+    path_values = []
+    for value in (doc.file_path, doc.file_name):
+        path_values.extend(_path_variants(value))
+    path_values = list(dict.fromkeys(path_values))
 
+    exact_matches = []
     for entry in entries:
-        ep = _norm(entry['zip_path'])
-        if doc_name and (ep == doc_name or ep.endswith('/' + doc_name)):
-            candidates.append((entry, 'exact_path'))
+        entry_variants = _path_variants(entry['zip_path'])
+        if any(candidate in entry_variants for candidate in path_values):
+            exact_matches.append(entry)
 
-    if len(candidates) == 1:
-        return candidates[0][0], 'exact_path', []
-    if len(candidates) > 1:
-        return None, 'ambiguous', [x[0]['zip_path'] for x in candidates]
+    if len(exact_matches) == 1:
+        return exact_matches[0], 'exact_path', []
+    if len(exact_matches) > 1:
+        return None, 'ambiguous', [x['zip_path'] for x in exact_matches]
 
     basename = _norm(os.path.basename(doc.file_name or doc.file_path or ''))
     by_base = [e for e in entries if _norm(e['basename']) == basename] if basename else []
@@ -141,8 +161,7 @@ def _match_document(doc: Document, entries: list[dict]) -> tuple[dict | None, st
     if len(by_base) > 1:
         return None, 'ambiguous', [x['zip_path'] for x in by_base]
 
-    # Last-resort legacy generated filename, only if it is unique in the ZIP.
-    legacy_base = _norm(os.path.basename(db_path))
+    legacy_base = _norm(os.path.basename(doc.file_path or ''))
     by_legacy = [e for e in entries if _norm(e['basename']) == legacy_base] if legacy_base else []
     if len(by_legacy) == 1:
         return by_legacy[0], 'legacy_basename', []
