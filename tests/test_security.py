@@ -71,10 +71,12 @@ class SecurityGuardTests(unittest.TestCase):
             user = User.query.filter_by(username='root').first()
             user.role = 'viewer'
             db.session.commit()
+            user_id = user.id
+            username = user.username
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = user.id
-            sess['username'] = user.username
+            sess['user_id'] = user_id
+            sess['username'] = username
             sess['role'] = 'viewer'
             sess['csrf_token'] = 'viewer-csrf'
 
