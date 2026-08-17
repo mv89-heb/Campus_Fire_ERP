@@ -1,4 +1,3 @@
-import hashlib
 import os
 import logging
 
@@ -17,11 +16,6 @@ class DMSService:
 
     @staticmethod
     def _find_requirement(form_number, zone_id=None):
-        """Resolve a requirement by form number, preferring the detected zone.
-
-        Form numbers are reused across zones (for example form 6 exists for
-        several campus areas), so matching by form number alone is unsafe.
-        """
         if form_number is None:
             return None
         form_label = f"טופס {form_number}"
@@ -35,14 +29,11 @@ class DMSService:
         matches = query.all()
         if len(matches) == 1:
             return matches[0]
-        # Multiple requirements share the same form number and no reliable
-        # zone match exists: leave req_id unset rather than assigning the
-        # document to an arbitrary zone.
         return None
 
     @staticmethod
     def ingest_document(filepath: str, original_filename: str):
-        """Ingest a validated PDF, analyze its content, then persist it."""
+        """Ingest a validated PDF, analyze it, and persist both result and evidence."""
         file_hash = DMSService.calculate_hash(filepath)
         if Document.query.filter_by(file_hash=file_hash).filter(Document.status != 'deleted').first():
             DMSService._cleanup_local_temp(filepath)
@@ -65,9 +56,6 @@ class DMSService:
             detected_req_id = req.id
             detected_zone_id = req.zone_id
 
-        # Never silently put an unclassified document into the residence zone.
-        # A fallback is only safe when the document has no detected form/zone
-        # at all and the legacy application explicitly needs a holding zone.
         if not detected_zone_id and analysis.get('form_number') is None:
             zone = Zone.query.filter_by(file_number='8855-7').first()
             if zone:
@@ -95,6 +83,18 @@ class DMSService:
             issue_date=analysis.get('issue_date'),
             category=analysis.get('category'),
             status='active',
+            analysis_expiry_date=analysis.get('expiry_date'),
+            analysis_issue_date=analysis.get('issue_date'),
+            analysis_validity_status=analysis.get('validity_status'),
+            analysis_validity_source=analysis.get('validity_source'),
+            analysis_validity_rule=analysis.get('validity_rule'),
+            analysis_validity_rule_label=analysis.get('validity_rule_label'),
+            analysis_validity_rule_evidence=analysis.get('validity_rule_evidence'),
+            requirement_cycle=analysis.get('requirement_cycle'),
+            requirement_source=analysis.get('requirement_source'),
+            requirement_note=analysis.get('requirement_note'),
+            analysis_confidence=analysis.get('confidence'),
+            analysis_review_required=analysis.get('status') == 'needs_review',
         )
         apply_analysis_to_document(new_doc, analysis)
         db.session.add(new_doc)
@@ -110,11 +110,7 @@ class DMSService:
                 DMSService._cleanup_local_temp(filepath)
 
         if analysis.get('status') == 'needs_review':
-            logger.warning(
-                'Document %s imported without reliable inspection date: %s',
-                original_filename,
-                analysis.get('analysis_notes'),
-            )
+            logger.warning('Document %s imported with unresolved validity: %s', original_filename, analysis.get('analysis_notes'))
         return new_doc
 
     @staticmethod
