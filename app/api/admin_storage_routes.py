@@ -5,6 +5,7 @@ API עבור Storage Health Check ו-Recovery של מסמכים ישנים.
 from flask import Blueprint, jsonify, request, current_app, session
 from app.services import storage_health_service as svc
 from app.services import storage_migration_service as migration_svc
+from app.services import storage
 from app.services.auth_service import AuthServiceError
 from app.api.auth_routes import admin_required
 
@@ -70,3 +71,48 @@ def api_cleanup_confirm():
 
     result = svc.cleanup_confirm(paths, session.get('user_id'), current_app.config['UPLOAD_FOLDER'])
     return jsonify(result)
+
+
+@admin_storage_bp.route('/api/admin/storage/inventory', methods=['GET'])
+@admin_required
+def api_storage_inventory():
+    """Read-only diagnostic of the configured Supabase bucket.
+
+    Never returns credentials or file contents. It exposes object names,
+    sizes and a small optional filename search so an administrator can verify
+    whether legacy documents actually exist in the bucket.
+    """
+    if not storage.is_configured():
+        return jsonify({
+            'configured': False,
+            'bucket': storage.get_bucket_name(),
+            'error': 'Supabase אינו מוגדר: חסרים SUPABASE_URL / SUPABASE_SERVICE_KEY',
+            'objects': [],
+        }), 503
+
+    try:
+        objects = storage.list_supabase_files()
+        query = (request.args.get('q') or '').strip().lower()
+        if query:
+            objects = [
+                item for item in objects
+                if query in str(item.get('filename', '')).lower()
+                or query in str(item.get('basename', '')).lower()
+            ]
+
+        return jsonify({
+            'configured': True,
+            'bucket': storage.get_bucket_name(),
+            'object_count': len(objects),
+            'query': query or None,
+            'objects': objects,
+        })
+    except Exception as exc:
+        current_app.logger.exception('Supabase inventory check failed')
+        return jsonify({
+            'configured': True,
+            'bucket': storage.get_bucket_name(),
+            'object_count': 0,
+            'objects': [],
+            'error': f'לא ניתן לקרוא את Supabase Storage: {exc}',
+        }), 502
