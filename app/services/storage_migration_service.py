@@ -11,16 +11,15 @@ from app.extensions import db
 from app.models import Document
 from app.services import storage
 from app.services import audit_log_service as alog
+from app.services.document_analysis_service import analyze_pdf_bytes, apply_analysis_to_document
 
 
 def scan_legacy_documents(upload_folder: str) -> dict:
-    """Classify legacy Document.file_path values without modifying data."""
     docs = Document.query.filter(Document.status != 'deleted').all()
     inventory = storage.list_supabase_files() if storage.is_configured() else []
     inventory_names = [item.get('filename') for item in inventory if item.get('filename')]
     rows = []
     counts = {'native': 0, 'recoverable_supabase': 0, 'migratable_local': 0, 'missing': 0, 'ambiguous': 0}
-
     for doc in docs:
         if not doc.file_path:
             counts['missing'] += 1
@@ -50,7 +49,6 @@ def scan_legacy_documents(upload_folder: str) -> dict:
 
 
 def migrate(upload_folder: str, acting_user_id) -> dict:
-    """Migrate/relink safe legacy records; never deletes source data."""
     if not storage.is_configured():
         return {'success': False, 'error': 'Supabase אינו מוגדר', 'migrated': [], 'failed': []}
     report = scan_legacy_documents(upload_folder)
@@ -70,6 +68,8 @@ def migrate(upload_folder: str, acting_user_id) -> dict:
                 with open(local_path, 'rb') as f:
                     data = f.read()
                 new_path = storage.upload_bytes(os.path.basename(old_path), data)
+                analysis = analyze_pdf_bytes(data, doc.file_name)
+                apply_analysis_to_document(doc, analysis)
             doc.file_path = new_path
             db.session.commit()
             alog.log('document_storage_migrated', 'document', doc.id, entity_label=doc.file_name,
@@ -149,16 +149,14 @@ def _match_document(doc: Document, entries: list[dict]) -> tuple[dict | None, st
 
 
 def _safe_restore_name(doc_id: int, entry: dict) -> str:
-    """Create an ASCII-only, deterministic Storage object key."""
     digest = entry['sha256']
     extension = '.pdf' if entry['basename'].lower().endswith('.pdf') else ''
     return f'restored/{doc_id}/{digest}{extension}'
 
 
 def _validate_native_storage(doc: Document) -> dict:
-    """Actually download a native Supabase object and validate it."""
     result = {'healthy': False, 'path': doc.file_path, 'bytes': None, 'sha256': None,
-              'pdf_valid': False, 'error': None}
+              'pdf_valid': False, 'error': None, 'data': None}
     try:
         data = storage.download_bytes(doc.file_path)
         result['bytes'] = len(data)
@@ -178,14 +176,32 @@ def _validate_native_storage(doc: Document) -> dict:
         else:
             result['pdf_valid'] = True
         result['healthy'] = True
+        result['data'] = data
         return result
     except Exception as exc:
         result['error'] = str(exc)
         return result
 
 
+def _analysis_payload(data: bytes, filename: str) -> dict:
+    analysis = analyze_pdf_bytes(data, filename)
+    return {
+        'analysis_status': analysis.get('status'),
+        'form_number': analysis.get('form_number'),
+        'document_type': analysis.get('document_type'),
+        'category': analysis.get('category'),
+        'zone_code': analysis.get('zone_code'),
+        'inspection_date': analysis.get('inspection_date').isoformat() if analysis.get('inspection_date') else None,
+        'explicit_expiry_date': analysis.get('explicit_expiry_date').isoformat() if analysis.get('explicit_expiry_date') else None,
+        'expiry_date': analysis.get('expiry_date').isoformat() if analysis.get('expiry_date') else None,
+        'validity_source': analysis.get('validity_source'),
+        'validity_status': analysis.get('validity_status'),
+        'confidence': analysis.get('confidence'),
+        'analysis_notes': analysis.get('analysis_notes'),
+    }
+
+
 def plan_zip_restore(zip_bytes: bytes, document_id: int | None = None, validate_native: bool = True) -> dict:
-    """Create a non-mutating recovery plan from a ZIP backup."""
     if not storage.is_configured():
         return {'success': False, 'error': 'Supabase אינו מוגדר', 'items': [], 'counts': {}}
     try:
@@ -200,7 +216,7 @@ def plan_zip_restore(zip_bytes: bytes, document_id: int | None = None, validate_
     items = []
     for doc in docs:
         if storage.is_supabase_path(doc.file_path):
-            native = _validate_native_storage(doc) if validate_native else {'healthy': True, 'bytes': None, 'sha256': None, 'error': None}
+            native = _validate_native_storage(doc) if validate_native else {'healthy': True, 'bytes': None, 'sha256': None, 'error': None, 'data': None}
             if native['healthy']:
                 counts['skipped_native'] += 1
                 item = {'document_id': doc.id, 'file_name': doc.file_name, 'status': 'skipped_native',
@@ -209,6 +225,7 @@ def plan_zip_restore(zip_bytes: bytes, document_id: int | None = None, validate_
                         'storage_path': doc.file_path}
                 if validate_native:
                     item.update({'bytes': native['bytes'], 'sha256': native['sha256']})
+                    item['analysis'] = _analysis_payload(native['data'], doc.file_name)
                 items.append(item)
                 continue
             counts['unhealthy_native'] += 1
@@ -227,16 +244,14 @@ def plan_zip_restore(zip_bytes: bytes, document_id: int | None = None, validate_
         validation = storage.verify_pdf_bytes(entry['data']) if entry['basename'].lower().endswith('.pdf') else {'status': True, 'error': None}
         if not validation.get('status'):
             counts['invalid_pdf'] += 1
-            item = {'document_id': doc.id, 'file_name': doc.file_name, 'status': 'invalid_pdf', 'source': entry['zip_path'], 'error': validation.get('error')}
-            if native_reason:
-                item.update({'previous_storage_status': 'unhealthy_native', 'previous_storage_error': native_reason})
-            items.append(item)
+            items.append({'document_id': doc.id, 'file_name': doc.file_name, 'status': 'invalid_pdf', 'source': entry['zip_path'], 'error': validation.get('error')})
             continue
         counts['matched'] += 1
         remote_name = _safe_restore_name(doc.id, entry)
         item = {'document_id': doc.id, 'file_name': doc.file_name, 'status': 'matched', 'match_method': method,
                 'source': entry['zip_path'], 'size': entry['size'], 'sha256': entry['sha256'],
-                'storage_path': f'{storage.get_bucket_name()}/{remote_name}'}
+                'storage_path': f'{storage.get_bucket_name()}/{remote_name}',
+                'analysis': _analysis_payload(entry['data'], doc.file_name)}
         if native_reason:
             item.update({'reason': 'ה-DB הצביע ל-Supabase אך הקובץ הקיים לא עבר בדיקת הורדה/שלמות; יוחלף מהגיבוי',
                          'previous_storage_status': 'unhealthy_native', 'previous_storage_error': native_reason})
@@ -245,33 +260,39 @@ def plan_zip_restore(zip_bytes: bytes, document_id: int | None = None, validate_
 
 
 def restore_zip(zip_bytes: bytes, acting_user_id, document_id: int | None = None) -> dict:
-    """Restore matched ZIP files; verify every uploaded object before DB update."""
-    plan = plan_zip_restore(zip_bytes, document_id, validate_native=False)
+    """Restore files and re-analyze every healthy native PDF too."""
+    plan = plan_zip_restore(zip_bytes, document_id, validate_native=True)
     if not plan.get('success'):
         return plan
     entries = {e['zip_path']: e for e in _zip_entries(zip_bytes)}
-    restored, failed = [], []
+    restored, failed, analyzed = [], [], []
     for item in plan['items']:
+        doc = db.session.get(Document, item['document_id'])
+        if not doc:
+            continue
+        if item['status'] == 'skipped_native':
+            try:
+                data = storage.download_bytes(doc.file_path)
+                analysis = analyze_pdf_bytes(data, doc.file_name)
+                apply_analysis_to_document(doc, analysis)
+                db.session.commit()
+                analyzed.append({'document_id': doc.id, 'file_name': doc.file_name, 'analysis': _analysis_payload(data, doc.file_name)})
+            except Exception as exc:
+                db.session.rollback()
+                failed.append({'document_id': doc.id, 'file_name': doc.file_name, 'error': f'ניתוח המסמך נכשל: {exc}'})
+            continue
         if item['status'] != 'matched':
             continue
-        doc = db.session.get(Document, item['document_id'])
         entry = entries.get(item['source'])
-        if not doc or not entry:
+        if not entry:
             failed.append({'document_id': item['document_id'], 'error': 'מסמך/קובץ מקור לא נמצא'})
             continue
-
         stored_path = None
         old_path = doc.file_path
         try:
             remote_name = _safe_restore_name(doc.id, entry)
-            stored_path = storage.upload_bytes(
-                remote_name,
-                entry['data'],
-                'application/pdf' if entry['basename'].lower().endswith('.pdf') else 'application/octet-stream',
-            )
-
-            # Never update Neon until the exact bytes we uploaded can be read
-            # back and independently verified.
+            stored_path = storage.upload_bytes(remote_name, entry['data'],
+                'application/pdf' if entry['basename'].lower().endswith('.pdf') else 'application/octet-stream')
             downloaded = storage.download_bytes(stored_path)
             actual_hash = hashlib.sha256(downloaded).hexdigest()
             if actual_hash != entry['sha256'] or len(downloaded) != entry['size']:
@@ -280,42 +301,28 @@ def restore_zip(zip_bytes: bytes, acting_user_id, document_id: int | None = None
                 validation = storage.verify_pdf_bytes(downloaded)
                 if not validation.get('status'):
                     raise RuntimeError(validation.get('error') or 'PDF verification failed')
-
             doc.file_path = stored_path
             doc.file_hash = entry['sha256']
             doc.file_size = entry['size']
+            analysis = analyze_pdf_bytes(downloaded, doc.file_name)
+            apply_analysis_to_document(doc, analysis)
             db.session.commit()
-
             try:
-                alog.log(
-                    'document_storage_restored',
-                    'document',
-                    doc.id,
-                    entity_label=doc.file_name,
-                    old_value={'file_path': old_path},
-                    new_value={'file_path': stored_path},
-                )
+                alog.log('document_storage_restored', 'document', doc.id, entity_label=doc.file_name,
+                         old_value={'file_path': old_path},
+                         new_value={'file_path': stored_path, 'analysis': _analysis_payload(downloaded, doc.file_name)})
                 db.session.commit()
             except Exception:
                 db.session.rollback()
-
-            restored.append({
-                'document_id': doc.id,
-                'file_name': doc.file_name,
-                'source': entry['zip_path'],
-                'storage_path': stored_path,
-                'sha256': actual_hash,
-                'size': len(downloaded),
-            })
+            restored.append({'document_id': doc.id, 'file_name': doc.file_name, 'source': entry['zip_path'],
+                             'storage_path': stored_path, 'sha256': actual_hash, 'size': len(downloaded),
+                             'analysis': _analysis_payload(downloaded, doc.file_name)})
         except Exception as exc:
             db.session.rollback()
-            # If Neon was not updated, remove the newly-created replacement
-            # object unless it was already the document's previous path.
             if stored_path and stored_path != old_path:
                 try:
                     storage.delete_object(stored_path)
                 except Exception:
                     pass
             failed.append({'document_id': doc.id, 'file_name': doc.file_name, 'error': str(exc)})
-
-    return {'success': not failed, 'restored': restored, 'failed': failed, 'plan': plan}
+    return {'success': not failed, 'restored': restored, 'analyzed': analyzed, 'failed': failed, 'plan': plan}
