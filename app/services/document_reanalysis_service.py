@@ -38,14 +38,46 @@ def _read_document_bytes(doc):
         return handle.read(), "local"
 
 
-def reanalyze_all(include_archived=False):
-    """Analyze every stored PDF without destructively erasing known DB values.
+def _persist_analysis(doc, analysis, previous_issue, previous_expiry):
+    """Persist the analysis as the current compliance truth.
 
-    If a new analysis cannot establish an expiry date, an existing DB expiry is
-    preserved. The response separately reports that the new analysis needs
-    review, so the dashboard can remain operational while the operator sees
-    that re-validation is incomplete.
+    If the PDF cannot prove an expiry, the old expiry is retained only in
+    previous_expiry_date. It is never used as the current compliance expiry.
+    This prevents an old/manual date from making an unverified document appear
+    valid after re-analysis.
     """
+    analysis_expiry = analysis.get('expiry_date')
+    analysis_issue = analysis.get('issue_date')
+
+    if previous_expiry and previous_expiry != analysis_expiry:
+        doc.previous_expiry_date = previous_expiry
+    elif analysis_expiry is not None:
+        doc.previous_expiry_date = None
+    if previous_issue and previous_issue != analysis_issue:
+        doc.previous_issue_date = previous_issue
+    elif analysis_issue is not None:
+        doc.previous_issue_date = None
+
+    doc.analysis_expiry_date = analysis_expiry
+    doc.analysis_issue_date = analysis_issue
+    doc.analysis_validity_status = analysis.get('validity_status') or 'needs_review'
+    doc.analysis_validity_source = analysis.get('validity_source')
+    doc.analysis_validity_rule = analysis.get('validity_rule')
+    doc.analysis_validity_rule_label = analysis.get('validity_rule_label')
+    doc.analysis_validity_rule_evidence = analysis.get('validity_rule_evidence')
+    doc.requirement_cycle = analysis.get('requirement_cycle')
+    doc.requirement_source = analysis.get('requirement_source')
+    doc.requirement_note = analysis.get('requirement_note')
+    doc.analysis_confidence = analysis.get('confidence')
+    doc.analysis_review_required = analysis.get('status') == 'needs_review'
+
+    # Only a date proven by the current analysis becomes the effective expiry.
+    doc.expiry_date = analysis_expiry
+    doc.issue_date = analysis_issue
+
+
+def reanalyze_all(include_archived=False):
+    """Analyze every stored PDF and make the analyzed result authoritative."""
     query = Document.query.filter(Document.status != 'deleted')
     if not include_archived:
         query = query.filter(Document.status != 'archived')
@@ -65,6 +97,9 @@ def reanalyze_all(include_archived=False):
             data, source = _read_document_bytes(doc)
             analysis = analyze_pdf_bytes(data, doc.file_name or '')
             if not analysis.get('text_extracted'):
+                doc.analysis_review_required = True
+                doc.analysis_validity_status = 'needs_review'
+                db.session.commit()
                 reviewed.append({
                     'document_id': doc.id,
                     'file_name': doc.file_name,
@@ -85,30 +120,17 @@ def reanalyze_all(include_archived=False):
             if req:
                 zone_id = req.zone_id
 
-            # If the analyzer cannot classify the zone confidently, do not
-            # overwrite an existing correct association.
             if zone_id is not None:
                 doc.zone_id = zone_id
                 doc.req_id = req.id if req else None
 
-            # Keep known DB dates when the new parser has no evidence. This is
-            # intentionally done before apply_analysis_to_document; that helper
-            # only writes non-null analysis dates.
             previous_issue = doc.issue_date
             previous_expiry = doc.expiry_date
             apply_analysis_to_document(doc, analysis)
-            if not analysis.get('inspection_date') and previous_issue:
-                doc.issue_date = previous_issue
-            if not analysis.get('expiry_date') and previous_expiry:
-                doc.expiry_date = previous_expiry
-
+            _persist_analysis(doc, analysis, previous_issue, previous_expiry)
             db.session.commit()
 
             analysis_expiry = analysis.get('expiry_date')
-            preserved_expiry = not analysis_expiry and bool(previous_expiry)
-            effective_expiry = analysis_expiry or previous_expiry
-            effective_status = validity_status(effective_expiry)
-
             row = {
                 'document_id': doc.id,
                 'file_name': doc.file_name,
@@ -118,16 +140,19 @@ def reanalyze_all(include_archived=False):
                 'issue_date': doc.issue_date.isoformat() if doc.issue_date else None,
                 'expiry_date': doc.expiry_date.isoformat() if doc.expiry_date else None,
                 'analysis_expiry_date': analysis_expiry.isoformat() if analysis_expiry else None,
-                'previous_expiry_preserved': preserved_expiry,
-                'validity_status': effective_status,
+                'previous_expiry_preserved': bool(doc.previous_expiry_date),
+                'previous_expiry_date': doc.previous_expiry_date.isoformat() if doc.previous_expiry_date else None,
+                'validity_status': doc.analysis_validity_status,
                 'analysis_validity_status': analysis.get('validity_status'),
                 'validity_source': analysis.get('validity_source'),
                 'validity_rule': analysis.get('validity_rule'),
                 'validity_rule_label': analysis.get('validity_rule_label'),
+                'validity_rule_evidence': analysis.get('validity_rule_evidence'),
                 'requirement_cycle': analysis.get('requirement_cycle'),
                 'requirement_source': analysis.get('requirement_source'),
                 'requirement_note': analysis.get('requirement_note'),
                 'confidence': analysis.get('confidence'),
+                'analysis_review_required': doc.analysis_review_required,
                 'notes': analysis.get('analysis_notes'),
                 'old': old,
             }
