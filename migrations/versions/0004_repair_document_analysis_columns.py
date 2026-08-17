@@ -1,6 +1,6 @@
 """Repair document-analysis columns for databases that were stamped ahead.
 
-Revision ID: 0004_repair_document_analysis_columns
+Revision ID: 0004_repair_doc_analysis
 Revises: 0003_document_validity_analysis
 
 The application model already contains the analysis fields and migration 0003
@@ -12,7 +12,7 @@ changing or deleting existing document data.
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0004_repair_document_analysis_columns"
+revision = "0004_repair_doc_analysis"
 down_revision = "0003_document_validity_analysis"
 branch_labels = None
 depends_on = None
