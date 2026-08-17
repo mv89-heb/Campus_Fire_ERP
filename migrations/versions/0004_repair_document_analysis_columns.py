@@ -1,13 +1,10 @@
-"""Repair document-analysis columns for databases that were stamped ahead.
+"""Repair document-analysis columns for production schema drift.
 
 Revision ID: 0004_repair_doc_analysis
 Revises: 0003_document_validity_analysis
 
-The application model already contains the analysis fields and migration 0003
-creates them on a clean database. Some production databases can nevertheless
-have an Alembic revision recorded without the physical columns being present.
-This migration is intentionally idempotent and repairs that drift without
-changing or deleting existing document data.
+The short revision identifier is intentional: PostgreSQL/Alembic installations
+may have an alembic_version.version_num column limited to VARCHAR(32).
 """
 from alembic import op
 import sqlalchemy as sa
@@ -51,27 +48,17 @@ def upgrade():
 
         kwargs = {"nullable": True}
         if name == "analysis_review_required":
-            # Existing rows must receive a deterministic safe value while the
-            # repair is applied. Remove the server default immediately after.
             kwargs = {"nullable": False, "server_default": sa.false()}
 
-        op.add_column(
-            "documents",
-            sa.Column(name, column_type, **kwargs),
-        )
+        op.add_column("documents", sa.Column(name, column_type, **kwargs))
 
         if name == "analysis_review_required":
-            op.alter_column(
-                "documents",
-                name,
-                server_default=None,
-            )
+            op.alter_column("documents", name, server_default=None)
 
         existing.add(name)
 
 
 def downgrade():
-    # Do not remove columns during downgrade: this migration is a production
-    # drift repair and deleting analysis data would be unsafe. Revision 0003
-    # remains responsible for the normal schema lifecycle.
+    # This migration repairs production drift. It must never delete analysis
+    # data during a downgrade.
     pass
