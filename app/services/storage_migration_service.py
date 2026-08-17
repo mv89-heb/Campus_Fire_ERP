@@ -185,12 +185,7 @@ def _validate_native_storage(doc: Document) -> dict:
 
 
 def plan_zip_restore(zip_bytes: bytes, document_id: int | None = None, validate_native: bool = True) -> dict:
-    """Create a non-mutating recovery plan from a ZIP backup.
-
-    Preview validates existing native objects. Restore can skip that repeated
-    validation because the Preview has already established native integrity;
-    the actual replacement files are independently verified after upload.
-    """
+    """Create a non-mutating recovery plan from a ZIP backup."""
     if not storage.is_configured():
         return {'success': False, 'error': 'Supabase אינו מוגדר', 'items': [], 'counts': {}}
     try:
@@ -264,10 +259,19 @@ def restore_zip(zip_bytes: bytes, acting_user_id, document_id: int | None = None
         if not doc or not entry:
             failed.append({'document_id': item['document_id'], 'error': 'מסמך/קובץ מקור לא נמצא'})
             continue
+
+        stored_path = None
+        old_path = doc.file_path
         try:
             remote_name = _safe_restore_name(doc.id, entry)
-            stored_path = storage.upload_bytes(remote_name, entry['data'],
-                                               'application/pdf' if entry['basename'].lower().endswith('.pdf') else 'application/octet-stream')
+            stored_path = storage.upload_bytes(
+                remote_name,
+                entry['data'],
+                'application/pdf' if entry['basename'].lower().endswith('.pdf') else 'application/octet-stream',
+            )
+
+            # Never update Neon until the exact bytes we uploaded can be read
+            # back and independently verified.
             downloaded = storage.download_bytes(stored_path)
             actual_hash = hashlib.sha256(downloaded).hexdigest()
             if actual_hash != entry['sha256'] or len(downloaded) != entry['size']:
@@ -276,20 +280,42 @@ def restore_zip(zip_bytes: bytes, acting_user_id, document_id: int | None = None
                 validation = storage.verify_pdf_bytes(downloaded)
                 if not validation.get('status'):
                     raise RuntimeError(validation.get('error') or 'PDF verification failed')
-            old_path = doc.file_path
+
             doc.file_path = stored_path
             doc.file_hash = entry['sha256']
             doc.file_size = entry['size']
             db.session.commit()
+
             try:
-                alog.log('document_storage_restored', 'document', doc.id, entity_label=doc.file_name,
-                         old_value={'file_path': old_path}, new_value={'file_path': stored_path})
+                alog.log(
+                    'document_storage_restored',
+                    'document',
+                    doc.id,
+                    entity_label=doc.file_name,
+                    old_value={'file_path': old_path},
+                    new_value={'file_path': stored_path},
+                )
                 db.session.commit()
             except Exception:
                 db.session.rollback()
-            restored.append({'document_id': doc.id, 'file_name': doc.file_name, 'source': entry['zip_path'],
-                             'storage_path': stored_path, 'sha256': actual_hash, 'size': len(downloaded)})
+
+            restored.append({
+                'document_id': doc.id,
+                'file_name': doc.file_name,
+                'source': entry['zip_path'],
+                'storage_path': stored_path,
+                'sha256': actual_hash,
+                'size': len(downloaded),
+            })
         except Exception as exc:
             db.session.rollback()
+            # If Neon was not updated, remove the newly-created replacement
+            # object unless it was already the document's previous path.
+            if stored_path and stored_path != old_path:
+                try:
+                    storage.delete_object(stored_path)
+                except Exception:
+                    pass
             failed.append({'document_id': doc.id, 'file_name': doc.file_name, 'error': str(exc)})
+
     return {'success': not failed, 'restored': restored, 'failed': failed, 'plan': plan}
