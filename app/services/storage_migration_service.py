@@ -30,14 +30,12 @@ def scan_legacy_documents(upload_folder: str) -> dict:
             counts['native'] += 1
             rows.append({'document_id': doc.id, 'file_name': doc.file_name, 'file_path': doc.file_path, 'state': 'native'})
             continue
-
         basename = os.path.basename(doc.file_path)
         local_path = os.path.join(upload_folder, basename)
         if os.path.isfile(local_path):
             counts['migratable_local'] += 1
             rows.append({'document_id': doc.id, 'file_name': doc.file_name, 'file_path': doc.file_path, 'state': 'migratable_local'})
             continue
-
         matches = [name for name in inventory_names if name == basename]
         if len(matches) == 1:
             counts['recoverable_supabase'] += 1
@@ -48,7 +46,6 @@ def scan_legacy_documents(upload_folder: str) -> dict:
         else:
             counts['missing'] += 1
             rows.append({'document_id': doc.id, 'file_name': doc.file_name, 'file_path': doc.file_path, 'state': 'missing'})
-
     return {'counts': counts, 'items': rows}
 
 
@@ -56,7 +53,6 @@ def migrate(upload_folder: str, acting_user_id) -> dict:
     """Migrate/relink safe legacy records; never deletes source data."""
     if not storage.is_configured():
         return {'success': False, 'error': 'Supabase אינו מוגדר', 'migrated': [], 'failed': []}
-
     report = scan_legacy_documents(upload_folder)
     migrated, failed = [], []
     for item in report['items']:
@@ -74,18 +70,15 @@ def migrate(upload_folder: str, acting_user_id) -> dict:
                 with open(local_path, 'rb') as f:
                     data = f.read()
                 new_path = storage.upload_bytes(os.path.basename(old_path), data)
-
             doc.file_path = new_path
             db.session.commit()
-            alog.log('document_storage_migrated', 'document', doc.id,
-                     entity_label=doc.file_name, old_value={'file_path': old_path},
-                     new_value={'file_path': new_path})
+            alog.log('document_storage_migrated', 'document', doc.id, entity_label=doc.file_name,
+                     old_value={'file_path': old_path}, new_value={'file_path': new_path})
             db.session.commit()
             migrated.append({'document_id': doc.id, 'file_name': doc.file_name, 'old_path': old_path, 'new_path': new_path})
         except Exception as exc:
             db.session.rollback()
             failed.append({'document_id': doc.id, 'file_name': doc.file_name, 'error': str(exc)})
-
     return {'success': not failed, 'migrated': migrated, 'failed': failed, 'report': scan_legacy_documents(upload_folder)}
 
 
@@ -97,25 +90,20 @@ def _norm(value: str) -> str:
 
 
 def _path_variants(value: str) -> set[str]:
-    """Return comparable path forms used by legacy uploads and ZIP backups."""
     normalized = _norm(value)
     if not normalized:
         return set()
-
     variants = {normalized}
     for prefix in ('uploads/', './uploads/', 'upload/', './upload/'):
         if normalized.startswith(prefix):
             variants.add(normalized[len(prefix):])
-
     marker = '/uploads/'
     if marker in normalized:
         variants.add(normalized.split(marker, 1)[1])
-
     return {v.strip('/') for v in variants if v.strip('/')}
 
 
 def _zip_entries(zip_bytes: bytes) -> list[dict]:
-    """Read safe metadata/content from a ZIP without extracting to disk."""
     entries = []
     with zipfile.ZipFile(BytesIO(zip_bytes), 'r') as zf:
         for info in zf.infolist():
@@ -126,41 +114,31 @@ def _zip_entries(zip_bytes: bytes) -> list[dict]:
             if normalized.startswith('../') or normalized == '..':
                 continue
             data = zf.read(info)
-            entries.append({
-                'zip_path': normalized,
-                'basename': posixpath.basename(normalized),
-                'data': data,
-                'size': len(data),
-                'sha256': hashlib.sha256(data).hexdigest(),
-            })
+            entries.append({'zip_path': normalized, 'basename': posixpath.basename(normalized), 'data': data,
+                            'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
     return entries
 
 
 def _match_document(doc: Document, entries: list[dict]) -> tuple[dict | None, str, list[str]]:
-    """Match by original path, tolerating the legacy uploads/ prefix, then basename."""
     path_values = []
     for value in (doc.file_path, doc.file_name):
         path_values.extend(_path_variants(value))
     path_values = list(dict.fromkeys(path_values))
-
     exact_matches = []
     for entry in entries:
         entry_variants = _path_variants(entry['zip_path'])
         if any(candidate in entry_variants for candidate in path_values):
             exact_matches.append(entry)
-
     if len(exact_matches) == 1:
         return exact_matches[0], 'exact_path', []
     if len(exact_matches) > 1:
         return None, 'ambiguous', [x['zip_path'] for x in exact_matches]
-
     basename = _norm(os.path.basename(doc.file_name or doc.file_path or ''))
     by_base = [e for e in entries if _norm(e['basename']) == basename] if basename else []
     if len(by_base) == 1:
         return by_base[0], 'basename', []
     if len(by_base) > 1:
         return None, 'ambiguous', [x['zip_path'] for x in by_base]
-
     legacy_base = _norm(os.path.basename(doc.file_path or ''))
     by_legacy = [e for e in entries if _norm(e['basename']) == legacy_base] if legacy_base else []
     if len(by_legacy) == 1:
@@ -168,6 +146,18 @@ def _match_document(doc: Document, entries: list[dict]) -> tuple[dict | None, st
     if len(by_legacy) > 1:
         return None, 'ambiguous', [x['zip_path'] for x in by_legacy]
     return None, 'missing', []
+
+
+def _safe_restore_name(doc_id: int, entry: dict) -> str:
+    """Create an ASCII-only, deterministic Storage object key.
+
+    The original Hebrew filename is kept in Document.file_name; Storage gets
+    a deterministic SHA-based key so Supabase never has to parse non-ASCII
+    object keys. The extension is fixed to .pdf for validated PDF backups.
+    """
+    digest = entry['sha256']
+    extension = '.pdf' if entry['basename'].lower().endswith('.pdf') else ''
+    return f'restored/{doc_id}/{digest}{extension}'
 
 
 def plan_zip_restore(zip_bytes: bytes, document_id: int | None = None) -> dict:
@@ -178,12 +168,10 @@ def plan_zip_restore(zip_bytes: bytes, document_id: int | None = None) -> dict:
         entries = _zip_entries(zip_bytes)
     except zipfile.BadZipFile:
         return {'success': False, 'error': 'קובץ ZIP אינו תקין', 'items': [], 'counts': {}}
-
     query = Document.query.filter(Document.status != 'deleted')
     if document_id:
         query = query.filter(Document.id == document_id)
     docs = query.order_by(Document.id.asc()).all()
-
     counts = {'matched': 0, 'ambiguous': 0, 'missing': 0, 'invalid_pdf': 0, 'skipped_native': 0}
     items = []
     for doc in docs:
@@ -202,17 +190,10 @@ def plan_zip_restore(zip_bytes: bytes, document_id: int | None = None) -> dict:
             items.append({'document_id': doc.id, 'file_name': doc.file_name, 'status': 'invalid_pdf', 'source': entry['zip_path'], 'error': validation.get('error')})
             continue
         counts['matched'] += 1
-        remote_name = f'restored/{doc.id}/{entry["basename"]}'
-        items.append({
-            'document_id': doc.id,
-            'file_name': doc.file_name,
-            'status': 'matched',
-            'match_method': method,
-            'source': entry['zip_path'],
-            'size': entry['size'],
-            'sha256': entry['sha256'],
-            'storage_path': f'{storage.get_bucket_name()}/{remote_name}',
-        })
+        remote_name = _safe_restore_name(doc.id, entry)
+        items.append({'document_id': doc.id, 'file_name': doc.file_name, 'status': 'matched', 'match_method': method,
+                      'source': entry['zip_path'], 'size': entry['size'], 'sha256': entry['sha256'],
+                      'storage_path': f'{storage.get_bucket_name()}/{remote_name}'})
     return {'success': True, 'zip_files': len(entries), 'counts': counts, 'items': items}
 
 
@@ -232,11 +213,9 @@ def restore_zip(zip_bytes: bytes, acting_user_id, document_id: int | None = None
             failed.append({'document_id': item['document_id'], 'error': 'מסמך/קובץ מקור לא נמצא'})
             continue
         try:
-            stored_path = storage.upload_bytes(
-                f'restored/{doc.id}/{entry["basename"]}',
-                entry['data'],
-                'application/pdf' if entry['basename'].lower().endswith('.pdf') else 'application/octet-stream',
-            )
+            remote_name = _safe_restore_name(doc.id, entry)
+            stored_path = storage.upload_bytes(remote_name, entry['data'],
+                                               'application/pdf' if entry['basename'].lower().endswith('.pdf') else 'application/octet-stream')
             downloaded = storage.download_bytes(stored_path)
             if hashlib.sha256(downloaded).hexdigest() != entry['sha256'] or len(downloaded) != entry['size']:
                 raise RuntimeError('אימות העלאה נכשל: hash או גודל אינם תואמים')
@@ -259,9 +238,4 @@ def restore_zip(zip_bytes: bytes, acting_user_id, document_id: int | None = None
         except Exception as exc:
             db.session.rollback()
             failed.append({'document_id': doc.id, 'file_name': doc.file_name, 'error': str(exc)})
-    return {
-        'success': not failed,
-        'restored': restored,
-        'failed': failed,
-        'plan': plan,
-    }
+    return {'success': not failed, 'restored': restored, 'failed': failed, 'plan': plan}
