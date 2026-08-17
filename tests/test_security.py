@@ -69,6 +69,8 @@ class SecurityGuardTests(unittest.TestCase):
         with self.app.app_context():
             from app.models import User
             user = User.query.filter_by(username='root').first()
+            user.role = 'viewer'
+            db.session.commit()
 
         with self.client.session_transaction() as sess:
             sess['user_id'] = user.id
