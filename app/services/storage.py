@@ -64,7 +64,13 @@ def upload_bytes(remote_filename: str, data: bytes, content_type: str = 'applica
     client = _get_client()
     bucket = _bucket_name()
     try:
-        client.storage.from_(bucket).upload(path=remote_filename, file=data, file_options={'content-type': content_type})
+        # Restore/re-upload operations must be idempotent: rerunning an import
+        # replaces the same object instead of failing with "already exists".
+        client.storage.from_(bucket).upload(
+            path=remote_filename,
+            file=data,
+            file_options={'content-type': content_type, 'upsert': 'true'},
+        )
     except Exception as e:
         logger.error(f'Supabase upload failed for {remote_filename}: {e}')
         raise StorageError(f'העלאה ל-Supabase Storage נכשלה: {e}')
@@ -93,6 +99,22 @@ def get_signed_url(stored_path: str, expires_in: int = 300):
     except Exception as e:
         logger.error(f'Supabase signed URL failed for {stored_path}: {e}')
         return None
+
+
+def download_bytes(stored_path: str) -> bytes:
+    """Download an object from Supabase Storage using the server-side key."""
+    if not stored_path:
+        raise StorageError('נתיב Supabase ריק')
+    bucket = _bucket_name()
+    remote_filename = stored_path[len(bucket) + 1:] if stored_path.startswith(f'{bucket}/') else stored_path
+    try:
+        data = _get_client().storage.from_(bucket).download(remote_filename)
+        if not isinstance(data, (bytes, bytearray)):
+            raise StorageError('Supabase החזיר תוכן שאינו bytes')
+        return bytes(data)
+    except Exception as e:
+        logger.error(f'Supabase download failed for {stored_path}: {e}')
+        raise StorageError(f'הורדה מ-Supabase Storage נכשלה: {e}')
 
 
 def calculate_hash(data: bytes) -> str:
