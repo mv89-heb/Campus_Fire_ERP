@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 _DATE_RE = re.compile(r"(?<!\d)(\d{1,2})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{2,4})(?!\d)")
@@ -43,13 +43,12 @@ def add_one_year(value: date) -> date:
     try:
         return value.replace(year=value.year + 1)
     except ValueError:
-        # 29/02 -> 28/02 in the following year.
         return value.replace(year=value.year + 1, day=28)
 
 
 def _israel_today() -> date:
     try:
-        return date.today() if ZoneInfo("Asia/Jerusalem") is None else __import__("datetime").datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+        return datetime.now(ZoneInfo("Asia/Jerusalem")).date()
     except Exception:
         return date.today()
 
@@ -100,12 +99,11 @@ def _candidate_dates(text: str):
 
 def _date_score(context: str) -> int:
     score = 0
-    lowered = context or ""
     for token in _POSITIVE_DATE_TOKENS:
-        if token in lowered:
+        if token in context:
             score += 4 if "תאריך" in token or "מועד" in token else 3
     for token in _NEGATIVE_DATE_TOKENS:
-        if token in lowered:
+        if token in context:
             score -= 6
     return score
 
@@ -118,8 +116,6 @@ def extract_inspection_date(text: str) -> date | None:
         if score > 0:
             scored.append((score, value))
     if scored:
-        # When several dates have the same semantic confidence, prefer the latest
-        # relevant date; old footer/header dates should not win over the inspection.
         scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
         return scored[0][1]
     return None
