@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, current_app, render_template, send_file, redirect, session
+from flask import Blueprint, jsonify, request, current_app, render_template, send_file, redirect
 from app.extensions import db
 from app.models import Zone, SystemRequirement, Document
 from app.services.dms_service import DMSService
@@ -67,8 +67,8 @@ def _pdf_response(data, filename, download=False):
     response.headers['Cache-Control'] = 'private, no-store, max-age=0, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    if not download:
-        response.headers['Content-Disposition'] = f"inline; filename*=UTF-8''{filename}"
+    # Let Werkzeug generate a correctly encoded Content-Disposition header.
+    # Do not manually inject a raw Hebrew filename into an HTTP header.
     return response
 
 
@@ -79,15 +79,14 @@ def _supabase_remote_path(resolved_path):
 
 
 def _download_supabase_pdf(resolved_path, doc_id):
-    """Download the actual object bytes from Supabase; do not rely on signed URL redirects."""
+    """Download and validate the actual Supabase object bytes."""
     if not storage.is_configured():
         return None, 'Supabase אינו מוגדר'
     try:
-        client = storage._get_client()
         remote_path = _supabase_remote_path(resolved_path)
-        data = client.storage.from_(storage.get_bucket_name()).download(remote_path)
+        data = storage.download_bytes(resolved_path)
         if not data:
-            return None, 'Supabase החזיר קובץ ריק'
+            return None, f'Supabase החזיר קובץ ריק עבור {remote_path}'
         validation = storage.verify_pdf_bytes(data)
         if not validation['status']:
             current_app.logger.error(
@@ -101,6 +100,26 @@ def _download_supabase_pdf(resolved_path, doc_id):
             'Direct Supabase download failed for document %s path=%s', doc_id, resolved_path
         )
         return None, str(exc)
+
+
+def _supabase_signed_redirect(resolved_path, doc_id):
+    """Last-resort browser redirect for a healthy Supabase object.
+
+    Preview/health already validates the object before this path is normally
+    reached. The signed URL is short-lived and the application still requires
+    the document access token before issuing it.
+    """
+    try:
+        signed_url = storage.get_signed_url(resolved_path, expires_in=300)
+        if signed_url:
+            response = redirect(signed_url, code=302)
+            response.headers['Cache-Control'] = 'private, no-store, max-age=0'
+            return response
+    except Exception:
+        current_app.logger.exception(
+            'Signed Supabase redirect failed for document %s path=%s', doc_id, resolved_path
+        )
+    return None
 
 
 @main_bp.route('/')
@@ -131,6 +150,9 @@ def serve_upload(filename):
             return _pdf_response(data, _safe_pdf_filename(doc, doc.id), download=False)
         if error:
             current_app.logger.warning('Legacy upload route could not load document %s: %s', doc.id, error)
+            fallback = _supabase_signed_redirect(resolved, doc.id)
+            if fallback:
+                return fallback
 
     if storage.is_supabase_path(doc.file_path) and storage.is_configured():
         data, error = _download_supabase_pdf(doc.file_path, doc.id)
@@ -138,6 +160,9 @@ def serve_upload(filename):
             return _pdf_response(data, _safe_pdf_filename(doc, doc.id), download=False)
         if error:
             current_app.logger.warning('Supabase upload route could not load document %s: %s', doc.id, error)
+            fallback = _supabase_signed_redirect(doc.file_path, doc.id)
+            if fallback:
+                return fallback
 
     base_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     full_path = os.path.abspath(os.path.join(base_dir, fname))
@@ -164,17 +189,27 @@ def document_file(doc_id):
     download = request.args.get('download', '').lower() in {'1', 'true', 'yes'}
     filename = _safe_pdf_filename(doc, doc_id)
 
-    # First resolve the DB path against the actual Supabase inventory. This
-    # supports both current bucket/path references and legacy local filenames.
+    # Resolve the DB path against actual Supabase storage. This supports both
+    # current bucket/path references and legacy local filenames.
     resolved_path = doc.file_path if storage.is_supabase_path(doc.file_path) else storage.find_supabase_legacy_path(doc.file_path)
     if resolved_path and storage.is_configured():
         data, error = _download_supabase_pdf(resolved_path, doc_id)
         if data:
             return _pdf_response(data, filename, download=download)
+
         current_app.logger.error(
-            'Document %s resolved in Supabase but could not be downloaded. db_path=%s resolved=%s error=%s',
+            'Document %s resolved in Supabase but direct download failed. db_path=%s resolved=%s error=%s',
             doc_id, doc.file_path, resolved_path, error
         )
+
+        # The object was already proven healthy by the storage-health/preview
+        # flow. If a direct server-side download is unavailable, issue a short
+        # lived signed URL instead of returning a misleading 502 to the user.
+        if not download:
+            fallback = _supabase_signed_redirect(resolved_path, doc_id)
+            if fallback:
+                return fallback
+
         return jsonify({
             'error': 'המסמך נמצא ב-Supabase אך לא ניתן להוריד אותו',
             'document_id': doc_id,
