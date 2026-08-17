@@ -60,9 +60,27 @@ def is_supabase_path(file_path: str) -> bool:
     return bool(file_path) and file_path.startswith(f'{_bucket_name()}/')
 
 
+def _restore_safe_remote_filename(remote_filename: str) -> str:
+    """Use an ASCII-only object key for recovery files.
+
+    Supabase Storage can reject legacy Hebrew object keys with InvalidKey.
+    Recovery objects do not need the original human-readable name because the
+    original name remains in Document.file_name; the DB points at this exact
+    object after a verified upload.
+    """
+    if not remote_filename.startswith('restored/'):
+        return remote_filename
+    directory, basename = remote_filename.rsplit('/', 1)
+    stem, ext = os.path.splitext(basename)
+    safe_id = hashlib.sha256(remote_filename.encode('utf-8')).hexdigest()[:32]
+    return f'{directory}/{safe_id}{ext.lower()}'
+
+
 def upload_bytes(remote_filename: str, data: bytes, content_type: str = 'application/pdf') -> str:
     client = _get_client()
     bucket = _bucket_name()
+    original_remote_filename = remote_filename
+    remote_filename = _restore_safe_remote_filename(remote_filename)
     try:
         # Restore/re-upload operations must be idempotent: rerunning an import
         # replaces the same object instead of failing with "already exists".
@@ -72,7 +90,7 @@ def upload_bytes(remote_filename: str, data: bytes, content_type: str = 'applica
             file_options={'content-type': content_type, 'upsert': 'true'},
         )
     except Exception as e:
-        logger.error(f'Supabase upload failed for {remote_filename}: {e}')
+        logger.error(f'Supabase upload failed for {original_remote_filename} -> {remote_filename}: {e}')
         raise StorageError(f'העלאה ל-Supabase Storage נכשלה: {e}')
     return f'{bucket}/{remote_filename}'
 
