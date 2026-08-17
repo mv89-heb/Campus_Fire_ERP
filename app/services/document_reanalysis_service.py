@@ -8,7 +8,7 @@ from flask import current_app
 from app.extensions import db
 from app.models import Document, Zone, SystemRequirement
 from app.services import storage
-from app.services.document_analysis_service import analyze_pdf_bytes, apply_analysis_to_document
+from app.services.document_analysis_service import analyze_pdf_bytes, apply_analysis_to_document, validity_status
 
 
 def _requirement_for(form_number, zone_id):
@@ -39,10 +39,12 @@ def _read_document_bytes(doc):
 
 
 def reanalyze_all(include_archived=False):
-    """Analyze every stored PDF and update classification/date fields safely.
+    """Analyze every stored PDF without destructively erasing known DB values.
 
-    No file is moved or deleted. Documents whose PDF cannot be downloaded or
-    parsed are reported as failed and retain their existing DB values.
+    If a new analysis cannot establish an expiry date, an existing DB expiry is
+    preserved. The response separately reports that the new analysis needs
+    review, so the dashboard can remain operational while the operator sees
+    that re-validation is incomplete.
     """
     query = Document.query.filter(Document.status != 'deleted')
     if not include_archived:
@@ -63,7 +65,14 @@ def reanalyze_all(include_archived=False):
             data, source = _read_document_bytes(doc)
             analysis = analyze_pdf_bytes(data, doc.file_name or '')
             if not analysis.get('text_extracted'):
-                reviewed.append({'document_id': doc.id, 'file_name': doc.file_name, 'status': 'needs_review', 'source': source, 'reason': analysis.get('analysis_notes')})
+                reviewed.append({
+                    'document_id': doc.id,
+                    'file_name': doc.file_name,
+                    'status': 'needs_review',
+                    'source': source,
+                    'reason': analysis.get('analysis_notes'),
+                    'old': old,
+                })
                 continue
 
             zone_id = None
@@ -82,8 +91,23 @@ def reanalyze_all(include_archived=False):
                 doc.zone_id = zone_id
                 doc.req_id = req.id if req else None
 
+            # Keep known DB dates when the new parser has no evidence. This is
+            # intentionally done before apply_analysis_to_document; that helper
+            # only writes non-null analysis dates.
+            previous_issue = doc.issue_date
+            previous_expiry = doc.expiry_date
             apply_analysis_to_document(doc, analysis)
+            if not analysis.get('inspection_date') and previous_issue:
+                doc.issue_date = previous_issue
+            if not analysis.get('expiry_date') and previous_expiry:
+                doc.expiry_date = previous_expiry
+
             db.session.commit()
+
+            analysis_expiry = analysis.get('expiry_date')
+            preserved_expiry = not analysis_expiry and bool(previous_expiry)
+            effective_expiry = analysis_expiry or previous_expiry
+            effective_status = validity_status(effective_expiry)
 
             row = {
                 'document_id': doc.id,
@@ -91,10 +115,18 @@ def reanalyze_all(include_archived=False):
                 'source': source,
                 'form_number': analysis.get('form_number'),
                 'zone_code': analysis.get('zone_code'),
-                'issue_date': analysis.get('issue_date').isoformat() if analysis.get('issue_date') else None,
-                'expiry_date': analysis.get('expiry_date').isoformat() if analysis.get('expiry_date') else None,
-                'validity_status': analysis.get('validity_status'),
+                'issue_date': doc.issue_date.isoformat() if doc.issue_date else None,
+                'expiry_date': doc.expiry_date.isoformat() if doc.expiry_date else None,
+                'analysis_expiry_date': analysis_expiry.isoformat() if analysis_expiry else None,
+                'previous_expiry_preserved': preserved_expiry,
+                'validity_status': effective_status,
+                'analysis_validity_status': analysis.get('validity_status'),
                 'validity_source': analysis.get('validity_source'),
+                'validity_rule': analysis.get('validity_rule'),
+                'validity_rule_label': analysis.get('validity_rule_label'),
+                'requirement_cycle': analysis.get('requirement_cycle'),
+                'requirement_source': analysis.get('requirement_source'),
+                'requirement_note': analysis.get('requirement_note'),
                 'confidence': analysis.get('confidence'),
                 'notes': analysis.get('analysis_notes'),
                 'old': old,
