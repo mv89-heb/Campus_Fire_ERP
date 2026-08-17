@@ -38,18 +38,15 @@ _EXPLICIT_EXPIRY_PATTERNS = (
     re.compile(r"(?:תוקף|בתוקף|תקף)\s*(?:עד|ליום|בתאריך)?\s*[:\-]?\s*" + _DATE_RE.pattern, re.I),
     re.compile(r"(?:valid\s+(?:until|through)|expires?|expiry|expiration)\s*[:\-]?\s*" + _DATE_RE.pattern, re.I),
 )
-
 _INSPECTION_LABELS = (
     "תאריך בדיקה", "מועד בדיקה", "תאריך ביצוע", "מועד ביצוע", "תאריך תחזוקה", "מועד תחזוקה",
     "תאריך ביקורת", "מועד ביקורת", "נבדק בתאריך", "נבדקה בתאריך", "נבדק ביום", "נבדקה ביום",
     "בוצע בתאריך", "בוצעה בתאריך", "בוצע ביום", "בוצעה ביום", "תאריך אישור", "מועד אישור",
-    "תאריך הנפקה", "מועד הנפקה", "הונפק בתאריך", "הונפק ביום", "תאריך מילוי", "מועד מילוי",
-    "בדיקה אחרונה",
+    "תאריך הנפקה", "מועד הנפקה", "הונפק בתאריך", "הונפק ביום", "תאריך מילוי", "מועד מילוי", "בדיקה אחרונה",
 )
-
 _NEGATIVE_DATE_CONTEXT = (
-    "בדיקה הבאה", "הבדיקה הבאה", "תחזוקה הבאה", "התחזוקה הבאה",
-    "ביקורת הבאה", "הביקורת הבאה", "תוקף", "בתוקף", "תקף עד", "רישיון", "היתר",
+    "בדיקה הבאה", "הבדיקה הבאה", "תחזוקה הבאה", "התחזוקה הבאה", "ביקורת הבאה", "הביקורת הבאה",
+    "תוקף", "בתוקף", "תקף עד", "רישיון", "היתר",
 )
 
 
@@ -58,13 +55,6 @@ def _today_israel():
         return datetime.now(ZoneInfo("Asia/Jerusalem")).date()
     except Exception:
         return date.today()
-
-
-def add_one_year(value: date) -> date:
-    try:
-        return value.replace(year=value.year + 1)
-    except ValueError:
-        return value.replace(year=value.year + 1, day=28)
 
 
 def validity_status(expiry_date, today=None):
@@ -114,24 +104,25 @@ def _semantic_expiry_candidates(text):
     candidates = []
     for i in range(len(lines)):
         context = " ".join(lines[max(0, i - 1):min(len(lines), i + 2)])
-        low = context.lower()
-        for value in _date_matches(context):
-            score = sum(100 for pattern in _EXPLICIT_EXPIRY_PATTERNS if pattern.search(context))
-            if any(t in low for t in ("תוקף", "בתוקף", "תקף עד", "valid until", "valid through", "expires")):
-                score += 25
-            if any(t in low for t in ("בדיקה הבאה", "תחזוקה הבאה", "ביקורת הבאה")):
-                score -= 30
-            if score > 0:
-                candidates.append((score, value, context))
+        for pattern in _EXPLICIT_EXPIRY_PATTERNS:
+            for match in pattern.finditer(context):
+                value = _parse_date_match(match)
+                if value:
+                    candidates.append((100, value, match.group(0)))
     return candidates
 
 
 def extract_explicit_expiry(text):
+    """Extract the date immediately attached to an explicit expiry label.
+
+    This intentionally does not choose the earliest date in a nearby block,
+    because a certificate can contain both an inspection date and a later
+    expiry date on the same line/table row.
+    """
     candidates = _semantic_expiry_candidates(text)
     if not candidates:
         return None
-    best_score = max(x[0] for x in candidates)
-    return min(x[1] for x in candidates if x[0] == best_score)
+    return max(candidates, key=lambda x: x[0])[1]
 
 
 def extract_inspection_date_evidence(text):
@@ -217,30 +208,11 @@ def detect_zone_evidence(text, filename=""):
     scores = _content_zone_scores(text)
     content_zone = max(scores, key=scores.get) if max(scores.values(), default=0) else None
     content_score = scores.get(content_zone, 0) if content_zone else 0
-
-    # A strong content signal may override a filename. Otherwise the filename
-    # remains the primary source because legacy uploads are often scanned PDFs
-    # whose extracted text contains little identifying metadata.
     if filename_zone:
         if content_zone and content_zone != filename_zone and content_score >= 60:
-            return {
-                "zone_code": content_zone,
-                "source": "strong_document_content",
-                "filename_zone": filename_zone,
-                "content_scores": scores,
-            }
-        return {
-            "zone_code": filename_zone,
-            "source": "filename_verified_by_content" if content_score else "filename",
-            "filename_zone": filename_zone,
-            "content_scores": scores,
-        }
-    return {
-        "zone_code": content_zone,
-        "source": "document_content" if content_zone else "unknown",
-        "filename_zone": None,
-        "content_scores": scores,
-    }
+            return {"zone_code": content_zone, "source": "strong_document_content", "filename_zone": filename_zone, "content_scores": scores}
+        return {"zone_code": filename_zone, "source": "filename_verified_by_content" if content_score else "filename", "filename_zone": filename_zone, "content_scores": scores}
+    return {"zone_code": content_zone, "source": "document_content" if content_zone else "unknown", "filename_zone": None, "content_scores": scores}
 
 
 def detect_zone_code(text, filename=""):
@@ -267,13 +239,7 @@ def analyze_pdf_bytes(data: bytes, filename=""):
     try:
         text, pages = _extract_text(data)
     except Exception as exc:
-        return {
-            "status": "needs_review",
-            "filename": filename,
-            "error": f"PDF text extraction failed: {exc}",
-            "text_extracted": False,
-            "analysis_notes": "לא ניתן לחלץ טקסט מה-PDF. נדרש OCR/בדיקה ידנית.",
-        }
+        return {"status": "needs_review", "filename": filename, "error": f"PDF text extraction failed: {exc}", "text_extracted": False, "analysis_notes": "לא ניתן לחלץ טקסט מה-PDF. נדרש OCR/בדיקה ידנית."}
 
     form = detect_form_number(text, filename)
     category, document_type = FORM_TYPES.get(form, (None, None))
@@ -283,13 +249,7 @@ def analyze_pdf_bytes(data: bytes, filename=""):
     inspection_evidence = extract_inspection_date_evidence(text)
     inspection_date = inspection_evidence["date"] if inspection_evidence else None
 
-    validity = resolve_validity(
-        zone_code=zone_code,
-        form_number=form,
-        text=text,
-        inspection_date=inspection_date,
-        explicit_expiry=explicit_expiry,
-    )
+    validity = resolve_validity(zone_code=zone_code, form_number=form, text=text, inspection_date=inspection_date, explicit_expiry=explicit_expiry)
     effective_expiry = validity.get("expiry_date")
     validity_source = validity.get("source") or "unknown"
     validity_status_value = validity_status(effective_expiry)
@@ -299,19 +259,11 @@ def analyze_pdf_bytes(data: bytes, filename=""):
     if explicit_expiry:
         notes.append(f"נמצא תוקף מפורש במסמך: {explicit_expiry.isoformat()}.")
     elif validity_source == "document_stated_interval":
-        notes.append(
-            f"לא נמצא תאריך תוקף מפורש; המסמך מציין כלל תדירות '{validity.get('rule_label')}' "
-            f"({validity.get('rule_evidence')}), ולכן התוקף חושב מתאריך הבדיקה/ההנפקה: {effective_expiry.isoformat()}."
-        )
+        notes.append(f"לא נמצא תוקף מפורש; המסמך מציין '{validity.get('rule_label')}' ({validity.get('rule_evidence')}), ולכן התוקף חושב מתאריך הבדיקה/ההנפקה: {effective_expiry.isoformat()}.")
     elif validity_source == "requirement_rule":
-        notes.append(
-            f"התוקף חושב לפי כלל דרישה מוגדר: {validity.get('rule_label')} -> {effective_expiry.isoformat()}."
-        )
+        notes.append(f"התוקף חושב לפי כלל דרישה מוגדר: {validity.get('rule_label')} -> {effective_expiry.isoformat()}.")
     else:
-        notes.append(
-            "לא נמצא בתוכן המסמך תוקף מפורש או כלל תדירות מספיק אמין לחישוב תוקף. נדרש עיון ידני."
-        )
-
+        notes.append("לא נמצא בתוכן המסמך תוקף מפורש או כלל תדירות מספיק אמין לחישוב תוקף. נדרש עיון ידני.")
     if inspection_evidence:
         notes.append(f"מקור תאריך הבדיקה: {inspection_evidence['context']}")
     if zone_code:
