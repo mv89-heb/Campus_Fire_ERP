@@ -10,36 +10,26 @@ _DATE_RE = re.compile(r"(?<!\d)(\d{1,2})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{2,4})
 _FORM_RE = re.compile(r"טופס\s*(?:מס[\u05f3']?\s*)?(\d{1,2})")
 
 FORM_TYPES = {
-    1: ("ציוד כיבוי", "בדיקת ציוד כיבוי אש"),
-    2: ("תחזוקת מטפים", "תחזוקת מטפים"),
-    3: ("חשמל", "בדיקת מערכת חשמל ותאורת חירום"),
-    4: ("גילוי אש", "תחזוקת מערכת גילוי אש"),
-    5: ("לוחות חשמל", "מערכת כיבוי בלוחות חשמל"),
-    6: ("כריזה", "מערכת מסירת הודעות/כריזת חירום"),
-    7: ("ספרינקלרים", "מערכת כיבוי אוטומטית בספרינקלרים"),
-    10: ("שחרור עשן", "מערכת שליטה בעשן"),
-    13: ("תיק שטח", "הגשת/עדכון תיק שטח"),
-    14: ("הדרכת עובדים", "הדרכת עובדים"),
-    16: ("מטבח", "ניקוי מערכת פליטה מבישול מסחרי"),
-    18: ("מערכת גז", "בדיקת תקינות מערכת גז"),
+    1: ("ציוד כיבוי", "בדיקת ציוד כיבוי אש"), 2: ("תחזוקת מטפים", "תחזוקת מטפים"),
+    3: ("חשמל", "בדיקת מערכת חשמל ותאורת חירום"), 4: ("גילוי אש", "תחזוקת מערכת גילוי אש"),
+    5: ("לוחות חשמל", "מערכת כיבוי בלוחות חשמל"), 6: ("כריזה", "מערכת מסירת הודעות/כריזת חירום"),
+    7: ("ספרינקלרים", "מערכת כיבוי אוטומטית בספרינקלרים"), 10: ("שחרור עשן", "מערכת שליטה בעשן"),
+    13: ("תיק שטח", "הגשת/עדכון תיק שטח"), 14: ("הדרכת עובדים", "הדרכת עובדים"),
+    16: ("מטבח", "ניקוי מערכת פליטה מבישול מסחרי"), 18: ("מערכת גז", "בדיקת תקינות מערכת גז"),
 }
 
 _POSITIVE_DATE_TOKENS = (
-    "תאריך בדיקה", "מועד בדיקה", "תאריך ביצוע", "מועד ביצוע",
-    "תאריך תחזוקה", "מועד תחזוקה", "נבדק בתאריך", "נבדקה בתאריך",
-    "בוצע בתאריך", "בוצעה בתאריך", "ביקור", "בדיק", "תחזוק",
-    "תאריך אישור", "מועד אישור", "תאריך הנפקה", "הונפק בתאריך",
-    "מצהיר", "תאריך מילוי",
+    "תאריך בדיקה", "מועד בדיקה", "תאריך ביצוע", "מועד ביצוע", "תאריך תחזוקה", "מועד תחזוקה",
+    "נבדק בתאריך", "נבדקה בתאריך", "בוצע בתאריך", "בוצעה בתאריך", "ביקור", "בדיק", "תחזוק",
+    "תאריך אישור", "מועד אישור", "תאריך הנפקה", "הונפק בתאריך", "מצהיר", "תאריך מילוי",
 )
 _NEGATIVE_DATE_TOKENS = (
-    "תוקף", "בתוקף", "תוקף עד", "תקף עד", "רישיון", "היתר",
-    "דרישה", "הבדיקה הבאה", "הבדיקה הבאה בתאריך", "תחזוקה הבאה",
-    "התחזוקה הבאה", "בדיקה הבאה", "הבא", "הבאה",
+    "תוקף", "בתוקף", "תוקף עד", "תקף עד", "רישיון", "היתר", "דרישה", "הבדיקה הבאה",
+    "הבדיקה הבאה בתאריך", "תחזוקה הבאה", "התחזוקה הבאה", "בדיקה הבאה", "הבא", "הבאה",
 )
 
 
 def add_one_year(value: date) -> date:
-    """Return the same calendar date one year later."""
     try:
         return value.replace(year=value.year + 1)
     except ValueError:
@@ -89,43 +79,30 @@ def extract_dates(text: str) -> list[date]:
 def _candidate_dates(text: str):
     for m in _DATE_RE.finditer(text or ""):
         value = _parse_date(m)
-        if not value:
-            continue
-        start = max(0, m.start() - 180)
-        end = min(len(text), m.end() + 180)
-        context = re.sub(r"\s+", " ", text[start:end]).strip()
-        yield value, context
+        if value:
+            start = max(0, m.start() - 180)
+            end = min(len(text), m.end() + 180)
+            yield value, re.sub(r"\s+", " ", text[start:end]).strip()
 
 
 def _date_score(context: str) -> int:
-    score = 0
-    for token in _POSITIVE_DATE_TOKENS:
-        if token in context:
-            score += 4 if "תאריך" in token or "מועד" in token else 3
-    for token in _NEGATIVE_DATE_TOKENS:
-        if token in context:
-            score -= 6
+    score = sum(4 if "תאריך" in token or "מועד" in token else 3 for token in _POSITIVE_DATE_TOKENS if token in context)
+    score -= sum(6 for token in _NEGATIVE_DATE_TOKENS if token in context)
     return score
 
 
 def extract_inspection_date(text: str) -> date | None:
-    """Find the most likely inspection/issue date, avoiding expiry/license dates."""
-    scored = []
-    for value, context in _candidate_dates(text or ""):
-        score = _date_score(context)
-        if score > 0:
-            scored.append((score, value))
-    if scored:
-        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
-        return scored[0][1]
-    return None
+    scored = [(score, value) for value, context in _candidate_dates(text or "") if (score := _date_score(context)) > 0]
+    if not scored:
+        return None
+    scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return scored[0][1]
 
 
 def extract_explicit_expiry(text: str) -> date | None:
-    values = []
-    for value, context in _candidate_dates(text or ""):
-        if any(token in context for token in ("תוקף", "בתוקף", "תוקף עד", "תקף עד", "תחזוקה הבאה", "התחזוקה הבאה")):
-            values.append(value)
+    values = [value for value, context in _candidate_dates(text or "") if any(
+        token in context for token in ("תוקף", "בתוקף", "תוקף עד", "תקף עד", "תחזוקה הבאה", "התחזוקה הבאה")
+    )]
     return min(values) if values else None
 
 
@@ -169,12 +146,8 @@ def analyze_pdf_bytes(data: bytes, filename: str = "") -> dict:
     category, document_type = FORM_TYPES.get(form, (None, None))
     inspection_date = extract_inspection_date(text)
     explicit_expiry = extract_explicit_expiry(text)
-
-    expiry_date = None
-    validity_source = "unknown"
-    if inspection_date:
-        expiry_date = add_one_year(inspection_date)
-        validity_source = "annual_rule"
+    expiry_date = add_one_year(inspection_date) if inspection_date else None
+    validity_source = "annual_rule" if inspection_date else "unknown"
     if explicit_expiry and (expiry_date is None or explicit_expiry < expiry_date):
         expiry_date = explicit_expiry
         validity_source = "explicit_expiry"
@@ -185,53 +158,50 @@ def analyze_pdf_bytes(data: bytes, filename: str = "") -> dict:
         analysis_notes = "לא אותר תאריך בדיקה/הנפקה אמין מתוך הטקסט; אין לחשב תוקף אוטומטי. נדרש עיון במסמך."
     else:
         status = "analyzed"
-        if validity_source == "explicit_expiry":
-            analysis_notes = "נמצא תאריך תוקף מפורש במסמך; הוא גובר על כלל השנה כאשר הוא מוקדם יותר."
-        else:
-            analysis_notes = "תוקף מחושב בדיוק שנה מתאריך הבדיקה/ההנפקה. ביום התאריך המקביל בשנה הבאה המסמך נחשב פג תוקף."
+        analysis_notes = (
+            "נמצא תאריך תוקף מפורש במסמך; הוא גובר על כלל השנה כאשר הוא מוקדם יותר."
+            if validity_source == "explicit_expiry"
+            else "תוקף מחושב בדיוק שנה מתאריך הבדיקה/ההנפקה. ביום התאריך המקביל בשנה הבאה המסמך נחשב פג תוקף."
+        )
 
     zone_code = detect_zone_code(text, filename)
     return {
-        "status": status,
-        "filename": filename,
-        "form_number": form,
-        "category": category,
-        "document_type": document_type,
-        "zone_code": zone_code,
-        "inspection_date": inspection_date,
-        "issue_date": inspection_date,
-        "explicit_expiry_date": explicit_expiry,
-        "expiry_date": expiry_date,
-        "validity_source": validity_source,
-        "validity_status": validity_status(expiry_date),
-        "confidence": confidence,
-        "analysis_notes": analysis_notes,
-        "text_length": len(text),
+        "status": status, "filename": filename, "form_number": form, "category": category,
+        "document_type": document_type, "zone_code": zone_code, "inspection_date": inspection_date,
+        "issue_date": inspection_date, "explicit_expiry_date": explicit_expiry, "expiry_date": expiry_date,
+        "validity_source": validity_source, "validity_status": validity_status(expiry_date),
+        "confidence": confidence, "analysis_notes": analysis_notes, "text_length": len(text),
         "text_extracted": bool(text.strip()),
         "analysis_json": json.dumps({
-            "form_number": form,
-            "category": category,
-            "document_type": document_type,
-            "zone_code": zone_code,
+            "form_number": form, "category": category, "document_type": document_type, "zone_code": zone_code,
             "inspection_date": inspection_date.isoformat() if inspection_date else None,
             "explicit_expiry_date": explicit_expiry.isoformat() if explicit_expiry else None,
             "expiry_date": expiry_date.isoformat() if expiry_date else None,
-            "validity_source": validity_source,
-            "validity_status": validity_status(expiry_date),
+            "validity_source": validity_source, "validity_status": validity_status(expiry_date),
         }, ensure_ascii=False),
     }
 
 
 def apply_analysis_to_document(doc, analysis: dict) -> dict:
+    """Apply trustworthy analysis without erasing existing expiry data on uncertain OCR."""
     if analysis.get("inspection_date"):
         doc.issue_date = analysis["issue_date"]
         doc.expiry_date = analysis["expiry_date"]
     elif analysis.get("explicit_expiry_date"):
         doc.expiry_date = analysis["explicit_expiry_date"]
     else:
-        doc.expiry_date = None
+        # Never destroy an already-known expiry because extraction was uncertain.
+        # Keep the DB value and flag the document for review.
+        if not getattr(doc, "expiry_date", None):
+            doc.expiry_date = None
+        analysis["analysis_notes"] = (
+            analysis.get("analysis_notes")
+            or "לא נמצא תאריך אמין; נתוני תוקף קיימים נשמרו ונדרש עיון ידני."
+        )
+
     if analysis.get("category"):
         doc.category = analysis["category"]
+
     tags = [x for x in [
         f"form:{analysis['form_number']}" if analysis.get("form_number") else None,
         f"zone:{analysis['zone_code']}" if analysis.get("zone_code") else None,
@@ -241,5 +211,6 @@ def apply_analysis_to_document(doc, analysis: dict) -> dict:
     ] if x]
     if tags:
         doc.tags = ",".join(tags)
-    doc.notes = analysis.get("analysis_notes")
+    if analysis.get("analysis_notes"):
+        doc.notes = analysis["analysis_notes"]
     return analysis
