@@ -156,25 +156,14 @@ def _safe_restore_name(doc_id: int, entry: dict) -> str:
 
 
 def _validate_native_storage(doc: Document) -> dict:
-    """Actually download a native Supabase object and validate it.
-
-    A DB path alone is never considered proof that a file exists. This is
-    intentionally stricter than signed-URL existence checks because missing
-    objects can otherwise be misclassified as healthy.
-    """
-    result = {
-        'healthy': False,
-        'path': doc.file_path,
-        'bytes': None,
-        'sha256': None,
-        'pdf_valid': False,
-        'error': None,
-    }
+    """Actually download a native Supabase object and validate it."""
+    result = {'healthy': False, 'path': doc.file_path, 'bytes': None, 'sha256': None,
+              'pdf_valid': False, 'error': None}
     try:
         data = storage.download_bytes(doc.file_path)
         result['bytes'] = len(data)
         result['sha256'] = hashlib.sha256(data).hexdigest()
-        if (doc.file_hash and result['sha256'] != doc.file_hash):
+        if doc.file_hash and result['sha256'] != doc.file_hash:
             result['error'] = 'SHA-256 של הקובץ ב-Supabase אינו תואם ל-DB'
             return result
         if doc.file_size is not None and len(data) != int(doc.file_size):
@@ -195,12 +184,12 @@ def _validate_native_storage(doc: Document) -> dict:
         return result
 
 
-def plan_zip_restore(zip_bytes: bytes, document_id: int | None = None) -> dict:
+def plan_zip_restore(zip_bytes: bytes, document_id: int | None = None, validate_native: bool = True) -> dict:
     """Create a non-mutating recovery plan from a ZIP backup.
 
-    Native Supabase paths are skipped only after a real download + integrity
-    check. If the DB points to Supabase but the object is missing/corrupt, the
-    document is treated as recoverable and can be matched against the backup.
+    Preview validates existing native objects. Restore can skip that repeated
+    validation because the Preview has already established native integrity;
+    the actual replacement files are independently verified after upload.
     """
     if not storage.is_configured():
         return {'success': False, 'error': 'Supabase אינו מוגדר', 'items': [], 'counts': {}}
@@ -216,18 +205,16 @@ def plan_zip_restore(zip_bytes: bytes, document_id: int | None = None) -> dict:
     items = []
     for doc in docs:
         if storage.is_supabase_path(doc.file_path):
-            native = _validate_native_storage(doc)
+            native = _validate_native_storage(doc) if validate_native else {'healthy': True, 'bytes': None, 'sha256': None, 'error': None}
             if native['healthy']:
                 counts['skipped_native'] += 1
-                items.append({
-                    'document_id': doc.id,
-                    'file_name': doc.file_name,
-                    'status': 'skipped_native',
-                    'reason': 'קובץ Supabase קיים, ניתן להורדה ועבר אימות SHA/PDF',
-                    'storage_path': doc.file_path,
-                    'bytes': native['bytes'],
-                    'sha256': native['sha256'],
-                })
+                item = {'document_id': doc.id, 'file_name': doc.file_name, 'status': 'skipped_native',
+                        'reason': ('קובץ Supabase קיים, ניתן להורדה ועבר אימות SHA/PDF' if validate_native
+                                   else 'קיים ב-Supabase; אומת ב-Preview, אין צורך בבדיקה כפולה'),
+                        'storage_path': doc.file_path}
+                if validate_native:
+                    item.update({'bytes': native['bytes'], 'sha256': native['sha256']})
+                items.append(item)
                 continue
             counts['unhealthy_native'] += 1
             native_reason = native['error'] or 'קובץ Supabase אינו זמין/תקין'
@@ -252,27 +239,19 @@ def plan_zip_restore(zip_bytes: bytes, document_id: int | None = None) -> dict:
             continue
         counts['matched'] += 1
         remote_name = _safe_restore_name(doc.id, entry)
-        item = {
-            'document_id': doc.id,
-            'file_name': doc.file_name,
-            'status': 'matched',
-            'match_method': method,
-            'source': entry['zip_path'],
-            'size': entry['size'],
-            'sha256': entry['sha256'],
-            'storage_path': f'{storage.get_bucket_name()}/{remote_name}',
-        }
+        item = {'document_id': doc.id, 'file_name': doc.file_name, 'status': 'matched', 'match_method': method,
+                'source': entry['zip_path'], 'size': entry['size'], 'sha256': entry['sha256'],
+                'storage_path': f'{storage.get_bucket_name()}/{remote_name}'}
         if native_reason:
             item.update({'reason': 'ה-DB הצביע ל-Supabase אך הקובץ הקיים לא עבר בדיקת הורדה/שלמות; יוחלף מהגיבוי',
-                         'previous_storage_status': 'unhealthy_native',
-                         'previous_storage_error': native_reason})
+                         'previous_storage_status': 'unhealthy_native', 'previous_storage_error': native_reason})
         items.append(item)
     return {'success': True, 'zip_files': len(entries), 'counts': counts, 'items': items}
 
 
 def restore_zip(zip_bytes: bytes, acting_user_id, document_id: int | None = None) -> dict:
-    """Restore matched ZIP files to Supabase and update DB only after verification."""
-    plan = plan_zip_restore(zip_bytes, document_id)
+    """Restore matched ZIP files; verify every uploaded object before DB update."""
+    plan = plan_zip_restore(zip_bytes, document_id, validate_native=False)
     if not plan.get('success'):
         return plan
     entries = {e['zip_path']: e for e in _zip_entries(zip_bytes)}
@@ -287,13 +266,11 @@ def restore_zip(zip_bytes: bytes, acting_user_id, document_id: int | None = None
             continue
         try:
             remote_name = _safe_restore_name(doc.id, entry)
-            stored_path = storage.upload_bytes(
-                remote_name,
-                entry['data'],
-                'application/pdf' if entry['basename'].lower().endswith('.pdf') else 'application/octet-stream',
-            )
+            stored_path = storage.upload_bytes(remote_name, entry['data'],
+                                               'application/pdf' if entry['basename'].lower().endswith('.pdf') else 'application/octet-stream')
             downloaded = storage.download_bytes(stored_path)
-            if hashlib.sha256(downloaded).hexdigest() != entry['sha256'] or len(downloaded) != entry['size']:
+            actual_hash = hashlib.sha256(downloaded).hexdigest()
+            if actual_hash != entry['sha256'] or len(downloaded) != entry['size']:
                 raise RuntimeError('אימות העלאה נכשל: hash או גודל אינם תואמים')
             if entry['basename'].lower().endswith('.pdf'):
                 validation = storage.verify_pdf_bytes(downloaded)
@@ -305,23 +282,13 @@ def restore_zip(zip_bytes: bytes, acting_user_id, document_id: int | None = None
             doc.file_size = entry['size']
             db.session.commit()
             try:
-                alog.log(
-                    'document_storage_restored',
-                    'document',
-                    doc.id,
-                    entity_label=doc.file_name,
-                    old_value={'file_path': old_path},
-                    new_value={'file_path': stored_path},
-                )
+                alog.log('document_storage_restored', 'document', doc.id, entity_label=doc.file_name,
+                         old_value={'file_path': old_path}, new_value={'file_path': stored_path})
                 db.session.commit()
             except Exception:
                 db.session.rollback()
-            restored.append({
-                'document_id': doc.id,
-                'file_name': doc.file_name,
-                'source': entry['zip_path'],
-                'storage_path': stored_path,
-            })
+            restored.append({'document_id': doc.id, 'file_name': doc.file_name, 'source': entry['zip_path'],
+                             'storage_path': stored_path, 'sha256': actual_hash, 'size': len(downloaded)})
         except Exception as exc:
             db.session.rollback()
             failed.append({'document_id': doc.id, 'file_name': doc.file_name, 'error': str(exc)})
