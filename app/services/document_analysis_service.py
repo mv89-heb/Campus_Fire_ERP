@@ -4,15 +4,17 @@ from __future__ import annotations
 import json
 import re
 from datetime import date
+from zoneinfo import ZoneInfo
 
-_DATE_RE = re.compile(r"(?<!\d)(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})(?!\d)")
+_DATE_RE = re.compile(r"(?<!\d)(\d{1,2})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{2,4})(?!\d)")
 _FORM_RE = re.compile(r"טופס\s*(?:מס[\u05f3']?\s*)?(\d{1,2})")
 
 FORM_TYPES = {
-    2: ("מטפים", "תחזוקת מטפים"),
+    1: ("ציוד כיבוי", "בדיקת ציוד כיבוי אש"),
+    2: ("תחזוקת מטפים", "תחזוקת מטפים"),
     3: ("חשמל", "בדיקת מערכת חשמל ותאורת חירום"),
     4: ("גילוי אש", "תחזוקת מערכת גילוי אש"),
-    5: ("כיבוי בלוחות חשמל", "מערכת כיבוי בלוחות חשמל"),
+    5: ("לוחות חשמל", "מערכת כיבוי בלוחות חשמל"),
     6: ("כריזה", "מערכת מסירת הודעות/כריזת חירום"),
     7: ("ספרינקלרים", "מערכת כיבוי אוטומטית בספרינקלרים"),
     10: ("שחרור עשן", "מערכת שליטה בעשן"),
@@ -22,18 +24,40 @@ FORM_TYPES = {
     18: ("מערכת גז", "בדיקת תקינות מערכת גז"),
 }
 
+_POSITIVE_DATE_TOKENS = (
+    "תאריך בדיקה", "מועד בדיקה", "תאריך ביצוע", "מועד ביצוע",
+    "תאריך תחזוקה", "מועד תחזוקה", "נבדק בתאריך", "נבדקה בתאריך",
+    "בוצע בתאריך", "בוצעה בתאריך", "ביקור", "בדיק", "תחזוק",
+    "תאריך אישור", "מועד אישור", "תאריך הנפקה", "הונפק בתאריך",
+    "מצהיר", "תאריך מילוי",
+)
+_NEGATIVE_DATE_TOKENS = (
+    "תוקף", "בתוקף", "תוקף עד", "תקף עד", "רישיון", "היתר",
+    "דרישה", "הבדיקה הבאה", "הבדיקה הבאה בתאריך", "תחזוקה הבאה",
+    "התחזוקה הבאה", "בדיקה הבאה", "הבא", "הבאה",
+)
+
 
 def add_one_year(value: date) -> date:
+    """Return the same calendar date one year later."""
     try:
         return value.replace(year=value.year + 1)
     except ValueError:
+        # 29/02 -> 28/02 in the following year.
         return value.replace(year=value.year + 1, day=28)
+
+
+def _israel_today() -> date:
+    try:
+        return date.today() if ZoneInfo("Asia/Jerusalem") is None else __import__("datetime").datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+    except Exception:
+        return date.today()
 
 
 def validity_status(expiry_date: date | None, today: date | None = None) -> str:
     if expiry_date is None:
         return "needs_review"
-    today = today or date.today()
+    today = today or _israel_today()
     if today >= expiry_date:
         return "expired"
     days = (expiry_date - today).days
@@ -68,30 +92,43 @@ def _candidate_dates(text: str):
         value = _parse_date(m)
         if not value:
             continue
-        start = max(0, m.start() - 110)
-        end = min(len(text), m.end() + 110)
-        yield value, text[start:end]
+        start = max(0, m.start() - 180)
+        end = min(len(text), m.end() + 180)
+        context = re.sub(r"\s+", " ", text[start:end]).strip()
+        yield value, context
+
+
+def _date_score(context: str) -> int:
+    score = 0
+    lowered = context or ""
+    for token in _POSITIVE_DATE_TOKENS:
+        if token in lowered:
+            score += 4 if "תאריך" in token or "מועד" in token else 3
+    for token in _NEGATIVE_DATE_TOKENS:
+        if token in lowered:
+            score -= 6
+    return score
 
 
 def extract_inspection_date(text: str) -> date | None:
+    """Find the most likely inspection/issue date, avoiding expiry/license dates."""
     scored = []
-    positive = ('תאריך', 'בתאריך', 'בדיק', 'ביקור', 'תחזוק', 'מצהיר')
-    negative = ('תוקף', 'בתוקף', 'רישיון', 'היתר', 'דרישה', 'הבאה', 'הבא')
-    for value, context in _candidate_dates(text or ''):
-        score = sum(3 for token in positive if token in context)
-        score -= sum(5 for token in negative if token in context)
+    for value, context in _candidate_dates(text or ""):
+        score = _date_score(context)
         if score > 0:
             scored.append((score, value))
     if scored:
-        scored.sort(key=lambda item: (-item[0], item[1]))
+        # When several dates have the same semantic confidence, prefer the latest
+        # relevant date; old footer/header dates should not win over the inspection.
+        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
         return scored[0][1]
     return None
 
 
 def extract_explicit_expiry(text: str) -> date | None:
     values = []
-    for value, context in _candidate_dates(text or ''):
-        if any(token in context for token in ('תוקף', 'בתוקף', 'תחזוקה הבאה', 'התחזוקה הבאה', 'תוקף האישור')):
+    for value, context in _candidate_dates(text or ""):
+        if any(token in context for token in ("תוקף", "בתוקף", "תוקף עד", "תקף עד", "תחזוקה הבאה", "התחזוקה הבאה")):
             values.append(value)
     return min(values) if values else None
 
@@ -128,7 +165,7 @@ def analyze_pdf_bytes(data: bytes, filename: str = "") -> dict:
     try:
         import fitz
         with fitz.open(stream=data, filetype="pdf") as document:
-            text = "\n".join(page.get_text() for page in document)
+            text = "\n".join(page.get_text("text") for page in document)
     except Exception as exc:
         return {"status": "needs_review", "error": f"PDF text extraction failed: {exc}", "filename": filename}
 
@@ -136,6 +173,7 @@ def analyze_pdf_bytes(data: bytes, filename: str = "") -> dict:
     category, document_type = FORM_TYPES.get(form, (None, None))
     inspection_date = extract_inspection_date(text)
     explicit_expiry = extract_explicit_expiry(text)
+
     expiry_date = None
     validity_source = "unknown"
     if inspection_date:
@@ -144,47 +182,68 @@ def analyze_pdf_bytes(data: bytes, filename: str = "") -> dict:
     if explicit_expiry and (expiry_date is None or explicit_expiry < expiry_date):
         expiry_date = explicit_expiry
         validity_source = "explicit_expiry"
-    confidence = 0.95 if form and inspection_date else 0.75 if form else 0.30
+
+    confidence = 0.98 if form and inspection_date and explicit_expiry else 0.95 if form and inspection_date else 0.75 if form else 0.30
     if not expiry_date:
         status = "needs_review"
-        analysis_notes = "לא אותר תאריך בדיקה/הנפקה אמין מתוך הטקסט; אין לחשב תוקף אוטומטי."
+        analysis_notes = "לא אותר תאריך בדיקה/הנפקה אמין מתוך הטקסט; אין לחשב תוקף אוטומטי. נדרש עיון במסמך."
     else:
         status = "analyzed"
-        analysis_notes = "תוקף מחושב מתאריך הבדיקה לפי כלל שנה קלנדרית; תאריך תוקף מפורש קודם לכלל אם קיים."
+        if validity_source == "explicit_expiry":
+            analysis_notes = "נמצא תאריך תוקף מפורש במסמך; הוא גובר על כלל השנה כאשר הוא מוקדם יותר."
+        else:
+            analysis_notes = "תוקף מחושב בדיוק שנה מתאריך הבדיקה/ההנפקה. ביום התאריך המקביל בשנה הבאה המסמך נחשב פג תוקף."
+
     zone_code = detect_zone_code(text, filename)
     return {
-        "status": status, "filename": filename, "form_number": form,
-        "category": category, "document_type": document_type, "zone_code": zone_code,
-        "inspection_date": inspection_date, "issue_date": inspection_date,
-        "explicit_expiry_date": explicit_expiry, "expiry_date": expiry_date,
-        "validity_source": validity_source, "validity_status": validity_status(expiry_date),
-        "confidence": confidence, "analysis_notes": analysis_notes,
-        "text_length": len(text), "text_extracted": bool(text.strip()),
-        "analysis_json": json.dumps({"form_number": form, "category": category,
-            "document_type": document_type, "zone_code": zone_code,
+        "status": status,
+        "filename": filename,
+        "form_number": form,
+        "category": category,
+        "document_type": document_type,
+        "zone_code": zone_code,
+        "inspection_date": inspection_date,
+        "issue_date": inspection_date,
+        "explicit_expiry_date": explicit_expiry,
+        "expiry_date": expiry_date,
+        "validity_source": validity_source,
+        "validity_status": validity_status(expiry_date),
+        "confidence": confidence,
+        "analysis_notes": analysis_notes,
+        "text_length": len(text),
+        "text_extracted": bool(text.strip()),
+        "analysis_json": json.dumps({
+            "form_number": form,
+            "category": category,
+            "document_type": document_type,
+            "zone_code": zone_code,
             "inspection_date": inspection_date.isoformat() if inspection_date else None,
             "explicit_expiry_date": explicit_expiry.isoformat() if explicit_expiry else None,
-            "validity_source": validity_source}, ensure_ascii=False),
+            "expiry_date": expiry_date.isoformat() if expiry_date else None,
+            "validity_source": validity_source,
+            "validity_status": validity_status(expiry_date),
+        }, ensure_ascii=False),
     }
 
 
 def apply_analysis_to_document(doc, analysis: dict) -> dict:
-    if analysis.get('inspection_date'):
-        doc.issue_date = analysis['issue_date']
-        doc.expiry_date = analysis['expiry_date']
-    elif analysis.get('explicit_expiry_date'):
-        doc.expiry_date = analysis['explicit_expiry_date']
+    if analysis.get("inspection_date"):
+        doc.issue_date = analysis["issue_date"]
+        doc.expiry_date = analysis["expiry_date"]
+    elif analysis.get("explicit_expiry_date"):
+        doc.expiry_date = analysis["explicit_expiry_date"]
     else:
         doc.expiry_date = None
-    if analysis.get('category'):
-        doc.category = analysis['category']
+    if analysis.get("category"):
+        doc.category = analysis["category"]
     tags = [x for x in [
-        f"form:{analysis['form_number']}" if analysis.get('form_number') else None,
-        f"zone:{analysis['zone_code']}" if analysis.get('zone_code') else None,
-        f"validity:{analysis.get('validity_source')}" if analysis.get('validity_source') else None,
-        f"analysis:{analysis.get('status')}" if analysis.get('status') else None,
+        f"form:{analysis['form_number']}" if analysis.get("form_number") else None,
+        f"zone:{analysis['zone_code']}" if analysis.get("zone_code") else None,
+        f"validity:{analysis.get('validity_source')}" if analysis.get("validity_source") else None,
+        f"analysis:{analysis.get('status')}" if analysis.get("status") else None,
+        f"validity_status:{analysis.get('validity_status')}" if analysis.get("validity_status") else None,
     ] if x]
     if tags:
-        doc.tags = ','.join(tags)
-    doc.notes = analysis.get('analysis_notes')
+        doc.tags = ",".join(tags)
+    doc.notes = analysis.get("analysis_notes")
     return analysis
