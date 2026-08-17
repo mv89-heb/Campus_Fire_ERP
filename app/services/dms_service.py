@@ -1,90 +1,63 @@
 import hashlib
 import os
-from datetime import date, timedelta
 from app.extensions import db
 from app.models import Document, Zone, SystemRequirement
 from app.services import storage
+from app.services.document_analysis_service import analyze_pdf_bytes, apply_analysis_to_document
 import logging
 
-try:
-    import fitz
-    HAS_FITZ = True
-except ImportError:
-    HAS_FITZ = False
-
 logger = logging.getLogger(__name__)
+
 
 class DMSService:
     @staticmethod
     def calculate_hash(filepath: str) -> str:
-        # Commit 3: מאציל למקור האמת המרוכז ב-storage.py, במקום מימוש מקומי
-        # כפול. חתימת הפונקציה (שם, פרמטר, ערך מוחזר) נשארת זהה לחלוטין,
-        # כך שאף קריאה קיימת ל-DMSService.calculate_hash() לא מושפעת.
         return storage.calculate_file_hash(filepath)
 
     @staticmethod
     def ingest_document(filepath: str, original_filename: str):
-        """
-        קולט מסמך שכבר נשמר זמנית בדיסק המקומי (ב-filepath, ע"י
-        validate_and_save_pdf). ה-API הזה לא השתנה כדי לא לשבור קריאות קיימות.
-
-        שינוי פנימי (Supabase): אם Supabase מוגדר, המסמך מועלה ל-Supabase
-        Storage ו-file_path נשמר בפורמט 'documents/uuid.pdf'; הקובץ הזמני
-        בדיסק המקומי נמחק אחרי הצלחה, כי Supabase הופך למקור האמת. אם
-        Supabase לא מוגדר, ההתנהגות הישנה נשמרת במלואה: הקובץ נשאר בדיסק
-        המקומי לצמיתות ו-file_path נשמר כ-'uuid.pdf' בלבד.
-        """
+        """Ingest a validated PDF, analyze its content, then persist it."""
         file_hash = DMSService.calculate_hash(filepath)
-        # לא סופרים כפילות מול מסמכים שנמחקו (status='deleted') - Option B
-        # משאירה את file_hash הישן ברשומה שנמחקה, ולכן בלי הסינון הזה
-        # משתמש שמחק מסמך לא היה יכול להעלות מחדש את אותו תוכן לעולם.
         if Document.query.filter_by(file_hash=file_hash).filter(Document.status != 'deleted').first():
             DMSService._cleanup_local_temp(filepath)
             return None
 
-        text = ""
-        if HAS_FITZ:
-            try:
-                with fitz.open(filepath) as doc:
-                    text = " ".join(page.get_text() for page in doc)
-            except Exception as e:
-                logger.warning(f"Could not read PDF text: {e}")
+        with open(filepath, 'rb') as f:
+            file_bytes = f.read()
 
-        combined_context = (text + " " + original_filename).replace(" ", "")
-
+        analysis = analyze_pdf_bytes(file_bytes, original_filename)
         detected_zone_id = None
-        if "8855" in combined_context: detected_zone_id = Zone.query.filter_by(file_number="8855-7").first().id
-        elif "8859" in combined_context: detected_zone_id = Zone.query.filter_by(file_number="8859-7").first().id
-        elif "8853" in combined_context: detected_zone_id = Zone.query.filter_by(file_number="8853-7").first().id
-        elif "8860" in combined_context: detected_zone_id = Zone.query.filter_by(file_number="8860-7").first().id
-        elif "ראשי" in combined_context: detected_zone_id = Zone.query.filter_by(file_number="ראשי").first().id
+        zone_code = analysis.get('zone_code')
+        if zone_code:
+            zone = Zone.query.filter_by(file_number=zone_code).first()
+            if zone:
+                detected_zone_id = zone.id
 
         detected_req_id = None
         reqs = SystemRequirement.query.all()
-        for req in reqs:
-            if req.required_form.replace(" ","") in combined_context:
-                detected_req_id = req.id
-                detected_zone_id = req.zone_id
-                break
-
+        form_number = analysis.get('form_number')
+        if form_number is not None:
+            form_label = f"טופס {form_number}"
+            for req in reqs:
+                if req.required_form.replace(' ', '') == form_label.replace(' ', ''):
+                    detected_req_id = req.id
+                    detected_zone_id = req.zone_id
+                    break
         if not detected_zone_id:
-            zone = Zone.query.filter_by(file_number="8855-7").first()
-            if zone: detected_zone_id = zone.id
+            zone = Zone.query.filter_by(file_number='8855-7').first()
+            if zone:
+                detected_zone_id = zone.id
 
-        # --- אחסון: Supabase אם מוגדר, אחרת דיסק מקומי (תאימות לאחור) ---
         uploaded_to_supabase = False
-        stored_path = os.path.basename(filepath)  # ברירת מחדל: פורמט מקומי ישן
-
+        stored_path = os.path.basename(filepath)
         if storage.is_configured():
             remote_filename = os.path.basename(filepath)
-            with open(filepath, "rb") as f:
-                file_bytes = f.read()
             try:
                 stored_path = storage.upload_bytes(remote_filename, file_bytes)
                 uploaded_to_supabase = True
             except storage.StorageError:
                 DMSService._cleanup_local_temp(filepath)
-                raise  # לא יוצרים רשומת Document אם ההעלאה ל-Supabase נכשלה
+                raise
 
         new_doc = Document(
             req_id=detected_req_id,
@@ -92,23 +65,27 @@ class DMSService:
             file_name=original_filename,
             file_path=stored_path,
             file_hash=file_hash,
-            file_size=os.path.getsize(filepath),
-            expiry_date=date.today() + timedelta(days=365)
+            file_size=len(file_bytes),
+            expiry_date=analysis.get('expiry_date'),
+            issue_date=analysis.get('issue_date'),
+            category=analysis.get('category'),
+            status='active',
         )
+        apply_analysis_to_document(new_doc, analysis)
         db.session.add(new_doc)
         try:
             db.session.commit()
         except Exception:
             db.session.rollback()
             if uploaded_to_supabase:
-                # לא משאירים קובץ יתום ב-Supabase אם ה-Neon נכשל
                 storage.delete_object(stored_path)
             raise
         finally:
             if uploaded_to_supabase:
-                # Supabase הוא כעת מקור האמת - לא משאירים עותק קבוע בדיסק של Render
                 DMSService._cleanup_local_temp(filepath)
 
+        if analysis.get('status') == 'needs_review':
+            logger.warning('Document %s imported without reliable inspection date: %s', original_filename, analysis.get('analysis_notes'))
         return new_doc
 
     @staticmethod
