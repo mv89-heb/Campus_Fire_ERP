@@ -63,48 +63,47 @@ def extract_dates(text: str) -> list[date]:
     return dates
 
 
+def _candidate_dates(text: str):
+    for m in _DATE_RE.finditer(text or ""):
+        value = _parse_date(m)
+        if not value:
+            continue
+        start = max(0, m.start() - 110)
+        end = min(len(text), m.end() + 110)
+        yield value, text[start:end]
+
+
 def extract_inspection_date(text: str) -> date | None:
-    text = text or ""
-    patterns = [
-        r"(?:תאריך\s*(?:הבדיקה|הביקורת|התחזוקה)?|בתאריך|תאריך הביקורת|תאריך הבדיקה)\s*[:\-]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})",
-        r"בוצעה\s+בדיק(?:ת|ה)[^\n]{0,80}?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})",
-        r"ביקרתי[^\n]{0,80}?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})",
-        r"מצהיר[^\n]{0,100}?בתאריך\s*[:\-]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})",
-    ]
-    for pattern in patterns:
-        m = re.search(pattern, text, flags=re.IGNORECASE)
-        if m:
-            dm = _DATE_RE.search(m.group(1))
-            if dm:
-                value = _parse_date(dm)
-                if value:
-                    return value
+    scored = []
+    positive = ('תאריך', 'בתאריך', 'בדיק', 'ביקור', 'תחזוק', 'מצהיר')
+    negative = ('תוקף', 'בתוקף', 'רישיון', 'היתר', 'דרישה', 'הבאה', 'הבא')
+    for value, context in _candidate_dates(text or ''):
+        score = sum(3 for token in positive if token in context)
+        score -= sum(5 for token in negative if token in context)
+        if score > 0:
+            scored.append((score, value))
+    if scored:
+        scored.sort(key=lambda item: (-item[0], item[1]))
+        return scored[0][1]
     return None
 
 
 def extract_explicit_expiry(text: str) -> date | None:
-    patterns = [
-        r"תוקף[^\n]{0,40}?עד\s*[:\-]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})",
-        r"בתוקף\s+עד\s*[:\-]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})",
-        r"תאריך התחזוקה הבאה\s*[:\-]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})",
-    ]
     values = []
-    for pattern in patterns:
-        for m in re.finditer(pattern, text or "", flags=re.IGNORECASE):
-            dm = _DATE_RE.search(m.group(1))
-            if dm:
-                value = _parse_date(dm)
-                if value:
-                    values.append(value)
+    for value, context in _candidate_dates(text or ''):
+        if any(token in context for token in ('תוקף', 'בתוקף', 'תחזוקה הבאה', 'התחזוקה הבאה', 'תוקף האישור')):
+            values.append(value)
     return min(values) if values else None
 
 
 def detect_form_number(text: str, filename: str = "") -> int | None:
-    for source in (text or "", filename or ""):
-        m = _FORM_RE.search(source)
-        if m:
-            return int(m.group(1))
+    m = _FORM_RE.search(filename or "")
+    if m:
+        return int(m.group(1))
     m = re.search(r"(?:טופס\s*)?(\d{1,2})(?:\s*\([^)]*\))?\.pdf$", filename or "", re.I)
+    if m:
+        return int(m.group(1))
+    m = _FORM_RE.search(text or "")
     return int(m.group(1)) if m else None
 
 
@@ -137,7 +136,6 @@ def analyze_pdf_bytes(data: bytes, filename: str = "") -> dict:
     category, document_type = FORM_TYPES.get(form, (None, None))
     inspection_date = extract_inspection_date(text)
     explicit_expiry = extract_explicit_expiry(text)
-
     expiry_date = None
     validity_source = "unknown"
     if inspection_date:
@@ -146,7 +144,6 @@ def analyze_pdf_bytes(data: bytes, filename: str = "") -> dict:
     if explicit_expiry and (expiry_date is None or explicit_expiry < expiry_date):
         expiry_date = explicit_expiry
         validity_source = "explicit_expiry"
-
     confidence = 0.95 if form and inspection_date else 0.75 if form else 0.30
     if not expiry_date:
         status = "needs_review"
@@ -154,34 +151,20 @@ def analyze_pdf_bytes(data: bytes, filename: str = "") -> dict:
     else:
         status = "analyzed"
         analysis_notes = "תוקף מחושב מתאריך הבדיקה לפי כלל שנה קלנדרית; תאריך תוקף מפורש קודם לכלל אם קיים."
-
     zone_code = detect_zone_code(text, filename)
     return {
-        "status": status,
-        "filename": filename,
-        "form_number": form,
-        "category": category,
-        "document_type": document_type,
-        "zone_code": zone_code,
-        "inspection_date": inspection_date,
-        "issue_date": inspection_date,
-        "explicit_expiry_date": explicit_expiry,
-        "expiry_date": expiry_date,
-        "validity_source": validity_source,
-        "validity_status": validity_status(expiry_date),
-        "confidence": confidence,
-        "analysis_notes": analysis_notes,
-        "text_length": len(text),
-        "text_extracted": bool(text.strip()),
-        "analysis_json": json.dumps({
-            "form_number": form,
-            "category": category,
-            "document_type": document_type,
-            "zone_code": zone_code,
+        "status": status, "filename": filename, "form_number": form,
+        "category": category, "document_type": document_type, "zone_code": zone_code,
+        "inspection_date": inspection_date, "issue_date": inspection_date,
+        "explicit_expiry_date": explicit_expiry, "expiry_date": expiry_date,
+        "validity_source": validity_source, "validity_status": validity_status(expiry_date),
+        "confidence": confidence, "analysis_notes": analysis_notes,
+        "text_length": len(text), "text_extracted": bool(text.strip()),
+        "analysis_json": json.dumps({"form_number": form, "category": category,
+            "document_type": document_type, "zone_code": zone_code,
             "inspection_date": inspection_date.isoformat() if inspection_date else None,
             "explicit_expiry_date": explicit_expiry.isoformat() if explicit_expiry else None,
-            "validity_source": validity_source,
-        }, ensure_ascii=False),
+            "validity_source": validity_source}, ensure_ascii=False),
     }
 
 
