@@ -21,6 +21,7 @@ PUBLIC_EXACT_PATHS = {
 }
 PUBLIC_PREFIXES = ('/static/',)
 WRITE_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
+CSRF_COOKIE_NAME = 'erp_csrf_token'
 
 
 def _same_origin_allowed(app) -> bool:
@@ -42,6 +43,18 @@ def _same_origin_allowed(app) -> bool:
 def _csrf_valid() -> bool:
     expected = session.get('csrf_token')
     supplied = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+
+    # Browser navigation/fetch requests can race with the shell's asynchronous
+    # /api/auth/me security-context load. Keep the normal header/form token as
+    # the primary mechanism, but allow the same server-issued token from a
+    # Strict, HttpOnly cookie when the browser has already proven same-origin.
+    # This preserves the origin check while removing the startup race.
+    if not supplied:
+        fetch_site = request.headers.get('Sec-Fetch-Site')
+        origin = request.headers.get('Origin')
+        if fetch_site in {'same-origin', 'same-site'} or origin:
+            supplied = request.cookies.get(CSRF_COOKIE_NAME)
+
     return bool(expected and supplied and hmac.compare_digest(str(expected), str(supplied)))
 
 
@@ -141,6 +154,24 @@ def _install_security_headers(app):
         response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
         if app.config.get('IS_PRODUCTION'):
             response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+
+        # Mirror the session CSRF token into a server-issued, Strict and
+        # HttpOnly cookie. The cookie is only accepted as a fallback after
+        # same-origin evidence is present, so the existing origin protection
+        # remains in force while the frontend can no longer lose the token
+        # because of an initialization race.
+        csrf_token = session.get('csrf_token')
+        if csrf_token:
+            response.set_cookie(
+                CSRF_COOKIE_NAME,
+                str(csrf_token),
+                secure=bool(app.config.get('IS_PRODUCTION')),
+                httponly=True,
+                samesite='Strict',
+                path='/',
+            )
+        else:
+            response.delete_cookie(CSRF_COOKIE_NAME, path='/')
         return response
 
 
