@@ -1,10 +1,11 @@
 import hashlib
 import os
+import logging
+
 from app.extensions import db
 from app.models import Document, Zone, SystemRequirement
 from app.services import storage
 from app.services.document_analysis_service import analyze_pdf_bytes, apply_analysis_to_document
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,31 @@ class DMSService:
     @staticmethod
     def calculate_hash(filepath: str) -> str:
         return storage.calculate_file_hash(filepath)
+
+    @staticmethod
+    def _find_requirement(form_number, zone_id=None):
+        """Resolve a requirement by form number, preferring the detected zone.
+
+        Form numbers are reused across zones (for example form 6 exists for
+        several campus areas), so matching by form number alone is unsafe.
+        """
+        if form_number is None:
+            return None
+        form_label = f"טופס {form_number}"
+        query = SystemRequirement.query.filter(
+            db.func.replace(SystemRequirement.required_form, ' ', '') == form_label.replace(' ', '')
+        )
+        if zone_id:
+            zone_match = query.filter(SystemRequirement.zone_id == zone_id).first()
+            if zone_match:
+                return zone_match
+        matches = query.all()
+        if len(matches) == 1:
+            return matches[0]
+        # Multiple requirements share the same form number and no reliable
+        # zone match exists: leave req_id unset rather than assigning the
+        # document to an arbitrary zone.
+        return None
 
     @staticmethod
     def ingest_document(filepath: str, original_filename: str):
@@ -34,16 +60,15 @@ class DMSService:
                 detected_zone_id = zone.id
 
         detected_req_id = None
-        reqs = SystemRequirement.query.all()
-        form_number = analysis.get('form_number')
-        if form_number is not None:
-            form_label = f"טופס {form_number}"
-            for req in reqs:
-                if req.required_form.replace(' ', '') == form_label.replace(' ', ''):
-                    detected_req_id = req.id
-                    detected_zone_id = req.zone_id
-                    break
-        if not detected_zone_id:
+        req = DMSService._find_requirement(analysis.get('form_number'), detected_zone_id)
+        if req:
+            detected_req_id = req.id
+            detected_zone_id = req.zone_id
+
+        # Never silently put an unclassified document into the residence zone.
+        # A fallback is only safe when the document has no detected form/zone
+        # at all and the legacy application explicitly needs a holding zone.
+        if not detected_zone_id and analysis.get('form_number') is None:
             zone = Zone.query.filter_by(file_number='8855-7').first()
             if zone:
                 detected_zone_id = zone.id
@@ -85,7 +110,11 @@ class DMSService:
                 DMSService._cleanup_local_temp(filepath)
 
         if analysis.get('status') == 'needs_review':
-            logger.warning('Document %s imported without reliable inspection date: %s', original_filename, analysis.get('analysis_notes'))
+            logger.warning(
+                'Document %s imported without reliable inspection date: %s',
+                original_filename,
+                analysis.get('analysis_notes'),
+            )
         return new_doc
 
     @staticmethod
