@@ -1,3 +1,5 @@
+from datetime import date, datetime
+
 from flask import Blueprint, jsonify, request, current_app, session, render_template_string
 from app.services import storage_health_service as svc
 from app.services import storage_migration_service as migration_svc
@@ -7,6 +9,17 @@ from app.services.auth_service import AuthServiceError
 from app.api.auth_routes import admin_required
 
 admin_storage_bp = Blueprint('admin_storage', __name__)
+
+
+def _json_safe(value):
+    """Recursively convert date/datetime values before returning API JSON."""
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(v) for v in value]
+    return value
 
 
 @admin_storage_bp.errorhandler(AuthServiceError)
@@ -58,7 +71,7 @@ def api_documents_reanalyze():
     try:
         include_archived = bool((request.get_json(silent=True) or {}).get('include_archived', False))
         result = reanalysis_svc.reanalyze_all(include_archived=include_archived)
-        return jsonify(result), (200 if result.get('success') else 409)
+        return jsonify(_json_safe(result)), (200 if result.get('success') else 409)
     except Exception as exc:
         current_app.logger.exception('Full document reanalysis failed')
         return jsonify({'success': False, 'error': 'ניתוח מחדש של המסמכים נכשל', 'details': str(exc)}), 500
@@ -109,7 +122,7 @@ def storage_recovery_page():
 <p>העלה ZIP של תיקיית המסמכים המקורית. קודם מתבצע Preview בלבד. לאחר מכן ניתן לבצע שחזור או לעדכן ניתוח ותאריכי תוקף למסמכים שכבר קיימים ב-Supabase.</p>
 <div class="warn">המערכת לא מוחקת מסמכים קיימים. מסמכים קיימים ב-Supabase ניתנים להורדה מהאחסון ועוברים ניתוח תוכן. רק לאחר הצלחה הנתונים ב-DB מתעדכנים.</div>
 <input id="zip" type="file" accept=".zip,application/zip">
-<div class="actions"><button id="preview">בדיקת התאמות</button><button id="restore" disabled>בצע שחזור</button><button id="reanalyze">🔎 נתח מחדש את כל המסמכים</button></div>
+<div class="actions"><button id="preview">בדיקת התאמות וניתוח</button><button id="restore" disabled>בצע שחזור / עדכון ניתוח</button><button id="reanalyze">🔎 נתח מחדש את כל המסמכים</button></div>
 <div id="summary" class="summary"></div><div id="status"></div><pre id="output">בחר ZIP כדי להתחיל, או לחץ על ניתוח מחדש כדי לנתח את כל המסמכים שכבר קיימים.</pre>
 <script>
 let lastPlan=null;const zip=document.getElementById('zip'),out=document.getElementById('output'),status=document.getElementById('status'),restore=document.getElementById('restore'),summary=document.getElementById('summary');
@@ -117,7 +130,7 @@ function renderSummary(j){const c=(j&&j.counts)||{};summary.innerHTML='';[['מת
 async function readResponse(r){const text=await r.text();try{return JSON.parse(text)}catch(e){return{success:false,error:`השרת החזיר תשובה שאינה JSON (HTTP ${r.status})`,details:text.slice(0,1200)}}}
 async function send(url){const f=zip.files[0];if(!f){alert('בחר קובץ ZIP');return null}const fd=new FormData();fd.append('backup',f,f.name);status.className='';status.textContent='מעבד...';const r=await fetch(url,{method:'POST',body:fd,credentials:'same-origin'});const j=await readResponse(r);out.textContent=JSON.stringify(j,null,2);renderSummary(j);if(!r.ok)throw new Error(j.error||`הפעולה נכשלה (HTTP ${r.status})`);return j}
 document.getElementById('preview').onclick=async()=>{restore.disabled=true;lastPlan=null;summary.innerHTML='';try{const j=await send('/api/admin/storage/recovery/preview');if(j&&j.success){lastPlan=j;const c=j.counts||{};const actionable=(c.matched||0)+(c.skipped_native||0);restore.disabled=actionable===0;status.className='ok';status.textContent=actionable?`נמצאו ${actionable} מסמכים שניתן לשחזר או לבדוק.`:'לא נמצאו מסמכים שניתן לעבד.'}else{status.className='err';status.textContent=(j&&j.error)||'ה-Preview נכשל'}}catch(e){status.className='err';status.textContent=e.message}};
-restore.onclick=async()=>{if(!lastPlan)return;const c=lastPlan.counts||{};const actionable=(c.matched||0)+(c.skipped_native||0);if(!actionable)return;if(!confirm(`לבצע שחזור עבור ${actionable} מסמכים בטוחים?`))return;restore.disabled=true;try{const j=await send('/api/admin/storage/recovery/restore');status.className=j&&j.success?'ok':'err';status.textContent=j&&j.success?`הפעולה הושלמה: ${((j.restored||[]).length)} שוחזרו.`:'הפעולה הושלמה חלקית — בדוק את הדוח'}catch(e){status.className='err';status.textContent=e.message}finally{restore.disabled=false}};
+restore.onclick=async()=>{if(!lastPlan)return;const c=lastPlan.counts||{};const actionable=(c.matched||0)+(c.skipped_native||0);if(!actionable)return;if(!confirm(`לבצע שחזור/עדכון ניתוח עבור ${actionable} מסמכים בטוחים?`))return;restore.disabled=true;try{const j=await send('/api/admin/storage/recovery/restore');status.className=j&&j.success?'ok':'err';status.textContent=j&&j.success?`הפעולה הושלמה: ${((j.restored||[]).length)} שוחזרו, ${((j.analyzed||[]).length)} נותחו מחדש.`:'הפעולה הושלמה חלקית — בדוק את הדוח'}catch(e){status.className='err';status.textContent=e.message}finally{restore.disabled=false}};
 document.getElementById('reanalyze').onclick=async()=>{const b=document.getElementById('reanalyze');if(!confirm('לנתח מחדש את כל המסמכים הפעילים הקיימים ב-Supabase/Storage ולעדכן שיוך, תאריך בדיקה ותוקף? לא יימחק קובץ.'))return;b.disabled=true;b.textContent='⏳ מנתח...';try{const r=await fetch('/api/admin/documents/reanalyze',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',credentials:'same-origin'});const j=await readResponse(r);out.textContent=JSON.stringify(j,null,2);renderSummary(j);status.className=j.success?'ok':'err';status.textContent=j.success?`הניתוח הושלם: ${j.counts.updated} עודכנו, ${j.counts.needs_review} דורשים בדיקה, ${j.counts.failed} נכשלו.`:(j.error||'הניתוח נכשל')}catch(e){status.className='err';status.textContent=e.message}finally{b.disabled=false;b.textContent='🔎 נתח מחדש את כל המסמכים'}};
 </script></main></body></html>''')
 
@@ -141,7 +154,7 @@ def storage_recovery_preview():
             message, status = error
             return jsonify({'success': False, 'error': message}), status
         result = migration_svc.plan_zip_restore(data)
-        return jsonify(result), (200 if result.get('success') else 409)
+        return jsonify(_json_safe(result)), (200 if result.get('success') else 409)
     except Exception as exc:
         current_app.logger.exception('Document recovery preview failed')
         return jsonify({'success': False, 'error': 'שגיאה פנימית ביצירת Preview', 'details': str(exc)}), 500
@@ -156,7 +169,7 @@ def storage_recovery_restore():
             message, status = error
             return jsonify({'success': False, 'error': message}), status
         result = migration_svc.restore_zip(data, session.get('user_id'))
-        return jsonify(result), (200 if result.get('success') else 409)
+        return jsonify(_json_safe(result)), (200 if result.get('success') else 409)
     except Exception as exc:
         current_app.logger.exception('Document recovery restore failed')
         return jsonify({'success': False, 'error': 'שגיאה פנימית בשחזור המסמכים', 'details': str(exc)}), 500
