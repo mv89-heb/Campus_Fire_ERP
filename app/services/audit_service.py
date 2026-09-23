@@ -142,12 +142,15 @@ def serialize_audit(audit, include_deficiencies=True):
                 meta = json.loads(doc.ai_actions_json or "{}")
             except (TypeError, ValueError):
                 meta = {}
-            if isinstance(meta, dict) and str(meta.get("audit_number") or "").strip().lower() == str(audit.audit_number).strip().lower():
+            direct_link = doc.audit_id == audit.id
+            metadata_link = (isinstance(meta, dict) and audit.audit_number and str(meta.get("audit_number") or "").strip().lower() == str(audit.audit_number).strip().lower())
+            if direct_link or metadata_link:
                 linked_documents.append({
                     "id": doc.id,
                     "file_name": doc.file_name,
                     "ai_status": doc.ai_status,
                     "ai_summary": doc.ai_summary,
+                    "link_source": "direct" if direct_link else "ai",
                 })
     data["linked_documents"] = linked_documents
     return data
