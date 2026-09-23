@@ -56,6 +56,16 @@ class Document(db.Model):
     previous_expiry_date = db.Column(db.Date, nullable=True)
     previous_issue_date = db.Column(db.Date, nullable=True)
 
+    ai_status = db.Column(db.String(20), default='not_requested', nullable=False)
+    ai_model = db.Column(db.String(80), nullable=True)
+    ai_analyzed_at = db.Column(db.DateTime, nullable=True)
+    ai_document_type = db.Column(db.String(120), nullable=True)
+    ai_summary = db.Column(db.Text, nullable=True)
+    ai_findings_json = db.Column(db.Text, nullable=True)
+    ai_actions_json = db.Column(db.Text, nullable=True)
+    ai_confidence = db.Column(db.Float, nullable=True)
+    ai_error = db.Column(db.Text, nullable=True)
+
 class Site(db.Model):
     __tablename__ = 'sites'
     id = db.Column(db.Integer, primary_key=True)

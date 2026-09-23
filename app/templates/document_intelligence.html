@@ -1,0 +1,29 @@
+{% extends "_shell.html" %}
+{% block title %}מרכז ניתוח מסמכים AI | בטיחות אש{% endblock %}
+{% block extra_style %}
+.ai-grid{display:grid;grid-template-columns:340px 1fr;gap:15px}.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:15px;margin-bottom:15px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.btn{padding:9px 14px;border-radius:var(--radius);border:1px solid var(--border-mid);background:var(--bg-hover);color:var(--text);cursor:pointer}.btn-primary{background:var(--accent);color:#000;border:0}.doc{padding:10px;border-bottom:1px solid var(--border);cursor:pointer}.doc:hover{background:var(--bg-hover)}.finding{border:1px solid var(--border);border-radius:8px;padding:12px;margin:9px 0}.finding.high,.finding.critical{border-right:4px solid var(--critical)}.finding.medium{border-right:4px solid var(--warning)}.action{background:rgba(63,185,80,.06);padding:10px;border-radius:7px;margin-top:8px}.muted{color:var(--text-muted);font-size:.82rem}@media(max-width:850px){.ai-grid{grid-template-columns:1fr}}
+{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:15px">
+<h1>🤖 מרכז ניתוח מסמכים AI</h1><div class="toolbar"><button class="btn" onclick="AI.queue()">📥 ניתוח כל המסמכים</button></div></div>
+<div class="ai-grid"><div class="card"><b>מסמכים</b><div id="list" style="margin-top:10px">טוען...</div></div><div class="card"><div id="detail" class="muted">בחר מסמך</div></div></div>
+{% endblock %}
+{% block extra_script %}
+<script>
+const AI=(()=>{let docs=[];
+const esc=s=>(s??'').toString().replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const labels={not_requested:'טרם נותח',queued:'בתור',processing:'בתהליך',completed:'הושלם',failed:'נכשל'};
+const sev={critical:'קריטי',high:'גבוהה',medium:'בינונית',low:'נמוכה',info:'מידע',unclear:'לא ברור'};
+async function load(){const d=await (await fetch('/api/dashboard')).json();docs=await Promise.all((d.recent_docs||[]).map(x=>fetch('/api/document-intelligence/'+x.doc_id).then(r=>r.json())));document.getElementById('list').innerHTML=docs.map(x=>'<div class="doc" onclick="AI.open('+x.document_id+')"><b>'+esc(x.file_name)+'</b><br><span class="muted">'+(labels[x.ai_status]||x.ai_status)+(x.review_required?' · ⚠️ בדיקה נדרשת':'')+'</span></div>').join('')||'<span class="muted">אין מסמכים</span>'}
+async function open(id){const d=await (await fetch('/api/document-intelligence/'+id)).json();let h='<h2>'+esc(d.file_name)+'</h2><div class="muted">'+esc(d.document_type||'לא זוהה')+' · '+(labels[d.ai_status]||d.ai_status)+(d.confidence!=null?' · ביטחון '+Math.round(d.confidence*100)+'%':'')+'</div>';
+if(d.error)h+='<div class="finding critical">'+esc(d.error)+'</div>';if(d.summary)h+='<div class="card"><b>סיכום הביקורת</b><p>'+esc(d.summary)+'</p></div>';
+(d.findings||[]).forEach((f,i)=>{h+='<div class="finding '+esc(f.severity)+'"><b>'+((i+1)+'. ')+esc(f.title)+'</b><div class="muted">'+(sev[f.severity]||f.severity)+' · ביטחון '+Math.round((f.confidence||0)*100)+'%</div><p>'+esc(f.description)+'</p><p><b>למה זה חשוב:</b> '+esc(f.why_it_matters)+'</p><div class="action"><b>מה צריך לעשות:</b><br>'+esc(f.recommended_action)+'<br><br><b>איך סוגרים:</b> '+esc(f.evidence_to_close)+'</div></div>'});
+const s=d.supplemental||{};if(s.missing_items?.length)h+='<div class="finding medium"><b>חוסרים</b><ul>'+s.missing_items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';if(s.contradictions?.length)h+='<div class="finding high"><b>סתירות</b><ul>'+s.contradictions.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';
+if(d.ai_status==='not_requested'||d.ai_status==='failed')h+='<button class="btn btn-primary" onclick="AI.analyze('+d.document_id+')">🤖 נתח עם Gemini</button>';if(d.ai_status==='completed')h+='<button class="btn btn-primary" onclick="AI.actions('+d.document_id+')">✅ צור ליקויים ומשימות</button>';
+document.getElementById('detail').innerHTML=h}
+async function analyze(id){const r=await fetch('/api/document-intelligence/'+id+'/analyze',{method:'POST'});const d=await r.json();if(!r.ok)alert(d.error||'שגיאה');await open(id);await load()}
+async function actions(id){const r=await fetch('/api/document-intelligence/'+id+'/create-actions',{method:'POST'});const d=await r.json();alert(d.error||('נוצרו '+d.count+' ליקויים ומשימות'));await open(id)}
+async function queue(){const r=await fetch('/api/document-intelligence/queue',{method:'POST'});const d=await r.json();alert(d.error||('נכנסו לתור '+d.queued+' מסמכים'));await load()}
+return{open,analyze,actions,queue};})();document.addEventListener('DOMContentLoaded',AI.queue);document.addEventListener('DOMContentLoaded',AI.load);
+</script>
+{% endblock %}

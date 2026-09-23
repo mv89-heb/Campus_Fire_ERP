@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request, current_app, render_template, send_file, redirect, session
 from app.extensions import db
 from app.models import Zone, SystemRequirement, Document
+from app.services import gemini_document_service as ai_svc
 from app.services.dms_service import DMSService
 from app.services import storage
 from app.services.document_analysis_service import validity_status
@@ -269,6 +270,50 @@ def upload_bulk():
     success = processed > 0 or (skipped_duplicates > 0 and not errors)
     return jsonify({'success': success, 'processed': processed, 'skipped_duplicates': skipped_duplicates,
                     'errors': errors, 'total_files': len(files)})
+
+
+@main_bp.route('/document-intelligence')
+def document_intelligence_page():
+    return render_template('document_intelligence.html', active_nav='permits')
+
+
+@main_bp.route('/api/document-intelligence/<int:doc_id>')
+def document_intelligence_detail(doc_id):
+    doc=db.session.get(Document,doc_id)
+    if not doc: return jsonify({'error':'המסמך לא נמצא'}),404
+    return jsonify({'document_id':doc.id,'file_name':doc.file_name,'ai_status':doc.ai_status,
+        'ai_model':doc.ai_model,'ai_analyzed_at':doc.ai_analyzed_at.isoformat() if doc.ai_analyzed_at else None,
+        'document_type':doc.ai_document_type,'summary':doc.ai_summary,
+        'findings':ai_svc.findings(doc),'supplemental':ai_svc.actions(doc),
+        'confidence':doc.ai_confidence,'error':doc.ai_error,'review_required':doc.analysis_review_required})
+
+
+@main_bp.route('/api/document-intelligence/<int:doc_id>/analyze', methods=['POST'])
+def document_intelligence_analyze(doc_id):
+    if not ai_svc.is_configured(): return jsonify({'error':'Gemini אינו מוגדר. הגדר GEMINI_API_KEY ב-Render.'}),503
+    try: return jsonify(ai_svc.analyze_and_persist(doc_id))
+    except Exception as exc:
+        current_app.logger.exception('Gemini analysis failed')
+        return jsonify({'error':str(exc)}),502
+
+
+@main_bp.route('/api/document-intelligence/<int:doc_id>/create-actions', methods=['POST'])
+def document_intelligence_create_actions(doc_id):
+    doc=db.session.get(Document,doc_id)
+    if not doc: return jsonify({'error':'המסמך לא נמצא'}),404
+    if doc.ai_status!='completed': return jsonify({'error':'יש להשלים ניתוח AI לפני יצירת פעולות'}),409
+    try: return jsonify(ai_svc.create_operational_actions(doc))
+    except Exception as exc:
+        db.session.rollback(); current_app.logger.exception('AI action creation failed')
+        return jsonify({'error':str(exc)}),500
+
+
+@main_bp.route('/api/document-intelligence/queue', methods=['POST'])
+def document_intelligence_queue():
+    if not ai_svc.is_configured(): return jsonify({'error':'Gemini אינו מוגדר. הגדר GEMINI_API_KEY ב-Render.'}),503
+    docs=Document.query.filter(Document.status.notin_(['deleted','archived'])).filter(Document.ai_status.in_(['not_requested','failed'])).all()
+    for doc in docs: ai_svc.queue(doc)
+    return jsonify({'queued':len(docs)})
 
 
 @main_bp.route('/api/system/health')
