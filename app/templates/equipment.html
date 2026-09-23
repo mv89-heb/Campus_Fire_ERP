@@ -151,7 +151,7 @@ const Equip = (() => {
           ${e.area_name ? `<div class="eq-row">📍 ${esc(e.area_name)}</div>` : ''}
           ${e.next_check_date ? `<div class="eq-row">🗓️ בדיקה הבאה: ${esc(e.next_check_date)}</div>` : ''}
           <div class="eq-actions">
-            <button class="btn btn-sm" style="flex:1" onclick="Equip.openModal(${e.id})">✏️ עריכה</button>
+            <button class="btn btn-sm" style="flex:1" onclick="Equip.openContext(${e.id})" >🔗 קשרים</button> <button onclick="Equip.openModal(${e.id})">✏️ עריכה</button>>✏️ עריכה</button>
             <button class="btn btn-sm btn-danger" onclick="Equip.remove(${e.id})">🗑️</button>
           </div>
         </div>
@@ -181,9 +181,20 @@ const Equip = (() => {
   }
 
   return {
+    closeContext: () => document.getElementById('eqContextModal').classList.remove('open'),
     init: async () => { await refresh(); const id = new URLSearchParams(window.location.search).get('equipment_id'); if (id) Equip.openModal(Number(id)); },
     refresh,
     applyFilters,
+    openContext: async (id) => {
+      const e=_all.find(x=>x.id===id); const modal=document.getElementById('eqContextModal'); const body=document.getElementById('eqContextBody');
+      document.getElementById('eqContextTitle').innerText='🧯 '+(e?.equipment_type||'ציוד');
+      modal.classList.add('open'); body.innerHTML='<div class="empty-state">טוען...</div>';
+      try{const r=await fetch('/api/integration/equipment/'+id);const d=await r.json();if(!r.ok)throw Error(d.error||'שגיאה');
+        body.innerHTML='<div class="card"><b>📍 מיקום</b><div>'+esc(d.location.site_name||'ללא אתר')+' · '+esc(d.location.building_name||'')+' · '+esc(d.location.floor_name||'')+' · '+esc(d.location.area_name||'')+'</div></div>'+
+        '<div class="card"><b>🚚 ספק</b><div>'+esc(d.supplier?.company_name||'לא משויך')+(d.supplier?.phone?' · '+esc(d.supplier.phone):'')+'</div></div>'+
+        '<div class="card"><b>🗓️ בדיקות</b><div>אחרונה: '+esc(d.equipment.last_check_date||'—')+' · הבאה: '+esc(d.equipment.next_check_date||'—')+'</div></div>';
+      }catch(e){body.innerHTML='<div class="error-state">⚠️ '+esc(e.message)+'</div>'}
+    },
     openModal: (id) => {
       document.getElementById('eqModalTitle').innerText = id ? 'עריכת ציוד' : 'ציוד חדש';
       fillForm(id ? _all.find(e => e.id === id) : null);
