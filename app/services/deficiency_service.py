@@ -114,5 +114,7 @@ def serialize_deficiency(d):
         "severity": d.severity, "responsible": d.responsible,
         "opened_at": str(d.opened_at) if d.opened_at else None,
         "due_date": str(d.due_date) if d.due_date else None,
-        "status": d.status, "task_id": d.task_id, "notes": d.notes,\n        "site_id": (db.session.get(Audit, d.audit_id).site_id if d.audit_id and db.session.get(Audit, d.audit_id) else None),\n        "source": "audit" if d.audit_id else ("ai_document" if d.notes and "document:" in d.notes else "manual"),
+        "status": d.status, "task_id": d.task_id, "notes": d.notes,
+        "site_id": (db.session.get(Audit, d.audit_id).site_id if d.audit_id and db.session.get(Audit, d.audit_id) else None),
+        "source": "audit" if d.audit_id else ("ai_document" if d.notes and "document:" in d.notes else "manual"),
     }
