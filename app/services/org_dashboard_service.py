@@ -65,8 +65,11 @@ def _task_kpis():
     by_status = Counter(t.status for t in tasks)
     urgent = [t for t in tasks if t.status != 'done' and t.priority in ('urgent', 'high')]
     urgent.sort(key=lambda t: (t.due_date is None, t.due_date or date.max))
+    today = date.today()
+    overdue = [t for t in tasks if t.status not in ('done', 'cancelled') and t.due_date and t.due_date < today]
     return {
         "open_count": by_status.get('open', 0) + by_status.get('in_progress', 0),
+        "overdue_count": len(overdue),
         "by_status": dict(by_status),
         "urgent_tasks": [
             {"id": t.id, "title": t.title, "priority": t.priority, "due_date": str(t.due_date) if t.due_date else None}
@@ -95,15 +98,22 @@ def _deficiency_kpis():
     deficiencies = Deficiency.query.all()
     open_defs = [d for d in deficiencies if d.status != 'resolved']
     by_severity = Counter(d.severity for d in open_defs)
-    return {"open_count": len(open_defs), "by_severity": dict(by_severity)}
+    return {
+        "open_count": len(open_defs),
+        "critical_count": sum(1 for d in open_defs if d.severity == 'critical'),
+        "overdue_count": sum(1 for d in open_defs if d.due_date and d.due_date < date.today()),
+        "by_severity": dict(by_severity)
+    }
 
 
 def _equipment_kpis():
     equipment = Equipment.query.all()
     faulty = [e for e in equipment if e.status == 'faulty']
+    due = [e for e in equipment if e.next_check_date and e.next_check_date <= date.today() and e.status != 'faulty']
     return {
         "total_count": len(equipment),
         "faulty_count": len(faulty),
+        "checks_due_count": len(due),
         "faulty_items": [
             {"id": e.id, "equipment_type": e.equipment_type, "serial_number": e.serial_number}
             for e in faulty[:10]
@@ -114,6 +124,17 @@ def _equipment_kpis():
 def _supplier_kpis():
     suppliers = Supplier.query.all()
     return {"total_count": len(suppliers), "active_count": sum(1 for s in suppliers if s.status == 'active')}
+
+
+def _document_kpis():
+    docs = Document.query.filter(Document.status.notin_(['archived', 'deleted'])).all()
+    unanalyzed = [d for d in docs if d.ai_status != 'completed']
+    review = [d for d in docs if d.analysis_review_required]
+    return {
+        "total_count": len(docs),
+        "unanalyzed_count": len(unanalyzed),
+        "review_count": len(review),
+    }
 
 
 def get_org_dashboard(force_refresh=False):
@@ -133,6 +154,7 @@ def _compute_org_dashboard():
     deficiencies = _deficiency_kpis()
     equipment = _equipment_kpis()
     suppliers = _supplier_kpis()
+    documents = _document_kpis()
 
     readiness_inputs = []
     total_permits = (
@@ -154,4 +176,5 @@ def _compute_org_dashboard():
         "deficiencies": deficiencies,
         "equipment": equipment,
         "suppliers": suppliers,
+        "documents": documents,
     }
