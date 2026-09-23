@@ -24,6 +24,6 @@ document.getElementById('detail').innerHTML=h}
 async function analyze(id){const r=await fetch('/api/document-intelligence/'+id+'/analyze',{method:'POST'});const d=await r.json();if(!r.ok)alert(d.error||'שגיאה');await open(id);await load()}
 async function actions(id){const r=await fetch('/api/document-intelligence/'+id+'/create-actions',{method:'POST'});const d=await r.json();alert(d.error||('נוצרו '+d.count+' ליקויים ומשימות'));await open(id)}
 async function queue(){const r=await fetch('/api/document-intelligence/queue',{method:'POST'});const d=await r.json();alert(d.error||('נכנסו לתור '+d.queued+' מסמכים'));await load()}
-return{open,analyze,actions,queue};})();document.addEventListener('DOMContentLoaded',AI.queue);document.addEventListener('DOMContentLoaded',AI.load);
+return{open,analyze,actions,queue};})();document.addEventListener('DOMContentLoaded',AI.load);
 </script>
 {% endblock %}
