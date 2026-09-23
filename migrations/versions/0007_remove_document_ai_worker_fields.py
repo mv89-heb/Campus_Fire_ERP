@@ -6,7 +6,7 @@ Revises: 0006_document_ai_worker
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0007_remove_document_ai_worker_fields"
+revision = "0007_remove_ai_worker"
 down_revision = "0006_document_ai_worker"
 branch_labels = None
 depends_on = None
