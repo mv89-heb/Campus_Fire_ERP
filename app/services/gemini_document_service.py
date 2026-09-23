@@ -264,6 +264,8 @@ def create_operational_actions(document):
             {"text": "לבצע את הפעולה המומלצת", "done": False},
             {"text": "לאסוף ראיה/אישור לסגירה", "done": False}
         ], ensure_ascii=False)
+        task.site_id = document.site_id or task.site_id
+        task.supplier_id = document.supplier_id or task.supplier_id
         d.task_id = task.id
         created.append({"deficiency_id": d.id, "task_id": task.id, "title": title})
         existing.add(title.lower())
