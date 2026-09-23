@@ -14,25 +14,25 @@ def global_search(q, limit_per_type=5):
     results = []
 
     for s in Site.query.filter(Site.name.ilike(like)).limit(limit_per_type).all():
-        results.append({"type": "site", "type_label": "אתר", "id": s.id, "label": s.name, "url": "/sites"})
+        results.append({"type": "site", "type_label": "אתר", "id": s.id, "label": s.name, "url": f"/sites?site_id={s.id}"})
 
     for s in Supplier.query.filter(db.or_(
             Supplier.company_name.ilike(like), Supplier.contact_name.ilike(like))).limit(limit_per_type).all():
-        results.append({"type": "supplier", "type_label": "ספק", "id": s.id, "label": s.company_name, "url": "/suppliers"})
+        results.append({"type": "supplier", "type_label": "ספק", "id": s.id, "label": s.company_name, "url": f"/suppliers?supplier_id={s.id}"})
 
     for e in Equipment.query.filter(db.or_(
             Equipment.equipment_type.ilike(like), Equipment.serial_number.ilike(like))).limit(limit_per_type).all():
-        results.append({"type": "equipment", "type_label": "ציוד", "id": e.id, "label": f"{e.equipment_type} ({e.serial_number or '—'})", "url": "/equipment"})
+        results.append({"type": "equipment", "type_label": "ציוד", "id": e.id, "label": f"{e.equipment_type} ({e.serial_number or '—'})", "url": f"/equipment?equipment_id={e.id}"})
 
     for t in Task.query.filter(Task.title.ilike(like)).limit(limit_per_type).all():
-        results.append({"type": "task", "type_label": "משימה", "id": t.id, "label": t.title, "url": "/tasks"})
+        results.append({"type": "task", "type_label": "משימה", "id": t.id, "label": t.title, "url": f"/tasks?task_id={t.id}"})
 
     for a in Audit.query.filter(db.or_(
             Audit.audit_number.ilike(like), Audit.inspector_name.ilike(like))).limit(limit_per_type).all():
-        results.append({"type": "audit", "type_label": "ביקורת", "id": a.id, "label": a.audit_number or f"ביקורת #{a.id}", "url": "/audits"})
+        results.append({"type": "audit", "type_label": "ביקורת", "id": a.id, "label": a.audit_number or f"ביקורת #{a.id}", "url": f"/audits?audit_id={a.id}"})
 
     for d in Deficiency.query.filter(Deficiency.title.ilike(like)).limit(limit_per_type).all():
-        results.append({"type": "deficiency", "type_label": "ליקוי", "id": d.id, "label": d.title, "url": "/audits"})
+        results.append({"type": "deficiency", "type_label": "ליקוי", "id": d.id, "label": d.title, "url": f"/audits?deficiency_id={d.id}"})
 
     for doc in Document.query.filter(db.or_(
             Document.file_name.ilike(like), Document.permit_number.ilike(like))).filter(Document.status != 'deleted').limit(limit_per_type).all():
