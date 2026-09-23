@@ -296,6 +296,8 @@ def _ai_document_payload(doc):
         'confidence': doc.ai_confidence,
         'error': doc.ai_error,
         'review_required': doc.analysis_review_required,
+        'relationships': {'site_id': doc.site_id, 'audit_id': doc.audit_id, 'supplier_id': doc.supplier_id},
+        'relationship_review_required': doc.ai_status == 'completed' and not (doc.site_id or doc.audit_id or doc.supplier_id),
     }
 
 
@@ -411,11 +413,14 @@ def document_intelligence_overview():
     missing_items = []
     contradictions = []
     actions = []
+    relationship_review_required = 0
 
     for doc in docs:
         status_counts[doc.ai_status] = status_counts.get(doc.ai_status, 0) + 1
         if doc.ai_status != 'completed':
             continue
+        if not (doc.site_id or doc.audit_id or doc.supplier_id):
+            relationship_review_required += 1
         for finding in ai_svc.findings(doc):
             severity = finding.get('severity') or 'unclear'
             severity_counts[severity] = severity_counts.get(severity, 0) + 1
@@ -455,6 +460,7 @@ def document_intelligence_overview():
         'status_counts': status_counts,
         'severity_counts': severity_counts,
         'review_required': sum(1 for d in docs if d.analysis_review_required),
+        'relationship_review_required': relationship_review_required,
         'recurring_findings': recurring_items,
         'missing_items': missing_items[:50],
         'contradictions': contradictions[:50],
