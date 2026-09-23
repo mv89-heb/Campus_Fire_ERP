@@ -148,7 +148,6 @@ def persist(document, result):
     except (TypeError, ValueError):
         document.ai_confidence = None
     document.ai_error = None
-    document.ai_started_at = None
     document.analysis_review_required = (
         document.analysis_review_required or
         result.get("overall_status") in {"critical", "unclear"} or
@@ -162,7 +161,6 @@ def analyze_and_persist(document_id):
     if not document:
         raise ValueError("המסמך לא נמצא")
     document.ai_status = "processing"
-    document.ai_started_at = datetime.utcnow()
     document.ai_error = None
     db.session.commit()
     try:
@@ -176,13 +174,6 @@ def analyze_and_persist(document_id):
         document.ai_error = str(exc)[:2000]
         db.session.commit()
         raise
-
-def queue(document):
-    document.ai_status = "queued"
-    document.ai_error = None
-    document.ai_started_at = None
-    document.ai_attempts = 0
-    db.session.commit()
 
 def findings(document):
     try:
