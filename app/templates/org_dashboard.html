@@ -60,6 +60,13 @@ tr:last-child td { border-bottom: none; }
   <div class="skeleton skeleton-kpi"></div>
 </div>
 
+<div class="card" id="actionCenter" style="border-right:4px solid var(--critical);">
+  <div class="card-title">🎯 דורש טיפול עכשיו</div>
+  <div id="actionCenterBody" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
+    <div class="skeleton skeleton-row"></div>
+  </div>
+</div>
+
 <div class="grid-2">
   <div class="card">
     <div class="card-title">📅 אישורים לפי חודש תפוגה</div>
@@ -141,7 +148,20 @@ async function loadDashboard(forceRefresh = false) {
       <div class="kpi-card"><div class="kpi-value">${d.audits.this_week.length}</div><div class="kpi-label">ביקורות השבוע</div></div>
       <div class="kpi-card bad"><div class="kpi-value">${d.deficiencies.open_count}</div><div class="kpi-label">ליקויים פתוחים</div></div>
       <div class="kpi-card bad"><div class="kpi-value">${d.equipment.faulty_count}</div><div class="kpi-label">ציוד לא תקין</div></div>
+      <div class="kpi-card warn"><div class="kpi-value">${d.equipment.checks_due_count || 0}</div><div class="kpi-label">בדיקות ציוד שהגיע מועדן</div></div>
     `;
+
+    const actions = [
+      {label:'משימות באיחור', count:d.tasks.overdue_count || 0, url:'/tasks', icon:'⏰', cls:'bad'},
+      {label:'ליקויים קריטיים', count:d.deficiencies.critical_count || 0, url:'/audits', icon:'🔴', cls:'bad'},
+      {label:'ליקויים באיחור', count:d.deficiencies.overdue_count || 0, url:'/audits', icon:'⚠️', cls:'warn'},
+      {label:'מסמכים ללא ניתוח Gemini', count:d.documents?.unanalyzed_count || 0, url:'/document-intelligence', icon:'🤖', cls:'warn'},
+      {label:'מסמכים לבדיקה', count:d.documents?.review_count || 0, url:'/document-intelligence', icon:'🔎', cls:'warn'},
+      {label:'בדיקות ציוד שהגיעו', count:d.equipment.checks_due_count || 0, url:'/equipment', icon:'🧯', cls:'warn'}
+    ].filter(x => x.count > 0);
+    document.getElementById('actionCenterBody').innerHTML = actions.length
+      ? actions.map(x => '<a href="'+x.url+'" class="kpi-card '+x.cls+'" style="text-decoration:none;"><div class="kpi-value">'+x.icon+' '+x.count+'</div><div class="kpi-label">'+esc(x.label)+'</div></a>').join('')
+      : '<div class="empty-state" style="grid-column:1/-1;">✅ אין פריטים דחופים כרגע</div>';
 
     renderBarChart('chartByMonth', d.permits.by_month);
     renderBarChart('chartByStatus', d.permits.by_status, { valid: 'תקין', warning: 'אזהרה', expired: 'פג תוקף' });
