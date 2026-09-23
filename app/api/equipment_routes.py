@@ -3,6 +3,7 @@ API עבור ניהול ציוד כיבוי אש (שלב 8).
 """
 from flask import Blueprint, jsonify, request, render_template
 from app.services import equipment_service as svc
+from app.services import integration_service as integration_svc
 from app.services.equipment_service import EquipmentServiceError
 
 equipment_bp = Blueprint('equipment', __name__)
@@ -60,3 +61,11 @@ def api_update_equipment(equipment_id):
 def api_delete_equipment(equipment_id):
     svc.delete_equipment(equipment_id)
     return jsonify({"success": True})
+
+
+@equipment_bp.route('/api/integration/equipment/<int:equipment_id>', methods=['GET'])
+def api_equipment_context(equipment_id):
+    try:
+        return jsonify(integration_svc.equipment_context(equipment_id))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
