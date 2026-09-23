@@ -182,6 +182,7 @@ const Equip = (() => {
 
   return {
     init: () => { refresh(); },
+    refresh,
     applyFilters,
     openModal: (id) => {
       document.getElementById('eqModalTitle').innerText = id ? 'עריכת ציוד' : 'ציוד חדש';
