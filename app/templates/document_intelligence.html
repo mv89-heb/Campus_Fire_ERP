@@ -46,7 +46,7 @@ const AI=(()=>{
       '<span>דורשים בדיקה: <b>'+d.review_required+'</b></span>'+
       '<span>ליקויים קריטיים/גבוהים: <b>'+(((sv.critical)||0)+((sv.high)||0))+'</b></span>'+
       '<span>חוסרים: <b>'+((d.missing_items||[]).length)+'</b></span>'+
-      '<span>סתירות: <b>'+((d.contradictions||[]).length)+'</b></span>'+\
+      '<span>סתירות: <b>'+((d.contradictions||[]).length)+'</b></span>'+
       '<span>קשרים לבדיקה: <b>'+((d.relationship_review_required)||0)+'</b></span></div>'+
       (d.recurring_findings?.length?'<div style="margin-top:10px"><b>ליקויים חוזרים:</b> '+d.recurring_findings.slice(0,5).map(x=>esc(x.title)+' × '+x.count).join(' · ')+'</div>':'');
   }
