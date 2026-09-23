@@ -421,24 +421,6 @@ def document_intelligence_overview():
     })
 
 
-@main_bp.route('/api/document-intelligence/queue', methods=['POST'])
-def document_intelligence_queue():
-    if not ai_svc.is_configured():
-        return jsonify({'error': 'Gemini אינו מוגדר. הגדר GEMINI_API_KEY ב-Render.'}), 503
-
-    docs = (
-        Document.query
-        .filter(Document.status.notin_(['deleted', 'archived']))
-        .filter(Document.ai_status.in_(['not_requested', 'failed']))
-        .all()
-    )
-    return jsonify({
-        'queued': len(docs),
-        'documents': [{'id': doc.id, 'file_name': doc.file_name} for doc in docs],
-        'mode': 'web_sequential',
-    })
-
-
 @main_bp.route('/api/system/health')
 def system_health():
     result = {'db_connected': False, 'zones_seeded': False, 'upload_folder_writable': False}
