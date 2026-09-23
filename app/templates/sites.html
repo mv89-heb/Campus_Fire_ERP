@@ -93,6 +93,14 @@
     </div>
   </div>
 </div>
+
+<div class="modal-overlay" id="siteContextModal">
+  <div class="modal" style="max-width:760px; max-height:88vh; overflow:auto;">
+    <h3 id="siteContextTitle">מרכז האתר</h3>
+    <div id="siteContextBody"><div class="empty-state">טוען...</div></div>
+    <div class="modal-actions"><button class="btn" onclick="Sites.closeModal('siteContextModal')">סגירה</button></div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_script %}
@@ -144,6 +152,7 @@ const Sites = (() => {
             <div class="site-meta">${esc(site.address || 'ללא כתובת')} · ${site.building_count} מבנים</div>
           </div>
           <div class="site-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-sm" onclick="Sites.openContext(${site.id})">📊</button>
             <button class="btn btn-sm" onclick="Sites.openSiteModal(${site.id})">✏️</button>
             <button class="btn btn-sm btn-danger" onclick="Sites.deleteSite(${site.id})">🗑️</button>
           </div>
@@ -207,6 +216,30 @@ const Sites = (() => {
     toggle: (key) => {
       if (openSections.has(key)) openSections.delete(key); else openSections.add(key);
       render();
+    },
+
+    openContext: async (siteId) => {
+      const modal = document.getElementById('siteContextModal');
+      const body = document.getElementById('siteContextBody');
+      const site = _sites.find(x => x.id === siteId);
+      document.getElementById('siteContextTitle').innerText = '📊 מרכז האתר · ' + (site?.name || '');
+      body.innerHTML = '<div class="empty-state">טוען קשרים...</div>';
+      modal.classList.add('open');
+      try {
+        const res = await fetch('/api/integration/sites/' + siteId);
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'שגיאה');
+        const counts = d.counts;
+        body.innerHTML = '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:14px;">' +
+          [['ביקורות',counts.audits],['ליקויים פתוחים',counts.open_deficiencies],['משימות פתוחות',counts.open_tasks],['ציוד',counts.equipment],['ספקים',counts.suppliers],['מסמכים',counts.documents]]
+          .map(x => '<div class="card" style="margin:0;text-align:center;padding:10px;"><b>'+x[1]+'</b><div style="font-size:.75rem;color:var(--text-muted)">'+x[0]+'</div></div>').join('') + '</div>' +
+          '<div style="font-weight:700;margin:12px 0 6px;">ביקורות אחרונות</div>' +
+          (d.audits.slice(0,5).map(a => '<div style="padding:7px 0;border-bottom:1px solid var(--border);"><b>'+esc(a.audit_number || ('#'+a.id))+'</b> · '+esc(a.audit_date || 'ללא תאריך')+' · '+esc(a.status)+(a.open_deficiency_count ? ' · ⚠️ '+a.open_deficiency_count : '')+'</div>').join('') || '<div class="empty-state">אין ביקורות</div>') +
+          '<div style="font-weight:700;margin:12px 0 6px;">ליקויים פתוחים</div>' +
+          (d.deficiencies.filter(x=>x.status!=='resolved').slice(0,8).map(x => '<div style="padding:7px 0;border-bottom:1px solid var(--border);"><b>'+esc(x.title)+'</b> · '+esc(x.severity)+' · יעד '+esc(x.due_date || '—')+'</div>').join('') || '<div class="empty-state">אין ליקויים פתוחים</div>') +
+          '<div style="font-weight:700;margin:12px 0 6px;">מסמכים</div>' +
+          (d.documents.slice(0,8).map(x => '<div style="padding:7px 0;border-bottom:1px solid var(--border);"><a href="/api/documents/'+x.id+'/file" target="_blank">'+esc(x.file_name)+'</a> · '+esc(x.ai_status)+'</div>').join('') || '<div class="empty-state">אין מסמכים מקושרים</div>');
+      } catch (e) { body.innerHTML = '<div class="error-state">⚠️ ' + esc(e.message) + '</div>'; }
     },
 
     openSiteModal: (siteId) => {
