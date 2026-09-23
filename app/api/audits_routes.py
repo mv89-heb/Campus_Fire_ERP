@@ -7,6 +7,7 @@ from app.services import audit_service as audit_svc
 from app.services import deficiency_service as def_svc
 from app.services.audit_service import AuditServiceError
 from app.services.deficiency_service import DeficiencyServiceError
+from app.services import integration_service as integration_svc
 
 audits_bp = Blueprint('audits', __name__)
 
@@ -126,3 +127,11 @@ def api_delete_deficiency(deficiency_id):
 def api_create_task_from_deficiency(deficiency_id):
     d, task = def_svc.create_task_from_deficiency(deficiency_id)
     return jsonify({"deficiency": def_svc.serialize_deficiency(d), "task_id": task.id}), 201
+
+
+@audits_bp.route('/api/integration/audits/<int:audit_id>', methods=['GET'])
+def api_audit_context(audit_id):
+    try:
+        return jsonify(integration_svc.audit_context(audit_id))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
