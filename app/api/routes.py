@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request, current_app, render_template, sen
 from app.extensions import db
 from app.models import Zone, SystemRequirement, Document
 from app.services import gemini_document_service as ai_svc
+from app.services import document_link_service as link_svc
 from app.services.dms_service import DMSService
 from app.services import storage
 from app.services.document_analysis_service import validity_status
@@ -295,6 +296,8 @@ def _ai_document_payload(doc):
         'confidence': doc.ai_confidence,
         'error': doc.ai_error,
         'review_required': doc.analysis_review_required,
+        'relationships': {'site_id': doc.site_id, 'audit_id': doc.audit_id, 'supplier_id': doc.supplier_id},
+        'relationship_review_required': doc.ai_status == 'completed' and not (doc.site_id or doc.audit_id or doc.supplier_id),
     }
 
 
@@ -347,6 +350,45 @@ def document_intelligence_analyze(doc_id):
         }), 502
 
 
+@main_bp.route('/api/document-intelligence/<int:doc_id>/context', methods=['GET'])
+def document_intelligence_context(doc_id):
+    doc = db.session.get(Document, doc_id)
+    if not doc:
+        return jsonify({'error': 'המסמך לא נמצא'}), 404
+    try:
+        links = link_svc.resolve_document(doc, persist=True)
+        return jsonify({
+            'document_id': doc.id,
+            'file_name': doc.file_name,
+            'links': links,
+            'current': {'site_id': doc.site_id, 'audit_id': doc.audit_id, 'supplier_id': doc.supplier_id},
+        })
+    except Exception as exc:
+        current_app.logger.exception('Document relationship resolution failed for %s', doc_id)
+        return jsonify({'error': str(exc)}), 500
+
+
+@main_bp.route('/api/document-intelligence/<int:doc_id>/links', methods=['POST'])
+def document_intelligence_links(doc_id):
+    doc = db.session.get(Document, doc_id)
+    if not doc:
+        return jsonify({'error': 'המסמך לא נמצא'}), 404
+    try:
+        document, links = link_svc.apply_links(doc.id, request.get_json(silent=True) or {})
+        return jsonify({
+            'success': True,
+            'current': {'site_id': document.site_id, 'audit_id': document.audit_id, 'supplier_id': document.supplier_id},
+            'links': links,
+        })
+    except (ValueError, TypeError) as exc:
+        db.session.rollback()
+        return jsonify({'error': str(exc)}), 400
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Document relationship link update failed for %s', doc_id)
+        return jsonify({'error': 'שגיאה בעדכון קשרי המסמך'}), 500
+
+
 @main_bp.route('/api/document-intelligence/<int:doc_id>/create-actions', methods=['POST'])
 def document_intelligence_create_actions(doc_id):
     doc = db.session.get(Document, doc_id)
@@ -371,11 +413,14 @@ def document_intelligence_overview():
     missing_items = []
     contradictions = []
     actions = []
+    relationship_review_required = 0
 
     for doc in docs:
         status_counts[doc.ai_status] = status_counts.get(doc.ai_status, 0) + 1
         if doc.ai_status != 'completed':
             continue
+        if not (doc.site_id or doc.audit_id or doc.supplier_id):
+            relationship_review_required += 1
         for finding in ai_svc.findings(doc):
             severity = finding.get('severity') or 'unclear'
             severity_counts[severity] = severity_counts.get(severity, 0) + 1
@@ -415,6 +460,7 @@ def document_intelligence_overview():
         'status_counts': status_counts,
         'severity_counts': severity_counts,
         'review_required': sum(1 for d in docs if d.analysis_review_required),
+        'relationship_review_required': relationship_review_required,
         'recurring_findings': recurring_items,
         'missing_items': missing_items[:50],
         'contradictions': contradictions[:50],

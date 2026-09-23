@@ -1,7 +1,7 @@
 {% extends "_shell.html" %}
 {% block title %}מרכז ניתוח מסמכים AI | בטיחות אש{% endblock %}
 {% block extra_style %}
-.ai-grid{display:grid;grid-template-columns:340px 1fr;gap:15px}.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:15px;margin-bottom:15px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.btn{padding:9px 14px;border-radius:var(--radius);border:1px solid var(--border-mid);background:var(--bg-hover);color:var(--text);cursor:pointer}.btn-primary{background:var(--accent);color:#000;border:0}.btn:disabled{opacity:.55;cursor:not-allowed}.doc{padding:10px;border-bottom:1px solid var(--border);cursor:pointer}.doc:hover{background:var(--bg-hover)}.finding{border:1px solid var(--border);border-radius:8px;padding:12px;margin:9px 0}.finding.high,.finding.critical{border-right:4px solid var(--critical)}.finding.medium{border-right:4px solid var(--warning)}.action{background:rgba(63,185,80,.06);padding:10px;border-radius:7px;margin-top:8px}.muted{color:var(--text-muted);font-size:.82rem}.progress{height:10px;background:var(--bg-hover);border-radius:999px;overflow:hidden;margin-top:10px}.progress>div{height:100%;width:0%;background:var(--accent);transition:width .2s}@media(max-width:850px){.ai-grid{grid-template-columns:1fr}}
+.ai-grid{display:grid;grid-template-columns:340px 1fr;gap:15px}.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:15px;margin-bottom:15px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.btn{padding:9px 14px;border-radius:var(--radius);border:1px solid var(--border-mid);background:var(--bg-hover);color:var(--text);cursor:pointer}.btn-primary{background:var(--accent);color:#000;border:0}.btn:disabled{opacity:.55;cursor:not-allowed}.doc{padding:10px;border-bottom:1px solid var(--border);cursor:pointer}.doc:hover{background:var(--bg-hover)}.finding{border:1px solid var(--border);border-radius:8px;padding:12px;margin:9px 0}.finding.high,.finding.critical{border-right:4px solid var(--critical)}.relationship{border:1px solid var(--border);border-radius:8px;padding:12px;margin:12px 0}.relationship-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.relationship-box{background:var(--bg-hover);border-radius:8px;padding:10px}.relationship-box select{width:100%;margin-top:7px;padding:8px;border:1px solid var(--border-mid);border-radius:6px;background:var(--bg-card);color:var(--text)}.relationship-ok{color:var(--valid)}.relationship-warn{color:var(--warning)}@media(max-width:850px){.relationship-grid{grid-template-columns:1fr}}.finding.medium{border-right:4px solid var(--warning)}.action{background:rgba(63,185,80,.06);padding:10px;border-radius:7px;margin-top:8px}.muted{color:var(--text-muted);font-size:.82rem}.progress{height:10px;background:var(--bg-hover);border-radius:999px;overflow:hidden;margin-top:10px}.progress>div{height:100%;width:0%;background:var(--accent);transition:width .2s}@media(max-width:850px){.ai-grid{grid-template-columns:1fr}}
 {% endblock %}
 {% block content %}
 <div id="overview" class="card" style="margin-bottom:15px">טוען תמונת מצב...</div>
@@ -46,7 +46,8 @@ const AI=(()=>{
       '<span>דורשים בדיקה: <b>'+d.review_required+'</b></span>'+
       '<span>ליקויים קריטיים/גבוהים: <b>'+(((sv.critical)||0)+((sv.high)||0))+'</b></span>'+
       '<span>חוסרים: <b>'+((d.missing_items||[]).length)+'</b></span>'+
-      '<span>סתירות: <b>'+((d.contradictions||[]).length)+'</b></span></div>'+
+      '<span>סתירות: <b>'+((d.contradictions||[]).length)+'</b></span>'+
+      '<span>קשרים לבדיקה: <b>'+((d.relationship_review_required)||0)+'</b></span></div>'+
       (d.recurring_findings?.length?'<div style="margin-top:10px"><b>ליקויים חוזרים:</b> '+d.recurring_findings.slice(0,5).map(x=>esc(x.title)+' × '+x.count).join(' · ')+'</div>':'');
   }
 
@@ -62,6 +63,48 @@ const AI=(()=>{
     ).join('')||'<span class="muted">אין מסמכים</span>';
   }
 
+  function relationshipLabel(type){return type==='audit'?'ביקורת':type==='site'?'אתר':'ספק';}
+  function relationshipOptions(type, links){
+    const box=links[type]||{};
+    const opts=(box.candidates||[]).map(x=>'<option value="'+x.id+'">'+esc(x.label)+' · '+Math.round((x.score||0)*100)+'%</option>').join('');
+    return '<option value="">בחר '+relationshipLabel(type)+'</option>'+opts;
+  }
+  async function relationshipContext(id){
+    const r=await fetch('/api/document-intelligence/'+id+'/context');
+    const d=await r.json();
+    if(!r.ok) return null;
+    return d;
+  }
+  async function saveRelationships(id){
+    const payload={
+      audit_id: document.getElementById('relAudit')?.value ? Number(document.getElementById('relAudit').value) : null,
+      site_id: document.getElementById('relSite')?.value ? Number(document.getElementById('relSite').value) : null,
+      supplier_id: document.getElementById('relSupplier')?.value ? Number(document.getElementById('relSupplier').value) : null
+    };
+    const r=await fetch('/api/document-intelligence/'+id+'/links',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'שגיאה בעדכון הקשרים');
+    await open(id);
+  }
+
+  async function renderRelationships(id){
+    const ctx=await relationshipContext(id);
+    if(!ctx) return '';
+    const l=ctx.links||{}, current=ctx.current||{};
+    const box=(type,currentId)=>{
+      const state=l[type]?.status||'missing';
+      const icon=state==='linked'?'🟢':state==='candidate'?'🟡':'⚪';
+      const label=state==='linked'?'מקושר':state==='candidate'?'נדרש אישור':'לא זוהה';
+      return '<div class="relationship-box"><b>'+icon+' '+relationshipLabel(type)+'</b><div class="muted">'+label+'</div>'+
+        '<select id="rel'+type.charAt(0).toUpperCase()+type.slice(1)+'">'+
+        (currentId?'<option value="'+currentId+'" selected>הקשר הנוכחי #'+currentId+'</option>':'')+
+        relationshipOptions(type,l)+'</select></div>';
+    };
+    return '<div class="relationship"><b>🔗 קשרים תפעוליים</b><div class="muted" style="margin:5px 0 10px">קישור אוטומטי נעשה רק כשיש התאמה ברורה. התאמות מועמדות דורשות אישור ידני.</div>'+
+      '<div class="relationship-grid">'+box('audit',current.audit_id)+box('site',current.site_id)+box('supplier',current.supplier_id)+'</div>'+
+      '<button class="btn btn-primary" style="margin-top:10px" onclick="AI.saveRelationships('+id+')">💾 שמור קשרים</button></div>';
+  }
+
   async function open(id){
     const r=await fetch('/api/document-intelligence/'+id);
     const d=await r.json();
@@ -69,6 +112,7 @@ const AI=(()=>{
     let h='<h2>'+esc(d.file_name)+'</h2><div class="muted">'+esc(d.document_type||'לא זוהה')+' · '+(labels[d.ai_status]||d.ai_status)+(d.confidence!=null?' · ביטחון '+Math.round(d.confidence*100)+'%':'')+'</div>';
     if(d.error)h+='<div class="finding critical">'+esc(d.error)+'</div>';
     if(d.summary)h+='<div class="card"><b>סיכום הביקורת</b><p>'+esc(d.summary)+'</p></div>';
+    h+=await renderRelationships(id);
     (d.findings||[]).forEach((f,i)=>{
       h+='<div class="finding '+esc(f.severity)+'"><b>'+((i+1)+'. ')+esc(f.title)+'</b>'+
       '<div class="muted">'+(sev[f.severity]||f.severity)+' · ביטחון '+Math.round((f.confidence||0)*100)+'%</div>'+
@@ -154,7 +198,7 @@ const AI=(()=>{
     await open(id);
   }
 
-  return {load,open,analyze,analyzeAll,actions};
+  return {load,open,analyze,analyzeAll,actions,saveRelationships};
 })();
 document.addEventListener('DOMContentLoaded',async()=>{await AI.load();const id=new URLSearchParams(window.location.search).get('document');if(id)await AI.open(Number(id));});
 </script>

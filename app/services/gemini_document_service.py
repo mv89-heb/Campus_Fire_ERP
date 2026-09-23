@@ -12,6 +12,7 @@ from app.extensions import db
 from app.models import Document, Deficiency, Task, Audit
 from app.services import storage
 from app.services import integration_service as integration_svc
+from app.services import document_link_service as link_svc
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +22,10 @@ SCHEMA = {
         "document_type": {"type": "STRING"},
         "document_purpose": {"type": "STRING"},
         "audit_number": {"type": "STRING", "nullable": True},
+        "site_name": {"type": "STRING", "nullable": True},
+        "site_address": {"type": "STRING", "nullable": True},
+        "supplier_name": {"type": "STRING", "nullable": True},
+        "supplier_number": {"type": "STRING", "nullable": True},
         "audit_date": {"type": "STRING", "nullable": True},
         "inspector_name": {"type": "STRING", "nullable": True},
         "summary": {"type": "STRING"},
@@ -48,7 +53,7 @@ SCHEMA = {
 }
 
 SYSTEM_PROMPT = """אתה מנתח מסמכי בטיחות אש עבור ERP.
-ה-PDF הוא מקור הראיות. אל תמציא עובדות, תאריכים, תקנים או חובות חוקיות.
+ה-PDF הוא מקור הראיות. אל תמציא עובדות, תאריכים, תקנים או חובות חוקיות.\nאם המסמך כולל שם אתר, כתובת, שם ספק, מספר ספק או מספר ביקורת — חלץ אותם. אם אינם מופיעים, החזר null.
 לכל ממצא: הסבר מה נמצא, למה זה חשוב, מה צריך לעשות בפועל, מי בדרך כלל מטפל
 אם אפשר להסיק זאת, ומה הראיה הדרושה לסגירה. הפרד עובדה מהמלצה וסמן אי-ודאות.
 אל תציג המלצה משפטית כעובדה. כתוב בעברית ברורה ומעשית."""
@@ -143,6 +148,10 @@ def persist(document, result):
         "audit_number": result.get("audit_number"),
         "audit_date": result.get("audit_date"),
         "inspector_name": result.get("inspector_name"),
+        "site_name": result.get("site_name"),
+        "site_address": result.get("site_address"),
+        "supplier_name": result.get("supplier_name"),
+        "supplier_number": result.get("supplier_number"),
         "missing_items": result.get("missing_items", []),
         "contradictions": result.get("contradictions", []),
         "follow_up_questions": result.get("follow_up_questions", [])
@@ -165,6 +174,7 @@ def persist(document, result):
         if linked_audit:
             document.audit_id = linked_audit.id
             document.site_id = linked_audit.site_id
+    link_svc.resolve_document(document, persist=False)
 
     document.analysis_review_required = (
         document.analysis_review_required or
@@ -173,6 +183,7 @@ def persist(document, result):
             for x in result.get("key_findings", []))
     )
     db.session.commit()
+    link_svc.resolve_document(document, persist=True)
 
 def analyze_and_persist(document_id):
     document = db.session.get(Document, document_id)
@@ -217,7 +228,8 @@ def create_operational_actions(document):
     except (TypeError, ValueError):
         result_meta = {}
     audit_number = result_meta.get("audit_number") if isinstance(result_meta, dict) else None
-    if audit_number:
+    audit = db.session.get(Audit, document.audit_id) if document.audit_id else None
+    if not audit and audit_number:
         audit = Audit.query.filter(db.func.lower(Audit.audit_number) == str(audit_number).strip().lower()).order_by(Audit.id.desc()).first()
 
     for item in findings(document):
@@ -252,6 +264,8 @@ def create_operational_actions(document):
             {"text": "לבצע את הפעולה המומלצת", "done": False},
             {"text": "לאסוף ראיה/אישור לסגירה", "done": False}
         ], ensure_ascii=False)
+        task.site_id = document.site_id or task.site_id
+        task.supplier_id = document.supplier_id or task.supplier_id
         d.task_id = task.id
         created.append({"deficiency_id": d.id, "task_id": task.id, "title": title})
         existing.add(title.lower())
