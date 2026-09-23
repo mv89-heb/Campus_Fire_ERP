@@ -188,19 +188,71 @@ def get_signed_url(stored_path: str, expires_in: int = 300):
 
 
 def download_bytes(stored_path: str) -> bytes:
-    """Download an object from Supabase Storage using the server-side key."""
+    """Download an object directly from Supabase Storage with retry handling."""
     if not stored_path:
         raise StorageError('נתיב Supabase ריק')
     bucket = _bucket_name()
     remote_filename = stored_path[len(bucket) + 1:] if stored_path.startswith(f'{bucket}/') else stored_path
-    try:
-        data = _get_client().storage.from_(bucket).download(remote_filename)
-        if not isinstance(data, (bytes, bytearray)):
-            raise StorageError('Supabase החזיר תוכן שאינו bytes')
-        return bytes(data)
-    except Exception as e:
-        logger.error(f'Supabase download failed for {stored_path}: {e}')
-        raise StorageError(f'הורדה מ-Supabase Storage נכשלה: {e}')
+
+    base_url = (current_app.config.get('SUPABASE_URL') or '').strip().rstrip('/')
+    key = current_app.config.get('SUPABASE_SERVICE_KEY')
+    if not base_url or not key:
+        raise StorageError('Supabase אינו מוגדר (חסרים SUPABASE_URL / SUPABASE_SERVICE_KEY)')
+
+    parsed = urlparse(base_url)
+    project_host = parsed.hostname or ''
+    if not project_host:
+        raise StorageError('SUPABASE_URL אינו תקין')
+
+    if project_host.endswith('.supabase.co'):
+        project_ref = project_host[:-len('.supabase.co')]
+        storage_url = f'https://{project_ref}.storage.supabase.co'
+    else:
+        storage_url = base_url
+
+    from urllib.parse import quote
+    import time
+    import httpx
+
+    object_path = quote(remote_filename, safe='/')
+    download_url = f'{storage_url}/storage/v1/object/{quote(bucket, safe="")}/{object_path}'
+    headers = {'Authorization': f'Bearer {key}', 'apikey': key}
+
+    last_error = None
+    for attempt in range(1, 4):
+        try:
+            with httpx.Client(timeout=httpx.Timeout(120.0, connect=20.0)) as client:
+                response = client.get(download_url, headers=headers)
+
+            if 200 <= response.status_code < 300:
+                return response.content
+
+            response_text = response.text[:1000]
+            last_error = f'HTTP {response.status_code}: {response_text}'
+            if response.status_code in (429, 500, 502, 503, 504, 540, 544) and attempt < 3:
+                time.sleep(attempt * 2)
+                continue
+            raise StorageError(f'הורדה מ-Supabase Storage נכשלה: {last_error}')
+        except StorageError:
+            raise
+        except (httpx.TimeoutException, httpx.NetworkError, OSError) as e:
+            last_error = str(e)
+            logger.warning(
+                'Supabase download attempt %s/3 failed for %s: %s',
+                attempt, stored_path, e
+            )
+            if attempt < 3:
+                time.sleep(attempt * 2)
+                continue
+            raise StorageError(
+                'החיבור ל-Supabase Storage נכשל לאחר 3 ניסיונות בהורדת המסמך. '
+                f'פרטי השגיאה: {last_error}'
+            )
+        except Exception as e:
+            logger.error(f'Supabase download failed for {stored_path}: {e}')
+            raise StorageError(f'הורדה מ-Supabase Storage נכשלה: {e}')
+
+    raise StorageError(f'הורדה מ-Supabase Storage נכשלה: {last_error}')
 
 
 def calculate_hash(data: bytes) -> str:
