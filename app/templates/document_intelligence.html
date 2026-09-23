@@ -156,6 +156,6 @@ const AI=(()=>{
 
   return {load,open,analyze,analyzeAll,actions};
 })();
-document.addEventListener('DOMContentLoaded',AI.load);
+document.addEventListener('DOMContentLoaded',async()=>{await AI.load();const id=new URLSearchParams(window.location.search).get('document');if(id)await AI.open(Number(id));});
 </script>
 {% endblock %}
