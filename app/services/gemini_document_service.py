@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 
 from flask import current_app
 from app.extensions import db
-from app.models import Document, Deficiency, Task
+from app.models import Document, Deficiency, Task, Audit
 from app.services import storage
 
 log = logging.getLogger(__name__)
@@ -139,6 +139,9 @@ def persist(document, result):
     document.ai_summary = result.get("summary")
     document.ai_findings_json = json.dumps(result.get("key_findings", []), ensure_ascii=False)
     document.ai_actions_json = json.dumps({
+        "audit_number": result.get("audit_number"),
+        "audit_date": result.get("audit_date"),
+        "inspector_name": result.get("inspector_name"),
         "missing_items": result.get("missing_items", []),
         "contradictions": result.get("contradictions", []),
         "follow_up_questions": result.get("follow_up_questions", [])
@@ -192,25 +195,39 @@ def actions(document):
 def create_operational_actions(document):
     created = []
     existing = {d.title.strip().lower() for d in Deficiency.query.filter(Deficiency.notes.ilike(f"%document:{document.id}%")).all()}
+    audit = None
+    result_meta = {}
+    try:
+        result_meta = json.loads(document.ai_actions_json or "{}")
+    except (TypeError, ValueError):
+        result_meta = {}
+    audit_number = result_meta.get("audit_number") if isinstance(result_meta, dict) else None
+    if audit_number:
+        audit = Audit.query.filter(db.func.lower(Audit.audit_number) == str(audit_number).strip().lower()).order_by(Audit.id.desc()).first()
+
     for item in findings(document):
         severity = item.get("severity")
         title = (item.get("title") or "").strip()
         if severity not in {"low", "medium", "high", "critical"} or not title or title.lower() in existing:
             continue
-        try:
-            due = date.today() + timedelta(days=max(0, int(item.get("due_days", 0) or 0)))
-        except (TypeError, ValueError):
-            due = None
+        due = None
+        if item.get("due_days") is not None:
+            try:
+                due = date.today() + timedelta(days=max(0, int(item.get("due_days"))))
+            except (TypeError, ValueError):
+                due = None
         description = "\n".join(x for x in [
             item.get("description"),
             "למה זה חשוב: " + str(item.get("why_it_matters") or ""),
             "מה לעשות: " + str(item.get("recommended_action") or ""),
-            "ראיה לסגירה: " + str(item.get("evidence_to_close") or "")
+            "ראיה לסגירה: " + str(item.get("evidence_to_close") or ""),
+            ("מקור: עמוד " + str(item.get("source_page")) + " · " + str(item.get("source_quote"))) if item.get("source_page") or item.get("source_quote") else ""
         ] if x)
         d = Deficiency(title=title, description=description, severity=severity,
+                       audit_id=audit.id if audit else None,
                        responsible=item.get("responsible_role"), opened_at=date.today(),
                        due_date=due, status="open",
-                       notes=f"document:{document.id}; ai_model:{document.ai_model or ''}")
+                       notes=f"document:{document.id}; ai_model:{document.ai_model or ''}" + (f"; audit:{audit.id}" if audit else ""))
         db.session.add(d)
         db.session.flush()
         priority = {"critical": "urgent", "high": "high", "medium": "normal", "low": "low"}[severity]
