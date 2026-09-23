@@ -1,30 +1,161 @@
 {% extends "_shell.html" %}
 {% block title %}מרכז ניתוח מסמכים AI | בטיחות אש{% endblock %}
 {% block extra_style %}
-.ai-grid{display:grid;grid-template-columns:340px 1fr;gap:15px}.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:15px;margin-bottom:15px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.btn{padding:9px 14px;border-radius:var(--radius);border:1px solid var(--border-mid);background:var(--bg-hover);color:var(--text);cursor:pointer}.btn-primary{background:var(--accent);color:#000;border:0}.doc{padding:10px;border-bottom:1px solid var(--border);cursor:pointer}.doc:hover{background:var(--bg-hover)}.finding{border:1px solid var(--border);border-radius:8px;padding:12px;margin:9px 0}.finding.high,.finding.critical{border-right:4px solid var(--critical)}.finding.medium{border-right:4px solid var(--warning)}.action{background:rgba(63,185,80,.06);padding:10px;border-radius:7px;margin-top:8px}.muted{color:var(--text-muted);font-size:.82rem}@media(max-width:850px){.ai-grid{grid-template-columns:1fr}}
+.ai-grid{display:grid;grid-template-columns:340px 1fr;gap:15px}.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:15px;margin-bottom:15px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.btn{padding:9px 14px;border-radius:var(--radius);border:1px solid var(--border-mid);background:var(--bg-hover);color:var(--text);cursor:pointer}.btn-primary{background:var(--accent);color:#000;border:0}.btn:disabled{opacity:.55;cursor:not-allowed}.doc{padding:10px;border-bottom:1px solid var(--border);cursor:pointer}.doc:hover{background:var(--bg-hover)}.finding{border:1px solid var(--border);border-radius:8px;padding:12px;margin:9px 0}.finding.high,.finding.critical{border-right:4px solid var(--critical)}.finding.medium{border-right:4px solid var(--warning)}.action{background:rgba(63,185,80,.06);padding:10px;border-radius:7px;margin-top:8px}.muted{color:var(--text-muted);font-size:.82rem}.progress{height:10px;background:var(--bg-hover);border-radius:999px;overflow:hidden;margin-top:10px}.progress>div{height:100%;width:0%;background:var(--accent);transition:width .2s}@media(max-width:850px){.ai-grid{grid-template-columns:1fr}}
 {% endblock %}
 {% block content %}
-<div id="overview" class="card" style="margin-bottom:15px">טוען תמונת מצב...</div><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:15px">
-<h1>🤖 מרכז ניתוח מסמכים AI</h1><div class="toolbar"><button class="btn" onclick="AI.queue()">📥 ניתוח כל המסמכים</button></div></div>
-<div class="ai-grid"><div class="card"><b>מסמכים</b><div id="list" style="margin-top:10px">טוען...</div></div><div class="card"><div id="detail" class="muted">בחר מסמך</div></div></div>
+<div id="overview" class="card" style="margin-bottom:15px">טוען תמונת מצב...</div>
+<div class="card" id="bulkPanel" style="display:none">
+  <b>⚙️ עיבוד המוני דרך הדפדפן</b>
+  <div id="bulkText" class="muted" style="margin-top:6px">מכין...</div>
+  <div class="progress"><div id="bulkProgress"></div></div>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:15px">
+  <h1>🤖 מרכז ניתוח מסמכים AI</h1>
+  <div class="toolbar">
+    <button id="bulkBtn" class="btn btn-primary" onclick="AI.analyzeAll()">🤖 ניתוח כל המסמכים</button>
+    <button class="btn" onclick="AI.load()">🔄 רענן</button>
+  </div>
+</div>
+<div class="ai-grid">
+  <div class="card"><b>מסמכים</b><div id="list" style="margin-top:10px">טוען...</div></div>
+  <div class="card"><div id="detail" class="muted">בחר מסמך</div></div>
+</div>
 {% endblock %}
 {% block extra_script %}
 <script>
-const AI=(()=>{let docs=[];
-const esc=s=>(s??'').toString().replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-const labels={not_requested:'טרם נותח',queued:'בתור',processing:'בתהליך',completed:'הושלם',failed:'נכשל'};
-const sev={critical:'קריטי',high:'גבוהה',medium:'בינונית',low:'נמוכה',info:'מידע',unclear:'לא ברור'};
-async function overview(){const r=await fetch('/api/document-intelligence/overview');const d=await r.json();if(!r.ok)return;const sc=d.status_counts||{},sev=d.severity_counts||{};document.getElementById('overview').innerHTML='<b>📊 תמונת מצב כוללת</b><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px"><span>סה"כ מסמכים: <b>'+d.total_documents+'</b></span><span>הושלמו: <b>'+((sc.completed)||0)+'</b></span><span>בתהליך: <b>'+(((sc.queued)||0)+((sc.processing)||0))+'</b></span><span>דורשים בדיקה: <b>'+d.review_required+'</b></span><span>ליקויים קריטיים/גבוהים: <b>'+(((sev.critical)||0)+((sev.high)||0))+'</b></span><span>חוסרים: <b>'+((d.missing_items||[]).length)+'</b></span><span>סתירות: <b>'+((d.contradictions||[]).length)+'</b></span></div>'+(d.recurring_findings?.length?'<div style="margin-top:10px"><b>ליקויים חוזרים:</b> '+d.recurring_findings.slice(0,5).map(x=>esc(x.title)+' × '+x.count).join(' · ')+'</div>':'');} async function load(){overview();const d=await (await fetch('/api/dashboard')).json();docs=await Promise.all((d.recent_docs||[]).map(x=>fetch('/api/document-intelligence/'+x.doc_id).then(r=>r.json())));document.getElementById('list').innerHTML=docs.map(x=>'<div class="doc" onclick="AI.open('+x.document_id+')"><b>'+esc(x.file_name)+'</b><br><span class="muted">'+(labels[x.ai_status]||x.ai_status)+(x.review_required?' · ⚠️ בדיקה נדרשת':'')+'</span></div>').join('')||'<span class="muted">אין מסמכים</span>'}
-async function open(id){const d=await (await fetch('/api/document-intelligence/'+id)).json();let h='<h2>'+esc(d.file_name)+'</h2><div class="muted">'+esc(d.document_type||'לא זוהה')+' · '+(labels[d.ai_status]||d.ai_status)+(d.confidence!=null?' · ביטחון '+Math.round(d.confidence*100)+'%':'')+'</div>';
-if(d.error)h+='<div class="finding critical">'+esc(d.error)+'</div>';if(d.summary)h+='<div class="card"><b>סיכום הביקורת</b><p>'+esc(d.summary)+'</p></div>';
-(d.findings||[]).forEach((f,i)=>{h+='<div class="finding '+esc(f.severity)+'"><b>'+((i+1)+'. ')+esc(f.title)+'</b><div class="muted">'+(sev[f.severity]||f.severity)+' · ביטחון '+Math.round((f.confidence||0)*100)+'%</div><p>'+esc(f.description)+'</p><p><b>למה זה חשוב:</b> '+esc(f.why_it_matters)+'</p><div class="action"><b>מה צריך לעשות:</b><br>'+esc(f.recommended_action)+'<br><br><b>איך סוגרים:</b> '+esc(f.evidence_to_close)+'</div></div>'});
-const s=d.supplemental||{};if(s.missing_items?.length)h+='<div class="finding medium"><b>חוסרים</b><ul>'+s.missing_items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';if(s.contradictions?.length)h+='<div class="finding high"><b>סתירות</b><ul>'+s.contradictions.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';
-if(d.ai_status==='not_requested'||d.ai_status==='failed')h+='<button class="btn btn-primary" onclick="AI.analyze('+d.document_id+')">🤖 נתח עם Gemini</button>';if(d.ai_status==='completed')h+='<button class="btn btn-primary" onclick="AI.actions('+d.document_id+')">✅ צור ליקויים ומשימות</button>';
-document.getElementById('detail').innerHTML=h}
-async function analyze(id){const r=await fetch('/api/document-intelligence/'+id+'/analyze',{method:'POST'});const d=await r.json();if(!r.ok){alert(d.error||'שגיאה');return}await open(id);await load();poll(id)}
-async function poll(id){for(let i=0;i<60;i++){await new Promise(resolve=>setTimeout(resolve,3000));const r=await fetch('/api/document-intelligence/'+id);if(!r.ok)return;const d=await r.json();await open(id);await overview();if(d.ai_status==='completed'||d.ai_status==='failed')return}}
-async function actions(id){const r=await fetch('/api/document-intelligence/'+id+'/create-actions',{method:'POST'});const d=await r.json();alert(d.error||('נוצרו '+d.count+' ליקויים ומשימות'));await open(id)}
-async function queue(){const r=await fetch('/api/document-intelligence/queue',{method:'POST'});const d=await r.json();alert(d.error||('נכנסו לתור '+d.queued+' מסמכים'));await load();overview()}
-return{open,analyze,actions,queue};})();document.addEventListener('DOMContentLoaded',AI.load);
+const AI=(()=>{
+  let docs=[];
+  let running=false;
+
+  const esc=s=>(s??'').toString().replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const labels={not_requested:'טרם נותח',processing:'בתהליך',completed:'הושלם',failed:'נכשל'};
+  const sev={critical:'קריטי',high:'גבוהה',medium:'בינונית',low:'נמוכה',info:'מידע',unclear:'לא ברור'};
+
+  async function overview(){
+    const r=await fetch('/api/document-intelligence/overview');
+    const d=await r.json();
+    if(!r.ok)return;
+    const sc=d.status_counts||{}, sv=d.severity_counts||{};
+    document.getElementById('overview').innerHTML=
+      '<b>📊 תמונת מצב כוללת</b><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">'+
+      '<span>סה"כ מסמכים: <b>'+d.total_documents+'</b></span>'+
+      '<span>הושלמו: <b>'+((sc.completed)||0)+'</b></span>'+
+      '<span>ממתינים לניתוח: <b>'+((sc.not_requested)||0)+'</b></span>'+
+      '<span>בתהליך: <b>'+((sc.processing)||0)+'</b></span>'+
+      '<span>דורשים בדיקה: <b>'+d.review_required+'</b></span>'+
+      '<span>ליקויים קריטיים/גבוהים: <b>'+(((sv.critical)||0)+((sv.high)||0))+'</b></span>'+
+      '<span>חוסרים: <b>'+((d.missing_items||[]).length)+'</b></span>'+
+      '<span>סתירות: <b>'+((d.contradictions||[]).length)+'</b></span></div>'+
+      (d.recurring_findings?.length?'<div style="margin-top:10px"><b>ליקויים חוזרים:</b> '+d.recurring_findings.slice(0,5).map(x=>esc(x.title)+' × '+x.count).join(' · ')+'</div>':'');
+  }
+
+  async function load(){
+    await overview();
+    const r=await fetch('/api/document-intelligence/documents');
+    const d=await r.json();
+    if(!r.ok){document.getElementById('list').innerHTML='<span class="muted">שגיאה בטעינת המסמכים</span>';return}
+    docs=d.documents||[];
+    document.getElementById('list').innerHTML=docs.map(x=>
+      '<div class="doc" onclick="AI.open('+x.document_id+')"><b>'+esc(x.file_name)+'</b><br>'+
+      '<span class="muted">'+(labels[x.ai_status]||x.ai_status)+(x.review_required?' · ⚠️ בדיקה נדרשת':'')+'</span></div>'
+    ).join('')||'<span class="muted">אין מסמכים</span>';
+  }
+
+  async function open(id){
+    const r=await fetch('/api/document-intelligence/'+id);
+    const d=await r.json();
+    if(!r.ok){document.getElementById('detail').innerHTML='<div class="finding critical">'+esc(d.error||'שגיאה')+'</div>';return}
+    let h='<h2>'+esc(d.file_name)+'</h2><div class="muted">'+esc(d.document_type||'לא זוהה')+' · '+(labels[d.ai_status]||d.ai_status)+(d.confidence!=null?' · ביטחון '+Math.round(d.confidence*100)+'%':'')+'</div>';
+    if(d.error)h+='<div class="finding critical">'+esc(d.error)+'</div>';
+    if(d.summary)h+='<div class="card"><b>סיכום הביקורת</b><p>'+esc(d.summary)+'</p></div>';
+    (d.findings||[]).forEach((f,i)=>{
+      h+='<div class="finding '+esc(f.severity)+'"><b>'+((i+1)+'. ')+esc(f.title)+'</b>'+
+      '<div class="muted">'+(sev[f.severity]||f.severity)+' · ביטחון '+Math.round((f.confidence||0)*100)+'%</div>'+
+      '<p>'+esc(f.description)+'</p><p><b>למה זה חשוב:</b> '+esc(f.why_it_matters)+'</p>'+
+      '<div class="action"><b>מה צריך לעשות:</b><br>'+esc(f.recommended_action)+
+      '<br><br><b>איך סוגרים:</b> '+esc(f.evidence_to_close)+'</div></div>';
+    });
+    const s=d.supplemental||{};
+    if(s.missing_items?.length)h+='<div class="finding medium"><b>חוסרים</b><ul>'+s.missing_items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';
+    if(s.contradictions?.length)h+='<div class="finding high"><b>סתירות</b><ul>'+s.contradictions.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';
+    if(d.ai_status==='not_requested'||d.ai_status==='failed')
+      h+='<button class="btn btn-primary" onclick="AI.analyze('+d.document_id+')">🤖 נתח עם Gemini</button>';
+    if(d.ai_status==='completed')
+      h+='<button class="btn btn-primary" onclick="AI.actions('+d.document_id+')">✅ צור ליקויים ומשימות</button>';
+    document.getElementById('detail').innerHTML=h;
+  }
+
+  async function analyze(id){
+    if(running)return;
+    const r=await fetch('/api/document-intelligence/'+id+'/analyze',{method:'POST'});
+    const d=await r.json();
+    if(!r.ok){alert(d.error||'שגיאה בניתוח');await open(id);return false}
+    await load();
+    await open(id);
+    return true;
+  }
+
+  async function analyzeWithRetry(id,maxAttempts=2){
+    for(let attempt=1;attempt<=maxAttempts;attempt++){
+      try{
+        const ok=await analyze(id);
+        if(ok)return true;
+      }catch(e){
+        if(attempt===maxAttempts)return false;
+      }
+      if(attempt<maxAttempts)await new Promise(resolve=>setTimeout(resolve,1500*attempt));
+    }
+    return false;
+  }
+
+  async function analyzeAll(){
+    if(running)return;
+    running=true;
+    const btn=document.getElementById('bulkBtn');
+    const panel=document.getElementById('bulkPanel');
+    const text=document.getElementById('bulkText');
+    const bar=document.getElementById('bulkProgress');
+    btn.disabled=true;
+    panel.style.display='block';
+    try{
+      const r=await fetch('/api/document-intelligence/documents');
+      const d=await r.json();
+      if(!r.ok)throw new Error(d.error||'לא ניתן לטעון מסמכים');
+      const pending=(d.documents||[]).filter(x=>x.ai_status!=='completed');
+      if(!pending.length){
+        text.textContent='כל המסמכים כבר נותחו.';
+        bar.style.width='100%';
+        return;
+      }
+      let done=0, failed=0;
+      for(const doc of pending){
+        text.textContent='מנתח '+(done+failed+1)+' מתוך '+pending.length+': '+doc.file_name;
+        const ok=await analyzeWithRetry(doc.document_id);
+        if(ok)done++;else failed++;
+        bar.style.width=Math.round(((done+failed)/pending.length)*100)+'%';
+        text.textContent='הושלמו '+done+' · נכשלו '+failed+' · '+(done+failed)+' מתוך '+pending.length;
+      }
+      await load();
+      alert(failed?'הניתוח הסתיים. הושלמו '+done+' מסמכים, ו-'+failed+' נכשלו לאחר ניסיונות חוזרים.':'הניתוח הסתיים בהצלחה: '+done+' מסמכים.');
+    }catch(e){
+      text.textContent='העיבוד נעצר: '+e.message;
+      alert(e.message||'שגיאה בעיבוד ההמוני');
+    }finally{
+      running=false;
+      btn.disabled=false;
+    }
+  }
+
+  async function actions(id){
+    const r=await fetch('/api/document-intelligence/'+id+'/create-actions',{method:'POST'});
+    const d=await r.json();
+    alert(d.error||('נוצרו '+d.count+' ליקויים ומשימות'));
+    await open(id);
+  }
+
+  return {load,open,analyze,analyzeAll,actions};
+})();
+document.addEventListener('DOMContentLoaded',AI.load);
 </script>
 {% endblock %}
