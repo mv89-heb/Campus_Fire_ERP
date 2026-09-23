@@ -151,7 +151,7 @@ const Equip = (() => {
           ${e.area_name ? `<div class="eq-row">📍 ${esc(e.area_name)}</div>` : ''}
           ${e.next_check_date ? `<div class="eq-row">🗓️ בדיקה הבאה: ${esc(e.next_check_date)}</div>` : ''}
           <div class="eq-actions">
-            <button class="btn btn-sm" style="flex:1" onclick="Equip.openContext(${e.id})" >🔗 קשרים</button> <button onclick="Equip.openModal(${e.id})">✏️ עריכה</button>>✏️ עריכה</button>
+            <button class="btn btn-sm" style="flex:1" onclick="Equip.openContext(${e.id})">🔗 קשרים</button><button class="btn btn-sm" onclick="Equip.openModal(${e.id})">✏️ עריכה</button>
             <button class="btn btn-sm btn-danger" onclick="Equip.remove(${e.id})">🗑️</button>
           </div>
         </div>
