@@ -99,17 +99,23 @@ const Shell = (() => {
   const nativeFetch = window.fetch.bind(window);
   const syncChannel = ('BroadcastChannel' in window) ? new BroadcastChannel('campus-fire-erp-sync') : null;
 
+  let refreshTimer = null;
   function refreshOtherPage() {
-    try {
-      if (window.Tasks && typeof window.Tasks.refresh === 'function') return window.Tasks.refresh();
-      if (window.Sites && typeof window.Sites.refresh === 'function') return window.Sites.refresh();
-      if (window.Audits && typeof window.Audits.refresh === 'function') return window.Audits.refresh();
-      if (window.Suppliers && typeof window.Suppliers.init === 'function') return window.Suppliers.init();
-      if (window.Equip && typeof window.Equip.init === 'function') return window.Equip.init();
-      if (window.AI && typeof window.AI.load === 'function') return window.AI.load();
-      if (typeof window.loadDashboard === 'function') return window.loadDashboard(true);
-      if (window.App && typeof window.App.refresh === 'function') return window.App.refresh();
-    } catch (e) {}
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(async () => {
+      const jobs = [];
+      try {
+        if (window.Tasks && typeof window.Tasks.refresh === 'function') jobs.push(window.Tasks.refresh());
+        if (window.Sites && typeof window.Sites.refresh === 'function') jobs.push(window.Sites.refresh());
+        if (window.Audits && typeof window.Audits.refresh === 'function') jobs.push(window.Audits.refresh());
+        if (window.Suppliers && typeof window.Suppliers.refresh === 'function') jobs.push(window.Suppliers.refresh());
+        if (window.Equip && typeof window.Equip.refresh === 'function') jobs.push(window.Equip.refresh());
+        if (window.AI && typeof window.AI.load === 'function') jobs.push(window.AI.load());
+        if (typeof window.loadDashboard === 'function') jobs.push(window.loadDashboard(true));
+        if (window.App && typeof window.App.refresh === 'function') jobs.push(window.App.refresh());
+        if (jobs.length) await Promise.allSettled(jobs);
+      } catch (e) {}
+    }, 120);
   }
 
   if (syncChannel) {
