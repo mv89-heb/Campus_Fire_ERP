@@ -104,13 +104,34 @@ def create_task_for_deficiency(deficiency: Deficiency) -> Task:
     return task
 
 
-def sync_task_completion(task: Task) -> list[Deficiency]:
-    """Propagate task completion/reopening to every linked deficiency."""
+def _severity_from_priority(priority: str | None) -> str | None:
+    return {
+        "urgent": "critical",
+        "high": "high",
+        "normal": "medium",
+        "low": "low",
+    }.get(priority)
+
+
+def sync_task_change(task: Task) -> list[Deficiency]:
+    """Propagate editable task fields back to deficiencies linked to the task."""
     deficiencies = Deficiency.query.filter_by(task_id=task.id).all()
+    severity = _severity_from_priority(task.priority)
     for deficiency in deficiencies:
+        if task.description is not None:
+            deficiency.description = task.description
+        deficiency.responsible = task.assignee
+        deficiency.due_date = task.due_date
+        if severity:
+            deficiency.severity = severity
         if task.status == "done":
             deficiency.status = "resolved"
         elif deficiency.status == "resolved":
             deficiency.status = "open"
         sync_audit_derived_state(deficiency.audit_id)
     return deficiencies
+
+
+def sync_task_completion(task: Task) -> list[Deficiency]:
+    """Backward-compatible wrapper for task completion synchronization."""
+    return sync_task_change(task)
