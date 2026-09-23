@@ -65,6 +65,8 @@ class Document(db.Model):
     ai_actions_json = db.Column(db.Text, nullable=True)
     ai_confidence = db.Column(db.Float, nullable=True)
     ai_error = db.Column(db.Text, nullable=True)
+    ai_attempts = db.Column(db.Integer, default=0, nullable=False)
+    ai_started_at = db.Column(db.DateTime, nullable=True)
 
 class Site(db.Model):
     __tablename__ = 'sites'
