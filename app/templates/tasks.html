@@ -245,7 +245,7 @@ const Tasks = (() => {
   }
 
   return {
-    init: () => { refresh(); },
+    init: async () => { await refresh(); const id = new URLSearchParams(window.location.search).get('task_id'); if (id) Tasks.openModal(Number(id)); },
     refresh,
     applyFilters,
 
