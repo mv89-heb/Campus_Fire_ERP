@@ -181,7 +181,7 @@ const Equip = (() => {
   }
 
   return {
-    init: () => { refresh(); },
+    init: async () => { await refresh(); const id = new URLSearchParams(window.location.search).get('equipment_id'); if (id) Equip.openModal(Number(id)); },
     refresh,
     applyFilters,
     openModal: (id) => {
