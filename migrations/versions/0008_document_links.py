@@ -1,13 +1,13 @@
 """Add document links to site, audit and supplier.
 
 Revision ID: 0008_document_links
-Revises: 0007_remove_document_ai_worker_fields
+Revises: 0007_remove_ai_worker
 """
 from alembic import op
 import sqlalchemy as sa
 
 revision = "0008_document_links"
-down_revision = "0007_remove_document_ai_worker_fields"
+down_revision = "0007_remove_ai_worker"
 branch_labels = None
 depends_on = None
 
