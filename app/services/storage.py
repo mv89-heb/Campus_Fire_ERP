@@ -77,36 +77,90 @@ def _restore_safe_remote_filename(remote_filename: str) -> str:
 
 
 def upload_bytes(remote_filename: str, data: bytes, content_type: str = 'application/pdf') -> str:
-    client = _get_client()
+    """
+    Upload directly to Supabase Storage's storage hostname.
+
+    The normal Supabase SDK routes storage traffic through the project API
+    hostname. After a Free-plan project resume, that gateway can temporarily
+    return HTTP 544 (DatabaseTimeout). The dedicated storage hostname is the
+    recommended path for larger uploads and avoids an unnecessary API-gateway
+    hop.
+    """
     bucket = _bucket_name()
     original_remote_filename = remote_filename
     remote_filename = _restore_safe_remote_filename(remote_filename)
-    try:
-        # supabase-storage-py passes file_options through to HTTP headers.
-        # Therefore values such as `upsert` must be strings/bytes, not Python bools.
-        client.storage.from_(bucket).upload(
-            path=remote_filename,
-            file=data,
-            file_options={
-                'content-type': str(content_type),
-                'upsert': 'true',
-            },
-        )
-    except Exception as e:
-        error_text = str(e)
-        if 'Name or service not known' in error_text or 'getaddrinfo' in error_text:
-            logger.error(
-                'Supabase upload DNS failure for %s -> %s; check SUPABASE_URL hostname',
-                original_remote_filename, remote_filename
+
+    base_url = (current_app.config.get('SUPABASE_URL') or '').strip().rstrip('/')
+    key = current_app.config.get('SUPABASE_SERVICE_KEY')
+    if not base_url or not key:
+        raise StorageError('Supabase אינו מוגדר (חסרים SUPABASE_URL / SUPABASE_SERVICE_KEY)')
+
+    parsed = urlparse(base_url)
+    project_host = parsed.hostname or ''
+    if not project_host:
+        raise StorageError('SUPABASE_URL אינו תקין. יש להגדיר כתובת HTTPS מלאה של פרויקט Supabase')
+
+    # For <project-ref>.supabase.co use the dedicated Storage hostname.
+    if project_host.endswith('.supabase.co'):
+        project_ref = project_host[:-len('.supabase.co')]
+        storage_url = f'https://{project_ref}.storage.supabase.co'
+    else:
+        storage_url = base_url
+
+    from urllib.parse import quote
+    import time
+    import httpx
+
+    object_path = quote(remote_filename, safe='/')
+    upload_url = f'{storage_url}/storage/v1/object/{quote(bucket, safe="")}/{object_path}'
+    headers = {
+        'Authorization': f'Bearer {key}',
+        'apikey': key,
+        'Content-Type': str(content_type),
+        'x-upsert': 'true',
+    }
+
+    last_error = None
+    # A resumed Free-plan project can briefly return 544 while its database
+    # services recover. Retry without forcing the browser to repeat the upload.
+    for attempt in range(1, 4):
+        try:
+            with httpx.Client(timeout=httpx.Timeout(120.0, connect=20.0)) as client:
+                response = client.post(upload_url, content=data, headers=headers)
+
+            if 200 <= response.status_code < 300:
+                return f'{bucket}/{remote_filename}'
+
+            response_text = response.text[:1000]
+            last_error = f'HTTP {response.status_code}: {response_text}'
+            if response.status_code in (429, 500, 502, 503, 504, 540, 544):
+                if attempt < 3:
+                    time.sleep(attempt * 2)
+                    continue
+            raise StorageError(f'העלאה ל-Supabase Storage נכשלה: {last_error}')
+        except StorageError:
+            raise
+        except (httpx.TimeoutException, httpx.NetworkError, OSError) as e:
+            last_error = str(e)
+            logger.warning(
+                'Supabase upload attempt %s/3 failed for %s: %s',
+                attempt, original_remote_filename, e
             )
+            if attempt < 3:
+                time.sleep(attempt * 2)
+                continue
             raise StorageError(
-                'לא ניתן להתחבר ל-Supabase: שם השרת של SUPABASE_URL לא נמצא. '
-                'בדוק ב-Render שהמשתנה SUPABASE_URL הוא כתובת HTTPS תקינה של פרויקט Supabase '
-                '(לדוגמה https://<project-ref>.supabase.co).'
+                'החיבור ל-Supabase Storage נכשל לאחר 3 ניסיונות. '
+                f'פרטי השגיאה: {last_error}'
             )
-        logger.error(f'Supabase upload failed for {original_remote_filename} -> {remote_filename}: {e}')
-        raise StorageError(f'העלאה ל-Supabase Storage נכשלה: {e}')
-    return f'{bucket}/{remote_filename}'
+        except Exception as e:
+            logger.error(
+                'Supabase upload failed for %s -> %s: %s',
+                original_remote_filename, remote_filename, e
+            )
+            raise StorageError(f'העלאה ל-Supabase Storage נכשלה: {e}')
+
+    raise StorageError(f'העלאה ל-Supabase Storage נכשלה: {last_error}')
 
 
 def delete_object(stored_path: str):
