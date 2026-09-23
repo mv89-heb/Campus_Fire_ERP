@@ -117,7 +117,11 @@ const AuditLog = (() => {
         <td><span class="ds-badge ${actionBadge[e.action] || 'ds-badge-neutral'}">${actionLabel[e.action] || e.action}</span></td>
         <td>${entityLabel[e.entity_type] || esc(e.entity_type)}</td>
         <td>${esc(e.entity_label || ('#' + e.entity_id))}</td>
-        <td class="diff-box">${e.new_value ? esc(e.new_value.slice(0, 150)) : ''}</td>
+        <td class="diff-box">
+          ${e.changed_fields?.length
+            ? '<details><summary>'+e.changed_fields.length+' שדות השתנו</summary><div style="margin-top:6px;">'+e.changed_fields.map(x => '<div style="padding:4px 0;border-bottom:1px solid var(--color-border);"><b>'+esc(x.field)+'</b>: '+esc(x.before == null ? '—' : x.before)+' → '+esc(x.after == null ? '—' : x.after)+'</div>').join('')+'</div></details>'
+            : (e.new_value ? '<details><summary>פרטים</summary><pre style="white-space:pre-wrap;max-width:360px;">'+esc(e.new_value)+'</pre></details>' : '—')}
+        </td>
       </tr>`).join('');
   }
 
