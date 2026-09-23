@@ -6,7 +6,8 @@ CSV/Excel/הדפסה יכולים לצרוך בלי לדעת על המודל ש�
 """
 from datetime import date
 
-from app.models import Document, Supplier, Equipment, Deficiency, Audit, Task
+from app.models import Document, Supplier, Equipment, Deficiency, Audit, Task, Site
+from app.extensions import db
 from app.services import audit_log_service
 
 
@@ -48,9 +49,19 @@ def report_suppliers():
 
 def report_equipment():
     items = Equipment.query.order_by(Equipment.equipment_type).all()
-    headers = ["סוג ציוד", "מספר סידורי", "יצרן", "דגם", "סטטוס", "בדיקה הבאה"]
-    rows = [[e.equipment_type, e.serial_number or '', e.manufacturer or '', e.model or '', e.status,
-             str(e.next_check_date) if e.next_check_date else ''] for e in items]
+    headers = ["סוג ציוד", "מספר סידורי", "יצרן", "דגם", "אתר", "סטטוס", "בדיקה הבאה"]
+    rows = []
+    for e in items:
+        site_name = ''
+        if e.area_id:
+            from app.models import Area, Floor, Building
+            area = db.session.get(Area, e.area_id)
+            floor = db.session.get(Floor, area.floor_id) if area else None
+            building = db.session.get(Building, floor.building_id) if floor else None
+            site = db.session.get(Site, building.site_id) if building else None
+            site_name = site.name if site else ''
+        rows.append([e.equipment_type, e.serial_number or '', e.manufacturer or '', e.model or '',
+                     site_name, e.status, str(e.next_check_date) if e.next_check_date else ''])
     return headers, rows
 
 
@@ -72,9 +83,39 @@ def report_audits():
 
 def report_tasks():
     items = Task.query.order_by(Task.due_date.asc().nullslast()).all()
-    headers = ["כותרת", "שיוך", "עדיפות", "סטטוס", "יעד"]
-    rows = [[t.title, t.assignee or '', t.priority, t.status, str(t.due_date) if t.due_date else '']
-            for t in items]
+    headers = ["כותרת", "שיוך", "עדיפות", "סטטוס", "יעד", "אתר"]
+    rows = []
+    for t in items:
+        site = db.session.get(Site, t.site_id) if t.site_id else None
+        rows.append([t.title, t.assignee or '', t.priority, t.status,
+                     str(t.due_date) if t.due_date else '', site.name if site else ''])
+    return headers, rows
+
+
+def report_documents():
+    items = Document.query.filter(Document.status.notin_(['archived', 'deleted'])).order_by(Document.uploaded_at.desc()).all()
+    headers = ["מסמך", "קטגוריה", "אתר", "ביקורת", "ספק", "AI", "בדיקה נדרשת", "תפוגה"]
+    rows = []
+    for d in items:
+        site = db.session.get(Site, d.site_id) if d.site_id else None
+        audit = db.session.get(Audit, d.audit_id) if d.audit_id else None
+        supplier = db.session.get(Supplier, d.supplier_id) if d.supplier_id else None
+        rows.append([d.file_name, d.category or '', site.name if site else '',
+                     audit.audit_number if audit else '', supplier.company_name if supplier else '',
+                     d.ai_status, 'כן' if d.analysis_review_required else 'לא',
+                     str(d.expiry_date) if d.expiry_date else ''])
+    return headers, rows
+
+
+def report_ai_findings():
+    items = Document.query.filter(Document.ai_findings_json.isnot(None)).order_by(Document.ai_analyzed_at.desc()).all()
+    headers = ["מסמך", "אתר", "AI", "ביטחון", "בדיקה", "סיכום"]
+    rows = []
+    for d in items:
+        site = db.session.get(Site, d.site_id) if d.site_id else None
+        rows.append([d.file_name, site.name if site else '', d.ai_status,
+                     round(d.ai_confidence * 100) if d.ai_confidence is not None else '',
+                     'כן' if d.analysis_review_required else 'לא', d.ai_summary or ''])
     return headers, rows
 
 
@@ -95,6 +136,8 @@ REPORTS = {
     'audits': {"label": "ביקורות", "func": report_audits},
     'tasks': {"label": "משימות", "func": report_tasks},
     'user_activity': {"label": "פעילות משתמשים", "func": report_user_activity},
+    'documents': {"label": "מסמכים וקשרי AI", "func": report_documents},
+    'ai_findings': {"label": "ממצאי Gemini", "func": report_ai_findings},
 }
 
 
