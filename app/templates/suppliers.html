@@ -232,7 +232,7 @@ const Suppliers = (() => {
   }
 
   return {
-    init: () => { refresh(); },
+    init: async () => { await refresh(); const id = new URLSearchParams(window.location.search).get('supplier_id'); if (id) Suppliers.openModal(Number(id)); },
     refresh,
     applyFilters,
 
