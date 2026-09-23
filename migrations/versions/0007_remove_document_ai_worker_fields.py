@@ -14,6 +14,9 @@ depends_on = None
 
 def upgrade():
     bind = op.get_bind()
+    # Jobs left in the old queue/worker states must become manually runnable
+    # by the web UI after the architecture switch.
+    op.execute(sa.text("UPDATE documents SET ai_status = 'not_requested' WHERE ai_status IN ('queued', 'processing')"))
     columns = {c["name"] for c in sa.inspect(bind).get_columns("documents")}
     indexes = {i["name"] for i in sa.inspect(bind).get_indexes("documents")}
 
