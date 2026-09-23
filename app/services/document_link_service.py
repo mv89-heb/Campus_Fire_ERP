@@ -72,6 +72,11 @@ def resolve_document(document, persist=True):
                 {"site_id": audit.site_id, "audit_date": audit.audit_date.isoformat() if audit.audit_date else None}
             ))
     audit_candidates.sort(key=lambda x: (-x["score"], x["id"]))
+    if not document.audit_id and audit_number:
+        exact = [x for x in audit_candidates if x["score"] >= 0.999]
+        if len(exact) == 1:
+            document.audit_id = exact[0]["id"]
+            document.site_id = exact[0].get("site_id")
     audit_candidates = audit_candidates[:8]
 
     site_candidates = []
@@ -80,6 +85,10 @@ def resolve_document(document, persist=True):
         if score >= 0.55:
             site_candidates.append(_candidate(site, score, site.name, {"address": site.address}))
     site_candidates.sort(key=lambda x: (-x["score"], x["id"]))
+    if not document.site_id and site_name:
+        exact = [x for x in site_candidates if x["score"] >= 0.999]
+        if len(exact) == 1:
+            document.site_id = exact[0]["id"]
     site_candidates = site_candidates[:8]
 
     supplier_candidates = []
@@ -88,6 +97,10 @@ def resolve_document(document, persist=True):
         if score >= 0.55:
             supplier_candidates.append(_candidate(supplier, score, supplier.company_name, {"supplier_number": supplier.supplier_number}))
     supplier_candidates.sort(key=lambda x: (-x["score"], x["id"]))
+    if not document.supplier_id:
+        exact = [x for x in supplier_candidates if x["score"] >= 0.999]
+        if len(exact) == 1:
+            document.supplier_id = exact[0]["id"]
     supplier_candidates = supplier_candidates[:8]
 
     links = {
