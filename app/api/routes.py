@@ -290,11 +290,19 @@ def document_intelligence_detail(doc_id):
 
 @main_bp.route('/api/document-intelligence/<int:doc_id>/analyze', methods=['POST'])
 def document_intelligence_analyze(doc_id):
-    if not ai_svc.is_configured(): return jsonify({'error':'Gemini אינו מוגדר. הגדר GEMINI_API_KEY ב-Render.'}),503
-    try: return jsonify(ai_svc.analyze_and_persist(doc_id))
-    except Exception as exc:
-        current_app.logger.exception('Gemini analysis failed')
-        return jsonify({'error':str(exc)}),502
+    if not ai_svc.is_configured():
+        return jsonify({'error':'Gemini אינו מוגדר. הגדר GEMINI_API_KEY ב-Render.'}),503
+    doc = db.session.get(Document, doc_id)
+    if not doc:
+        return jsonify({'error':'המסמך לא נמצא'}),404
+    if doc.status in {'deleted', 'archived'}:
+        return jsonify({'error':'לא ניתן לנתח מסמך שנמחק או הועבר לארכיון'}),409
+    if doc.ai_status == 'processing':
+        return jsonify({'queued':False,'status':'processing','document_id':doc.id}),202
+    if doc.ai_status == 'queued':
+        return jsonify({'queued':False,'status':'queued','document_id':doc.id}),202
+    ai_svc.queue(doc)
+    return jsonify({'queued':True,'status':'queued','document_id':doc.id}),202
 
 
 @main_bp.route('/api/document-intelligence/<int:doc_id>/create-actions', methods=['POST'])
