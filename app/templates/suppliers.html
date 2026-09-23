@@ -198,7 +198,7 @@ const Suppliers = (() => {
         ${s.contract_expiry ? `<div class="supplier-row">📄 חוזה עד ${esc(s.contract_expiry)}</div>` : ''}
         ${s.insurance_expiry ? `<div class="supplier-row">🛡️ ביטוח עד ${esc(s.insurance_expiry)}</div>` : ''}
         <div class="supplier-actions">
-          <button class="btn btn-sm" style="flex:1" onclick="Suppliers.openModal(${s.id})">✏️ עריכה</button>
+          <button class="btn btn-sm" style="flex:1" onclick="Suppliers.openContext(${s.id})" >🔗 קשרים</button> <button onclick="Suppliers.openModal(${s.id})">✏️ עריכה</button>>✏️ עריכה</button>
           <button class="btn btn-sm btn-danger" onclick="Suppliers.remove(${s.id})">🗑️</button>
         </div>
       </div>`).join('');
@@ -232,10 +232,21 @@ const Suppliers = (() => {
   }
 
   return {
+    closeContext: () => document.getElementById('supplierContextModal').classList.remove('open'),
     init: async () => { await refresh(); const id = new URLSearchParams(window.location.search).get('supplier_id'); if (id) Suppliers.openModal(Number(id)); },
     refresh,
     applyFilters,
 
+    openContext: async (id) => {
+      const s=_all.find(x=>x.id===id); const modal=document.getElementById('supplierContextModal'); const body=document.getElementById('supplierContextBody');
+      document.getElementById('supplierContextTitle').innerText='🚚 '+(s?.company_name||'ספק');
+      modal.classList.add('open'); body.innerHTML='<div class="empty-state">טוען...</div>';
+      try{const r=await fetch('/api/integration/suppliers/'+id);const d=await r.json();if(!r.ok)throw Error(d.error||'שגיאה');
+        body.innerHTML='<div class="card"><b>📦 ציוד ('+d.equipment.length+')</b>'+ (d.equipment.slice(0,10).map(e=>'<div style="padding:5px 0;">'+esc(e.equipment_type)+' · '+esc(e.serial_number||'—')+' · '+esc(e.status)+'</div>').join('')||'<div class="muted">אין ציוד</div>')+'</div>'+
+        '<div class="card"><b>📄 מסמכים ('+d.documents.length+')</b>'+ (d.documents.slice(0,10).map(x=>'<div style="padding:5px 0;">'+esc(x.file_name)+' · '+esc(x.ai_status)+'</div>').join('')||'<div class="muted">אין מסמכים</div>')+'</div>'+
+        '<div class="card"><b>✅ משימות ('+d.tasks.length+')</b>'+ (d.tasks.slice(0,10).map(x=>'<div style="padding:5px 0;">'+esc(x.title)+' · '+esc(x.status)+'</div>').join('')||'<div class="muted">אין משימות</div>')+'</div>';
+      }catch(e){body.innerHTML='<div class="error-state">⚠️ '+esc(e.message)+'</div>}
+    },
     openModal: (id) => {
       document.getElementById('supplierModalTitle').innerText = id ? 'עריכת ספק' : 'ספק חדש';
       fillForm(id ? _all.find(s => s.id === id) : null);
