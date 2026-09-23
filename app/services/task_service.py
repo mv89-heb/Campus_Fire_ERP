@@ -110,6 +110,7 @@ def update_task(task_id, data):
             setattr(task, field, value)
     if 'checklist' in data:
         task.checklist_json = json.dumps(_validate_checklist(data['checklist']), ensure_ascii=False)
+    integration_svc.sync_task_change(task)
     alog.log('update', 'task', task.id, entity_label=task.title, new_value=data)
     db.session.commit()
     return task
