@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request, current_app, render_template, sen
 from app.extensions import db
 from app.models import Zone, SystemRequirement, Document
 from app.services import gemini_document_service as ai_svc
+from app.services import document_link_service as link_svc
 from app.services.dms_service import DMSService
 from app.services import storage
 from app.services.document_analysis_service import validity_status
@@ -345,6 +346,45 @@ def document_intelligence_analyze(doc_id):
             'document_id': doc_id,
             'ai_status': 'failed',
         }), 502
+
+
+@main_bp.route('/api/document-intelligence/<int:doc_id>/context', methods=['GET'])
+def document_intelligence_context(doc_id):
+    doc = db.session.get(Document, doc_id)
+    if not doc:
+        return jsonify({'error': 'המסמך לא נמצא'}), 404
+    try:
+        links = link_svc.resolve_document(doc, persist=True)
+        return jsonify({
+            'document_id': doc.id,
+            'file_name': doc.file_name,
+            'links': links,
+            'current': {'site_id': doc.site_id, 'audit_id': doc.audit_id, 'supplier_id': doc.supplier_id},
+        })
+    except Exception as exc:
+        current_app.logger.exception('Document relationship resolution failed for %s', doc_id)
+        return jsonify({'error': str(exc)}), 500
+
+
+@main_bp.route('/api/document-intelligence/<int:doc_id>/links', methods=['POST'])
+def document_intelligence_links(doc_id):
+    doc = db.session.get(Document, doc_id)
+    if not doc:
+        return jsonify({'error': 'המסמך לא נמצא'}), 404
+    try:
+        document, links = link_svc.apply_links(doc.id, request.get_json(silent=True) or {})
+        return jsonify({
+            'success': True,
+            'current': {'site_id': document.site_id, 'audit_id': document.audit_id, 'supplier_id': document.supplier_id},
+            'links': links,
+        })
+    except (ValueError, TypeError) as exc:
+        db.session.rollback()
+        return jsonify({'error': str(exc)}), 400
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Document relationship link update failed for %s', doc_id)
+        return jsonify({'error': 'שגיאה בעדכון קשרי המסמך'}), 500
 
 
 @main_bp.route('/api/document-intelligence/<int:doc_id>/create-actions', methods=['POST'])
