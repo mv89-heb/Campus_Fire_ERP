@@ -70,7 +70,6 @@ class Config:
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
     GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.8-flash')
     GEMINI_THINKING_LEVEL = os.environ.get('GEMINI_THINKING_LEVEL', 'medium')
-    GEMINI_AUTO_QUEUE = _env_bool('GEMINI_AUTO_QUEUE', True)
     GEMINI_REVIEW_CONFIDENCE = float(os.environ.get('GEMINI_REVIEW_CONFIDENCE', '0.80'))
     GEMINI_MAX_INLINE_PDF_BYTES = int(os.environ.get('GEMINI_MAX_INLINE_PDF_BYTES', str(50 * 1024 * 1024)))
     ALLOWED_PDF_MIME_TYPES = ('application/pdf', 'application/x-pdf')
