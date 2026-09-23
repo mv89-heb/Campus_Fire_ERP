@@ -7,6 +7,7 @@ import json
 from app.extensions import db
 from app.models import Audit, Deficiency, Site, Building, Floor, Document
 from app.services import audit_log_service as alog
+from app.services import integration_service as integration_svc
 
 
 class AuditServiceError(Exception):
@@ -73,6 +74,7 @@ def update_audit(audit_id, data):
             if field in _DATE_FIELDS:
                 value = _parse_date(value)
             setattr(audit, field, value)
+    integration_svc.sync_audit_change(audit)
     alog.log('update', 'audit', audit.id, entity_label=audit.audit_number or f"#{audit.id}",
              new_value={k: v for k, v in data.items() if k != 'signature_data'})
     db.session.commit()
