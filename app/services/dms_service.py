@@ -5,7 +5,6 @@ from app.extensions import db
 from app.models import Document, Zone, SystemRequirement
 from app.services import storage
 from app.services.document_analysis_service import analyze_pdf_bytes, apply_analysis_to_document
-from flask import current_app
 
 logger = logging.getLogger(__name__)
 
@@ -96,11 +95,7 @@ class DMSService:
             requirement_note=analysis.get('requirement_note'),
             analysis_confidence=analysis.get('confidence'),
             analysis_review_required=analysis.get('status') == 'needs_review',
-            ai_status=(
-                'queued'
-                if current_app.config.get('GEMINI_AUTO_QUEUE') and current_app.config.get('GEMINI_API_KEY')
-                else 'not_requested'
-            ),
+            ai_status='not_requested',
         )
         apply_analysis_to_document(new_doc, analysis)
         db.session.add(new_doc)
