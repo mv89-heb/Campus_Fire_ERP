@@ -181,6 +181,7 @@ def queue(document):
     document.ai_status = "queued"
     document.ai_error = None
     document.ai_started_at = None
+    document.ai_attempts = 0
     db.session.commit()
 
 def findings(document):
