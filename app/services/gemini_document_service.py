@@ -152,6 +152,20 @@ def persist(document, result):
     except (TypeError, ValueError):
         document.ai_confidence = None
     document.ai_error = None
+
+    # Turn AI entity extraction into explicit ERP relationships.
+    audit_number = str(result.get("audit_number") or "").strip()
+    if audit_number:
+        linked_audit = (
+            Audit.query
+            .filter(db.func.lower(Audit.audit_number) == audit_number.lower())
+            .order_by(Audit.id.desc())
+            .first()
+        )
+        if linked_audit:
+            document.audit_id = linked_audit.id
+            document.site_id = linked_audit.site_id
+
     document.analysis_review_required = (
         document.analysis_review_required or
         result.get("overall_status") in {"critical", "unclear"} or
