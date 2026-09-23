@@ -97,6 +97,30 @@ const Shell = (() => {
   const notifTypeIcon = { permit: '📋', task: '✅', audit: '🔍', equipment: '🧯' };
 
   const nativeFetch = window.fetch.bind(window);
+  const syncChannel = ('BroadcastChannel' in window) ? new BroadcastChannel('campus-fire-erp-sync') : null;
+
+  function refreshOtherPage() {
+    try {
+      if (window.Tasks && typeof window.Tasks.refresh === 'function') return window.Tasks.refresh();
+      if (window.Audits && typeof window.Audits.refresh === 'function') return window.Audits.refresh();
+      if (window.Suppliers && typeof window.Suppliers.init === 'function') return window.Suppliers.init();
+      if (window.Equip && typeof window.Equip.init === 'function') return window.Equip.init();
+      if (window.AI && typeof window.AI.load === 'function') return window.AI.load();
+      if (typeof window.loadDashboard === 'function') return window.loadDashboard(true);
+      if (window.App && typeof window.App.refresh === 'function') return window.App.refresh();
+    } catch (e) {}
+  }
+
+  if (syncChannel) {
+    syncChannel.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'data-changed') refreshOtherPage();
+    });
+  }
+
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'campus-fire-erp-data-version') refreshOtherPage();
+  });
+
   window.fetch = async (input, init = {}) => {
     const method = (init.method || (input && input.method) || 'GET').toUpperCase();
     if (method !== 'GET' && method !== 'HEAD' && csrfToken) {
@@ -107,6 +131,11 @@ const Shell = (() => {
     if (!('credentials' in init)) init.credentials = 'same-origin';
     const response = await nativeFetch(input, init);
     if (response.status === 401) csrfToken = null;
+    if (response.ok && method !== 'GET' && method !== 'HEAD') {
+      const message = { type: 'data-changed', path: typeof input === 'string' ? input : (input?.url || '') };
+      try { if (syncChannel) syncChannel.postMessage(message); } catch (e) {}
+      try { localStorage.setItem('campus-fire-erp-data-version', String(Date.now())); } catch (e) {}
+    }
     return response;
   };
 
