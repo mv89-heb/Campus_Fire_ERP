@@ -2,9 +2,10 @@
 Service Layer עבור מערכת ביקורות (שלב 5).
 """
 from datetime import date, datetime
+import json
 
 from app.extensions import db
-from app.models import Audit, Deficiency, Site, Building, Floor
+from app.models import Audit, Deficiency, Site, Building, Floor, Document
 from app.services import audit_log_service as alog
 
 
@@ -131,4 +132,20 @@ def serialize_audit(audit, include_deficiencies=True):
     if include_deficiencies:
         from app.services.deficiency_service import serialize_deficiency
         data["deficiencies"] = [serialize_deficiency(d) for d in audit.deficiencies]
+
+    linked_documents = []
+    if audit.audit_number:
+        for doc in Document.query.filter(Document.status.notin_(["deleted", "archived"])).all():
+            try:
+                meta = json.loads(doc.ai_actions_json or "{}")
+            except (TypeError, ValueError):
+                meta = {}
+            if isinstance(meta, dict) and str(meta.get("audit_number") or "").strip().lower() == str(audit.audit_number).strip().lower():
+                linked_documents.append({
+                    "id": doc.id,
+                    "file_name": doc.file_name,
+                    "ai_status": doc.ai_status,
+                    "ai_summary": doc.ai_summary,
+                })
+    data["linked_documents"] = linked_documents
     return data
