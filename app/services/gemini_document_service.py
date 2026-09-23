@@ -11,6 +11,7 @@ from flask import current_app
 from app.extensions import db
 from app.models import Document, Deficiency, Task, Audit
 from app.services import storage
+from app.services import integration_service as integration_svc
 
 log = logging.getLogger(__name__)
 
@@ -231,15 +232,12 @@ def create_operational_actions(document):
         db.session.add(d)
         db.session.flush()
         priority = {"critical": "urgent", "high": "high", "medium": "normal", "low": "low"}[severity]
-        task = Task(title=f"תיקון ליקוי AI: {title}", description=description,
-                    assignee=item.get("responsible_role"), priority=priority, status="open",
-                    due_date=due,
-                    checklist_json=json.dumps([
-                        {"text": "לבצע את הפעולה המומלצת", "done": False},
-                        {"text": "לאסוף ראיה/אישור לסגירה", "done": False}
-                    ], ensure_ascii=False))
-        db.session.add(task)
-        db.session.flush()
+        task = integration_svc.create_task_for_deficiency(d)
+        task.title = f"תיקון ליקוי AI: {title}"
+        task.checklist_json = json.dumps([
+            {"text": "לבצע את הפעולה המומלצת", "done": False},
+            {"text": "לאסוף ראיה/אישור לסגירה", "done": False}
+        ], ensure_ascii=False)
         d.task_id = task.id
         created.append({"deficiency_id": d.id, "task_id": task.id, "title": title})
         existing.add(title.lower())
