@@ -6,6 +6,7 @@ from datetime import date, datetime
 from app.extensions import db
 from app.models import Deficiency, Task
 from app.services import audit_log_service as alog
+from app.services import integration_service as integration_svc
 
 
 class DeficiencyServiceError(Exception):
@@ -69,6 +70,7 @@ def create_deficiency(data):
             setattr(d, field, value)
     db.session.add(d)
     db.session.flush()
+    integration_svc.sync_after_deficiency_change(d)
     alog.log('create', 'deficiency', d.id, entity_label=d.title, new_value=data)
     db.session.commit()
     return d
@@ -82,6 +84,7 @@ def update_deficiency(deficiency_id, data):
             if field in _DATE_FIELDS:
                 value = _parse_date(value)
             setattr(d, field, value)
+    integration_svc.sync_after_deficiency_change(d)
     alog.log('update', 'deficiency', d.id, entity_label=d.title, new_value=data)
     db.session.commit()
     return d
@@ -99,18 +102,7 @@ def create_task_from_deficiency(deficiency_id):
     d = get_deficiency_or_404(deficiency_id)
     if d.task_id:
         raise DeficiencyServiceError("לליקוי זה כבר קיימת משימה מקושרת")
-    priority_map = {'critical': 'urgent', 'high': 'high', 'medium': 'normal', 'low': 'low'}
-    task = Task(
-        title=f"תיקון ליקוי: {d.title}",
-        description=d.description,
-        assignee=d.responsible,
-        priority=priority_map.get(d.severity, 'normal'),
-        status='open',
-        due_date=d.due_date,
-    )
-    db.session.add(task)
-    db.session.flush()  # לקבל task.id לפני ה-commit
-    d.task_id = task.id
+    task = integration_svc.create_task_for_deficiency(d)
     alog.log('create', 'task', task.id, entity_label=task.title, new_value={'from_deficiency': d.id})
     db.session.commit()
     return d, task
