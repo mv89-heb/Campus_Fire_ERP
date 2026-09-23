@@ -69,6 +69,18 @@ def sync_after_deficiency_change(deficiency: Deficiency) -> None:
     sync_audit_derived_state(deficiency.audit_id)
 
 
+def sync_audit_change(audit: Audit) -> list[Deficiency]:
+    """Propagate audit context changes to its deficiencies and linked tasks."""
+    deficiencies = Deficiency.query.filter_by(audit_id=audit.id).all()
+    for deficiency in deficiencies:
+        if deficiency.task_id:
+            task = db.session.get(Task, deficiency.task_id)
+            if task:
+                task.site_id = audit.site_id
+        sync_audit_derived_state(audit.id)
+    return deficiencies
+
+
 def create_task_for_deficiency(deficiency: Deficiency) -> Task:
     """Create the canonical repair task for a deficiency."""
     if deficiency.task_id:
