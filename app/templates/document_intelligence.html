@@ -21,9 +21,10 @@ if(d.error)h+='<div class="finding critical">'+esc(d.error)+'</div>';if(d.summar
 const s=d.supplemental||{};if(s.missing_items?.length)h+='<div class="finding medium"><b>חוסרים</b><ul>'+s.missing_items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';if(s.contradictions?.length)h+='<div class="finding high"><b>סתירות</b><ul>'+s.contradictions.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';
 if(d.ai_status==='not_requested'||d.ai_status==='failed')h+='<button class="btn btn-primary" onclick="AI.analyze('+d.document_id+')">🤖 נתח עם Gemini</button>';if(d.ai_status==='completed')h+='<button class="btn btn-primary" onclick="AI.actions('+d.document_id+')">✅ צור ליקויים ומשימות</button>';
 document.getElementById('detail').innerHTML=h}
-async function analyze(id){const r=await fetch('/api/document-intelligence/'+id+'/analyze',{method:'POST'});const d=await r.json();if(!r.ok)alert(d.error||'שגיאה');await open(id);await load()}
+async function analyze(id){const r=await fetch('/api/document-intelligence/'+id+'/analyze',{method:'POST'});const d=await r.json();if(!r.ok){alert(d.error||'שגיאה');return}await open(id);await load();poll(id)}
+async function poll(id){for(let i=0;i<60;i++){await new Promise(resolve=>setTimeout(resolve,3000));const r=await fetch('/api/document-intelligence/'+id);if(!r.ok)return;const d=await r.json();await open(id);await overview();if(d.ai_status==='completed'||d.ai_status==='failed')return}}
 async function actions(id){const r=await fetch('/api/document-intelligence/'+id+'/create-actions',{method:'POST'});const d=await r.json();alert(d.error||('נוצרו '+d.count+' ליקויים ומשימות'));await open(id)}
-async function queue(){const r=await fetch('/api/document-intelligence/queue',{method:'POST'});const d=await r.json();alert(d.error||('נכנסו לתור '+d.queued+' מסמכים'));await load()}
+async function queue(){const r=await fetch('/api/document-intelligence/queue',{method:'POST'});const d=await r.json();alert(d.error||('נכנסו לתור '+d.queued+' מסמכים'));await load();overview()}
 return{open,analyze,actions,queue};})();document.addEventListener('DOMContentLoaded',AI.load);
 </script>
 {% endblock %}
