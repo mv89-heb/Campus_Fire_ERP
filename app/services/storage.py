@@ -5,6 +5,7 @@ import hashlib
 import logging
 import os
 from datetime import datetime
+from urllib.parse import urlparse
 
 from flask import current_app
 
@@ -19,10 +20,15 @@ _client_cache = {}
 
 
 def _get_client():
-    url = current_app.config.get('SUPABASE_URL')
+    url = (current_app.config.get('SUPABASE_URL') or '').strip().rstrip('/')
     key = current_app.config.get('SUPABASE_SERVICE_KEY')
     if not url or not key:
         raise StorageError('Supabase אינו מוגדר (חסרים SUPABASE_URL / SUPABASE_SERVICE_KEY)')
+    parsed = urlparse(url)
+    if parsed.scheme != 'https' or not parsed.hostname:
+        raise StorageError('SUPABASE_URL אינו תקין. יש להגדיר כתובת HTTPS מלאה בפורמט https://<project-ref>.supabase.co')
+    if parsed.path not in ('', '/'):
+        raise StorageError('SUPABASE_URL כולל נתיב לא צפוי. יש להגדיר רק https://<project-ref>.supabase.co')
     cache_key = (url, key)
     if cache_key in _client_cache:
         return _client_cache[cache_key]
@@ -87,6 +93,17 @@ def upload_bytes(remote_filename: str, data: bytes, content_type: str = 'applica
             },
         )
     except Exception as e:
+        error_text = str(e)
+        if 'Name or service not known' in error_text or 'getaddrinfo' in error_text:
+            logger.error(
+                'Supabase upload DNS failure for %s -> %s; check SUPABASE_URL hostname',
+                original_remote_filename, remote_filename
+            )
+            raise StorageError(
+                'לא ניתן להתחבר ל-Supabase: שם השרת של SUPABASE_URL לא נמצא. '
+                'בדוק ב-Render שהמשתנה SUPABASE_URL הוא כתובת HTTPS תקינה של פרויקט Supabase '
+                '(לדוגמה https://<project-ref>.supabase.co).'
+            )
         logger.error(f'Supabase upload failed for {original_remote_filename} -> {remote_filename}: {e}')
         raise StorageError(f'העלאה ל-Supabase Storage נכשלה: {e}')
     return f'{bucket}/{remote_filename}'
