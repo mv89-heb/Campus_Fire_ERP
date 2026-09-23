@@ -202,6 +202,7 @@ const Sites = (() => {
 
   return {
     init: () => { refresh(); },
+    refresh,
 
     toggle: (key) => {
       if (openSections.has(key)) openSections.delete(key); else openSections.add(key);
