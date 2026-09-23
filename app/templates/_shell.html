@@ -102,6 +102,7 @@ const Shell = (() => {
   function refreshOtherPage() {
     try {
       if (window.Tasks && typeof window.Tasks.refresh === 'function') return window.Tasks.refresh();
+      if (window.Sites && typeof window.Sites.refresh === 'function') return window.Sites.refresh();
       if (window.Audits && typeof window.Audits.refresh === 'function') return window.Audits.refresh();
       if (window.Suppliers && typeof window.Suppliers.init === 'function') return window.Suppliers.init();
       if (window.Equip && typeof window.Equip.init === 'function') return window.Equip.init();
