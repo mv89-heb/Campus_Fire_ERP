@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta
 from app.extensions import db
 from app.models import Task
 from app.services import audit_log_service as alog
+from app.services import integration_service as integration_svc
 
 
 class TaskServiceError(Exception):
@@ -143,6 +144,7 @@ def complete_task(task_id):
         )
         db.session.add(next_task)
 
+    integration_svc.sync_task_completion(task)
     db.session.commit()
     return task, next_task
 
