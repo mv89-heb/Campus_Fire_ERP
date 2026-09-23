@@ -308,6 +308,47 @@ def document_intelligence_create_actions(doc_id):
         return jsonify({'error':str(exc)}),500
 
 
+@main_bp.route('/api/document-intelligence/overview')
+def document_intelligence_overview():
+    docs = Document.query.filter(Document.status.notin_(['deleted', 'archived'])).all()
+    status_counts = {}
+    severity_counts = {}
+    recurring = {}
+    missing_items = []
+    contradictions = []
+    actions = []
+    for doc in docs:
+        status_counts[doc.ai_status] = status_counts.get(doc.ai_status, 0) + 1
+        if doc.ai_status != 'completed':
+            continue
+        for finding in ai_svc.findings(doc):
+            severity = finding.get('severity') or 'unclear'
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            title = ' '.join(str(finding.get('title') or '').lower().split())
+            if title:
+                item = recurring.setdefault(title, {'title': finding.get('title'), 'count': 0, 'severity': severity, 'documents': []})
+                item['count'] += 1
+                item['documents'].append({'id': doc.id, 'file_name': doc.file_name})
+        extra = ai_svc.actions(doc)
+        for value in extra.get('missing_items', []):
+            missing_items.append({'document_id': doc.id, 'file_name': doc.file_name, 'item': value})
+        for value in extra.get('contradictions', []):
+            contradictions.append({'document_id': doc.id, 'file_name': doc.file_name, 'item': value})
+        for finding in ai_svc.findings(doc):
+            if finding.get('recommended_action'):
+                actions.append({'document_id': doc.id, 'file_name': doc.file_name, 'title': finding.get('title'), 'action': finding.get('recommended_action'), 'severity': finding.get('severity')})
+    recurring_items = sorted((x for x in recurring.values() if x['count'] > 1), key=lambda x: (-x['count'], x['title'] or ''))[:20]
+    return jsonify({
+        'total_documents': len(docs),
+        'status_counts': status_counts,
+        'severity_counts': severity_counts,
+        'review_required': sum(1 for d in docs if d.analysis_review_required),
+        'recurring_findings': recurring_items,
+        'missing_items': missing_items[:50],
+        'contradictions': contradictions[:50],
+        'top_actions': sorted(actions, key=lambda x: {'critical': 0, 'high': 1, 'medium': 2, 'low': 3, 'info': 4, 'unclear': 5}.get(x['severity'], 6))[:30],
+    })
+
 @main_bp.route('/api/document-intelligence/queue', methods=['POST'])
 def document_intelligence_queue():
     if not ai_svc.is_configured(): return jsonify({'error':'Gemini אינו מוגדר. הגדר GEMINI_API_KEY ב-Render.'}),503
