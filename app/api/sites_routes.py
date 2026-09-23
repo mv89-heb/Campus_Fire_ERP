@@ -4,6 +4,7 @@ Blueprint נפרד מ-main_bp הקיים, כדי לא לגעת בקוד שכבר
 """
 from flask import Blueprint, jsonify, request, render_template
 from app.services import site_service as svc
+from app.services import integration_service as integration_svc
 from app.services.site_service import SiteServiceError
 
 sites_bp = Blueprint('sites', __name__)
@@ -115,3 +116,11 @@ def api_update_area(area_id):
 def api_delete_area(area_id):
     svc.delete_area(area_id)
     return jsonify({"success": True})
+
+
+@sites_bp.route('/api/integration/sites/<int:site_id>', methods=['GET'])
+def api_site_context(site_id):
+    try:
+        return jsonify(integration_svc.site_context(site_id))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
