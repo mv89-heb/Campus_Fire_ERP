@@ -65,13 +65,36 @@ def list_entity_types():
     return sorted({r[0] for r in rows if r[0]})
 
 
+def _parse_snapshot(value):
+    if not value:
+        return None
+    try:
+        parsed = json.loads(value)
+        return parsed
+    except (TypeError, ValueError):
+        return value
+
+
 def serialize(entry):
+    old_value = _parse_snapshot(entry.old_value)
+    new_value = _parse_snapshot(entry.new_value)
+    changed_fields = []
+    if isinstance(old_value, dict) and isinstance(new_value, dict):
+        for key in sorted(set(old_value) | set(new_value)):
+            if old_value.get(key) != new_value.get(key):
+                changed_fields.append({
+                    "field": key,
+                    "before": old_value.get(key),
+                    "after": new_value.get(key),
+                })
     return {
         "id": entry.id, "user_id": entry.user_id,
         "username": entry.username_snapshot or "אנונימי",
         "action": entry.action, "entity_type": entry.entity_type,
         "entity_id": entry.entity_id, "entity_label": entry.entity_label,
         "old_value": entry.old_value, "new_value": entry.new_value,
+        "old_snapshot": old_value, "new_snapshot": new_value,
+        "changed_fields": changed_fields,
         "ip_address": entry.ip_address,
         "created_at": entry.created_at.isoformat() if entry.created_at else None,
     }
