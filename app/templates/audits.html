@@ -286,8 +286,12 @@ const Audits = (() => {
           </div>
         </div>`).join('') || '<div class="empty-state" style="padding:10px;">אין ליקויים בביקורת זו</div>';
 
-      const timelineRes = await fetch(`/api/audit-log?entity_type=audit&entity_id=${auditId}`);
+      const [timelineRes, contextRes] = await Promise.all([
+        fetch(`/api/audit-log?entity_type=audit&entity_id=${auditId}`),
+        fetch(`/api/integration/audits/${auditId}`)
+      ]);
       const timelineItems = await timelineRes.json();
+      const context = contextRes.ok ? await contextRes.json() : { documents: [], tasks: [] };
       const timelineActionLabel = { create: 'נוצרה', update: 'עודכנה', delete: 'נמחקה' };
       const timelineHtml = timelineItems.length ? `
         <div style="margin-top:20px; border-top:1px solid var(--border); padding-top:14px;">
@@ -312,6 +316,15 @@ const Audits = (() => {
           ${full.score != null ? `<span class="score-badge" style="color:${full.score >= 80 ? 'var(--valid)' : full.score >= 50 ? 'var(--warning)' : 'var(--critical)'}">${full.score}</span>` : ''}
         </div>
         ${full.notes ? `<div style="font-size:0.85rem; margin-bottom:14px;">📝 ${esc(full.notes)}</div>` : ''}
+        <div style="display:flex; gap:8px; margin-bottom:16px;">
+          <a class="btn btn-sm" href="/sites?site_id=${full.site_id}">🏢 מרכז האתר</a>
+        </div>
+        <div class="card" style="padding:10px;margin-bottom:14px;">
+          <div style="font-weight:700;margin-bottom:8px;">🔗 קשרים תפעוליים</div>
+          <div style="font-size:.82rem;color:var(--text-muted);">מסמכים: ${context.documents.length} · משימות מקושרות: ${context.tasks.length} · ליקויים: ${context.deficiencies.length}</div>
+          ${context.documents.length ? '<div style="margin-top:8px;">' + context.documents.slice(0,5).map(d => '<a href="/api/documents/'+d.id+'/file" target="_blank" style="display:block;padding:4px 0;">📄 '+esc(d.file_name)+'</a>').join('') + '</div>' : ''}
+          ${context.tasks.length ? '<div style="margin-top:8px;">' + context.tasks.slice(0,5).map(t => '<div style="padding:4px 0;">✅ '+esc(t.title)+' · '+esc(t.status)+'</div>').join('') + '</div>' : ''}
+        </div>
         <div style="display:flex; gap:8px; margin-bottom:16px;">
           <a class="btn btn-sm" href="/audits/${auditId}/report" target="_blank">📄 דו"ח PDF</a>
           <button class="btn btn-sm" onclick="Audits.openAuditModal(${auditId})">✏️ עריכת ביקורת</button>
