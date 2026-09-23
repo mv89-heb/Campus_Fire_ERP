@@ -3,6 +3,7 @@ API עבור ניהול ספקים (שלב 4).
 """
 from flask import Blueprint, jsonify, request, render_template
 from app.services import supplier_service as svc
+from app.services import integration_service as integration_svc
 from app.services.supplier_service import SupplierServiceError
 
 suppliers_bp = Blueprint('suppliers', __name__)
@@ -60,3 +61,11 @@ def api_update_supplier(supplier_id):
 def api_delete_supplier(supplier_id):
     svc.delete_supplier(supplier_id)
     return jsonify({"success": True})
+
+
+@suppliers_bp.route('/api/integration/suppliers/<int:supplier_id>', methods=['GET'])
+def api_supplier_context(supplier_id):
+    try:
+        return jsonify(integration_svc.supplier_context(supplier_id))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
