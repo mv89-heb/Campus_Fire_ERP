@@ -277,43 +277,85 @@ def document_intelligence_page():
     return render_template('document_intelligence.html', active_nav='permits')
 
 
+def _ai_document_payload(doc):
+    return {
+        'document_id': doc.id,
+        'file_name': doc.file_name,
+        'ai_status': doc.ai_status,
+        'ai_model': doc.ai_model,
+        'ai_analyzed_at': doc.ai_analyzed_at.isoformat() if doc.ai_analyzed_at else None,
+        'document_type': doc.ai_document_type,
+        'summary': doc.ai_summary,
+        'findings': ai_svc.findings(doc),
+        'supplemental': ai_svc.actions(doc),
+        'confidence': doc.ai_confidence,
+        'error': doc.ai_error,
+        'review_required': doc.analysis_review_required,
+    }
+
+
 @main_bp.route('/api/document-intelligence/<int:doc_id>')
 def document_intelligence_detail(doc_id):
-    doc=db.session.get(Document,doc_id)
-    if not doc: return jsonify({'error':'המסמך לא נמצא'}),404
-    return jsonify({'document_id':doc.id,'file_name':doc.file_name,'ai_status':doc.ai_status,
-        'ai_model':doc.ai_model,'ai_analyzed_at':doc.ai_analyzed_at.isoformat() if doc.ai_analyzed_at else None,
-        'document_type':doc.ai_document_type,'summary':doc.ai_summary,
-        'findings':ai_svc.findings(doc),'supplemental':ai_svc.actions(doc),
-        'confidence':doc.ai_confidence,'error':doc.ai_error,'review_required':doc.analysis_review_required})
+    doc = db.session.get(Document, doc_id)
+    if not doc:
+        return jsonify({'error': 'המסמך לא נמצא'}), 404
+    return jsonify(_ai_document_payload(doc))
+
+
+@main_bp.route('/api/document-intelligence/documents')
+def document_intelligence_documents():
+    docs = (
+        Document.query
+        .filter(Document.status.notin_(['deleted', 'archived']))
+        .order_by(Document.uploaded_at.desc(), Document.id.desc())
+        .all()
+    )
+    return jsonify({
+        'documents': [_ai_document_payload(doc) for doc in docs],
+        'total': len(docs),
+    })
 
 
 @main_bp.route('/api/document-intelligence/<int:doc_id>/analyze', methods=['POST'])
 def document_intelligence_analyze(doc_id):
     if not ai_svc.is_configured():
-        return jsonify({'error':'Gemini אינו מוגדר. הגדר GEMINI_API_KEY ב-Render.'}),503
+        return jsonify({'error': 'Gemini אינו מוגדר. הגדר GEMINI_API_KEY ב-Render.'}), 503
+
     doc = db.session.get(Document, doc_id)
     if not doc:
-        return jsonify({'error':'המסמך לא נמצא'}),404
+        return jsonify({'error': 'המסמך לא נמצא'}), 404
     if doc.status in {'deleted', 'archived'}:
-        return jsonify({'error':'לא ניתן לנתח מסמך שנמחק או הועבר לארכיון'}),409
+        return jsonify({'error': 'לא ניתן לנתח מסמך שנמחק או הועבר לארכיון'}), 409
     if doc.ai_status == 'processing':
-        return jsonify({'queued':False,'status':'processing','document_id':doc.id}),202
-    if doc.ai_status == 'queued':
-        return jsonify({'queued':False,'status':'queued','document_id':doc.id}),202
-    ai_svc.queue(doc)
-    return jsonify({'queued':True,'status':'queued','document_id':doc.id}),202
+        return jsonify({'error': 'המסמך כבר נמצא בתהליך ניתוח. נסה שוב לאחר סיום.'}), 409
+
+    try:
+        result = ai_svc.analyze_and_persist(doc.id)
+        doc = db.session.get(Document, doc.id)
+        return jsonify(_ai_document_payload(doc) | {'result': result}), 200
+    except Exception:
+        current_app.logger.exception('Web Gemini analysis failed for document %s', doc_id)
+        doc = db.session.get(Document, doc_id)
+        return jsonify({
+            'error': doc.ai_error if doc else 'שגיאת Gemini בניתוח המסמך',
+            'document_id': doc_id,
+            'ai_status': 'failed',
+        }), 502
 
 
 @main_bp.route('/api/document-intelligence/<int:doc_id>/create-actions', methods=['POST'])
 def document_intelligence_create_actions(doc_id):
-    doc=db.session.get(Document,doc_id)
-    if not doc: return jsonify({'error':'המסמך לא נמצא'}),404
-    if doc.ai_status!='completed': return jsonify({'error':'יש להשלים ניתוח AI לפני יצירת פעולות'}),409
-    try: return jsonify(ai_svc.create_operational_actions(doc))
+    doc = db.session.get(Document, doc_id)
+    if not doc:
+        return jsonify({'error': 'המסמך לא נמצא'}), 404
+    if doc.ai_status != 'completed':
+        return jsonify({'error': 'יש להשלים ניתוח AI לפני יצירת פעולות'}), 409
+    try:
+        return jsonify(ai_svc.create_operational_actions(doc))
     except Exception as exc:
-        db.session.rollback(); current_app.logger.exception('AI action creation failed')
-        return jsonify({'error':str(exc)}),500
+        db.session.rollback()
+        current_app.logger.exception('AI action creation failed')
+        return jsonify({'error': str(exc)}), 500
 
 
 @main_bp.route('/api/document-intelligence/overview')
@@ -325,6 +367,7 @@ def document_intelligence_overview():
     missing_items = []
     contradictions = []
     actions = []
+
     for doc in docs:
         status_counts[doc.ai_status] = status_counts.get(doc.ai_status, 0) + 1
         if doc.ai_status != 'completed':
@@ -334,9 +377,15 @@ def document_intelligence_overview():
             severity_counts[severity] = severity_counts.get(severity, 0) + 1
             title = ' '.join(str(finding.get('title') or '').lower().split())
             if title:
-                item = recurring.setdefault(title, {'title': finding.get('title'), 'count': 0, 'severity': severity, 'documents': []})
+                item = recurring.setdefault(title, {
+                    'title': finding.get('title'),
+                    'count': 0,
+                    'severity': severity,
+                    'documents': []
+                })
                 item['count'] += 1
                 item['documents'].append({'id': doc.id, 'file_name': doc.file_name})
+
         extra = ai_svc.actions(doc)
         for value in extra.get('missing_items', []):
             missing_items.append({'document_id': doc.id, 'file_name': doc.file_name, 'item': value})
@@ -344,8 +393,19 @@ def document_intelligence_overview():
             contradictions.append({'document_id': doc.id, 'file_name': doc.file_name, 'item': value})
         for finding in ai_svc.findings(doc):
             if finding.get('recommended_action'):
-                actions.append({'document_id': doc.id, 'file_name': doc.file_name, 'title': finding.get('title'), 'action': finding.get('recommended_action'), 'severity': finding.get('severity')})
-    recurring_items = sorted((x for x in recurring.values() if x['count'] > 1), key=lambda x: (-x['count'], x['title'] or ''))[:20]
+                actions.append({
+                    'document_id': doc.id,
+                    'file_name': doc.file_name,
+                    'title': finding.get('title'),
+                    'action': finding.get('recommended_action'),
+                    'severity': finding.get('severity')
+                })
+
+    recurring_items = sorted(
+        (x for x in recurring.values() if x['count'] > 1),
+        key=lambda x: (-x['count'], x['title'] or '')
+    )[:20]
+
     return jsonify({
         'total_documents': len(docs),
         'status_counts': status_counts,
@@ -354,15 +414,29 @@ def document_intelligence_overview():
         'recurring_findings': recurring_items,
         'missing_items': missing_items[:50],
         'contradictions': contradictions[:50],
-        'top_actions': sorted(actions, key=lambda x: {'critical': 0, 'high': 1, 'medium': 2, 'low': 3, 'info': 4, 'unclear': 5}.get(x['severity'], 6))[:30],
+        'top_actions': sorted(
+            actions,
+            key=lambda x: {'critical': 0, 'high': 1, 'medium': 2, 'low': 3, 'info': 4, 'unclear': 5}.get(x['severity'], 6)
+        )[:30],
     })
+
 
 @main_bp.route('/api/document-intelligence/queue', methods=['POST'])
 def document_intelligence_queue():
-    if not ai_svc.is_configured(): return jsonify({'error':'Gemini אינו מוגדר. הגדר GEMINI_API_KEY ב-Render.'}),503
-    docs=Document.query.filter(Document.status.notin_(['deleted','archived'])).filter(Document.ai_status.in_(['not_requested','failed'])).all()
-    for doc in docs: ai_svc.queue(doc)
-    return jsonify({'queued':len(docs)})
+    if not ai_svc.is_configured():
+        return jsonify({'error': 'Gemini אינו מוגדר. הגדר GEMINI_API_KEY ב-Render.'}), 503
+
+    docs = (
+        Document.query
+        .filter(Document.status.notin_(['deleted', 'archived']))
+        .filter(Document.ai_status.in_(['not_requested', 'failed']))
+        .all()
+    )
+    return jsonify({
+        'queued': len(docs),
+        'documents': [{'id': doc.id, 'file_name': doc.file_name} for doc in docs],
+        'mode': 'web_sequential',
+    })
 
 
 @main_bp.route('/api/system/health')
