@@ -282,3 +282,60 @@ def audit_context(audit_id: int) -> dict:
         } for t in tasks],
         "documents": [_document_summary(d) for d in documents],
     }
+
+
+def equipment_context(equipment_id: int) -> dict:
+    eq = db.session.get(Equipment, equipment_id)
+    if not eq:
+        raise ValueError("הציוד לא נמצא")
+    area = db.session.get(Area, eq.area_id) if eq.area_id else None
+    floor = db.session.get(Floor, area.floor_id) if area else None
+    building = db.session.get(Building, floor.building_id) if floor else None
+    site = db.session.get(Site, building.site_id) if building else None
+    supplier = db.session.get(Supplier, eq.supplier_id) if eq.supplier_id else None
+    return {
+        "equipment": {
+            "id": eq.id, "equipment_type": eq.equipment_type, "serial_number": eq.serial_number,
+            "manufacturer": eq.manufacturer, "model": eq.model, "status": eq.status,
+            "last_check_date": eq.last_check_date.isoformat() if eq.last_check_date else None,
+            "next_check_date": eq.next_check_date.isoformat() if eq.next_check_date else None,
+        },
+        "location": {
+            "site_id": site.id if site else None, "site_name": site.name if site else None,
+            "building_id": building.id if building else None, "building_name": building.name if building else None,
+            "floor_id": floor.id if floor else None, "floor_name": floor.name if floor else None,
+            "area_id": area.id if area else None, "area_name": area.name if area else None,
+        },
+        "supplier": {"id": supplier.id, "company_name": supplier.company_name, "phone": supplier.phone} if supplier else None,
+    }
+
+
+def supplier_context(supplier_id: int) -> dict:
+    supplier = db.session.get(Supplier, supplier_id)
+    if not supplier:
+        raise ValueError("הספק לא נמצא")
+    equipment = Equipment.query.filter_by(supplier_id=supplier.id).order_by(Equipment.equipment_type).all()
+    documents = Document.query.filter(
+        Document.supplier_id == supplier.id,
+        Document.status.notin_(["deleted", "archived"]),
+    ).order_by(Document.uploaded_at.desc()).all()
+    tasks = Task.query.filter_by(supplier_id=supplier.id).order_by(Task.due_date.asc().nullslast(), Task.id.desc()).all()
+    return {
+        "supplier": {
+            "id": supplier.id, "company_name": supplier.company_name, "supplier_number": supplier.supplier_number,
+            "contact_name": supplier.contact_name, "phone": supplier.phone, "email": supplier.email,
+            "service_type": supplier.service_type, "status": supplier.status,
+            "contract_expiry": supplier.contract_expiry.isoformat() if supplier.contract_expiry else None,
+            "insurance_expiry": supplier.insurance_expiry.isoformat() if supplier.insurance_expiry else None,
+            "site_id": supplier.site_id,
+        },
+        "equipment": [{
+            "id": e.id, "equipment_type": e.equipment_type, "serial_number": e.serial_number,
+            "status": e.status, "next_check_date": e.next_check_date.isoformat() if e.next_check_date else None,
+        } for e in equipment],
+        "documents": [_document_summary(d) for d in documents],
+        "tasks": [{
+            "id": t.id, "title": t.title, "status": t.status, "priority": t.priority,
+            "due_date": t.due_date.isoformat() if t.due_date else None,
+        } for t in tasks],
+    }
