@@ -379,7 +379,7 @@ const Audits = (() => {
   }
 
   return {
-    init: async () => { await refresh(); loadSites(); const params = new URLSearchParams(window.location.search); const auditId = params.get('audit_id'); if (auditId) openDetail(Number(auditId)); },
+    init: async () => { await refresh(); loadSites(); const params = new URLSearchParams(window.location.search); const auditId = params.get('audit_id'); if (auditId) Audits.openDetail(Number(auditId)); },
     refresh,
 
     openDetail: (id) => {
