@@ -157,4 +157,5 @@ def apply_links(document_id, payload):
 
     resolve_document(document, persist=False)
     db.session.commit()
-    return document, resolve_document(document, persist=False)
+    links = resolve_document(document, persist=True)
+    return document, links
