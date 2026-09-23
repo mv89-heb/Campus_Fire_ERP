@@ -11,7 +11,7 @@ from app.models import Document, Supplier, Task, Audit, Deficiency, Equipment, Z
 from app.services.document_analysis_service import validity_status
 
 _CACHE = {"data": None, "expires_at": 0}
-_CACHE_TTL_SECONDS = 30
+_CACHE_TTL_SECONDS = 0
 
 
 def _permit_kpis():
