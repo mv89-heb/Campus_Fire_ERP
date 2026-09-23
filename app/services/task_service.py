@@ -5,7 +5,7 @@ import json
 from datetime import date, datetime, timedelta
 
 from app.extensions import db
-from app.models import Task
+from app.models import Task, Deficiency
 from app.services import audit_log_service as alog
 from app.services import integration_service as integration_svc
 
@@ -161,6 +161,6 @@ def serialize_task(task):
         "priority": task.priority, "status": task.status,
         "due_date": str(task.due_date) if task.due_date else None,
         "is_recurring": task.is_recurring, "recurrence_rule": task.recurrence_rule,
-        "checklist": checklist, "site_id": task.site_id, "supplier_id": task.supplier_id,
+        "checklist": checklist, "site_id": task.site_id, "supplier_id": task.supplier_id,\n        "source_deficiency_id": (next((d.id for d in Deficiency.query.filter_by(task_id=task.id).limit(1).all()), None)),
         "completed_at": task.completed_at.isoformat() if task.completed_at else None,
     }
