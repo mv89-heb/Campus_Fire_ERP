@@ -86,11 +86,11 @@ const AI=(()=>{
     document.getElementById('detail').innerHTML=h;
   }
 
-  async function analyze(id){
-    if(running)return;
+  async function analyze(id, silent=false){
     const r=await fetch('/api/document-intelligence/'+id+'/analyze',{method:'POST'});
-    const d=await r.json();
-    if(!r.ok){alert(d.error||'שגיאה בניתוח');await open(id);return false}
+    let d={};
+    try{ d=await r.json(); }catch(e){}
+    if(!r.ok){if(!silent)alert(d.error||'שגיאה בניתוח');await open(id);return false}
     await load();
     await open(id);
     return true;
@@ -99,7 +99,7 @@ const AI=(()=>{
   async function analyzeWithRetry(id,maxAttempts=2){
     for(let attempt=1;attempt<=maxAttempts;attempt++){
       try{
-        const ok=await analyze(id);
+        const ok=await analyze(id, true);
         if(ok)return true;
       }catch(e){
         if(attempt===maxAttempts)return false;
