@@ -210,7 +210,7 @@ const Sites = (() => {
   }
 
   return {
-    init: async () => { await refresh(); const id = new URLSearchParams(window.location.search).get('site_id'); if (id) openContext(Number(id)); },
+    init: async () => { await refresh(); const id = new URLSearchParams(window.location.search).get('site_id'); if (id) Sites.openContext(Number(id)); },
     refresh,
 
     toggle: (key) => {
