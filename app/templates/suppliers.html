@@ -198,7 +198,7 @@ const Suppliers = (() => {
         ${s.contract_expiry ? `<div class="supplier-row">📄 חוזה עד ${esc(s.contract_expiry)}</div>` : ''}
         ${s.insurance_expiry ? `<div class="supplier-row">🛡️ ביטוח עד ${esc(s.insurance_expiry)}</div>` : ''}
         <div class="supplier-actions">
-          <button class="btn btn-sm" style="flex:1" onclick="Suppliers.openContext(${s.id})" >🔗 קשרים</button> <button onclick="Suppliers.openModal(${s.id})">✏️ עריכה</button>>✏️ עריכה</button>
+          <button class="btn btn-sm" style="flex:1" onclick="Suppliers.openContext(${s.id})">🔗 קשרים</button><button class="btn btn-sm" onclick="Suppliers.openModal(${s.id})">✏️ עריכה</button>
           <button class="btn btn-sm btn-danger" onclick="Suppliers.remove(${s.id})">🗑️</button>
         </div>
       </div>`).join('');
