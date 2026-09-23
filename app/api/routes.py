@@ -235,6 +235,8 @@ def dashboard():
                                 'issue_date': str(d.issue_date) if d.issue_date else '',
                                 'expiry_date': str(d.expiry_date) if d.expiry_date else '',
                                 'validity_status': ('missing' if not d.file_path else validity_status(d.expiry_date)),
+                                'ai_status': d.ai_status,
+                                'ai_summary': d.ai_summary,
                                 'file_path': d.file_path,
                                 'file_access_url': f'/api/documents/{d.id}/file' if d.file_path else None})
         score = round((valid_count / total_reqs * 100) if total_reqs else 0, 1)
@@ -274,7 +276,9 @@ def upload_bulk():
 
 @main_bp.route('/document-intelligence')
 def document_intelligence_page():
-    return render_template('document_intelligence.html', active_nav='permits')
+    if not session.get('user_id'):
+        return redirect('/login')
+    return render_template('document_intelligence.html', active_nav='document_intelligence')
 
 
 def _ai_document_payload(doc):
