@@ -192,6 +192,8 @@ const Tasks = (() => {
         <div class="task-meta">
           ${t.assignee ? `<span>👤 ${esc(t.assignee)}</span>` : ''}
           ${t.due_date ? `<span>📅 ${esc(t.due_date)}</span>` : ''}
+          ${t.site_id ? `<a href="/sites?site_id=${t.site_id}" style="color:inherit;">🏢 אתר #${t.site_id}</a>` : ''}
+          ${t.source_deficiency_id ? `<a href="/audits?deficiency_id=${t.source_deficiency_id}" style="color:inherit;">⚠️ מליקוי #${t.source_deficiency_id}</a>` : ''}
           ${t.is_recurring ? `<span>🔁 חוזר (${esc(t.recurrence_rule || '')})</span>` : ''}
           ${checklistTotal ? `<span>☑️ ${checklistDone}/${checklistTotal}</span>` : ''}
         </div>
@@ -245,7 +247,14 @@ const Tasks = (() => {
   }
 
   return {
-    init: async () => { await refresh(); const id = new URLSearchParams(window.location.search).get('task_id'); if (id) Tasks.openModal(Number(id)); },
+    init: async () => {
+      await refresh();
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('task_id');
+      const siteId = params.get('site_id');
+      if (siteId) { _all = _all.filter(t => String(t.site_id) === String(siteId)); render(_all); }
+      if (id) Tasks.openModal(Number(id));
+    },
     refresh,
     applyFilters,
 
