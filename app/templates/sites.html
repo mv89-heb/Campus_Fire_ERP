@@ -63,8 +63,8 @@
 {% endblock %}
 
 {% block content %}
-ddiv class="page-title-row">
-  dh1>🏢 ניהול אתרים</h1>
+<div class="page-title-row">
+  <h1>🏢 ניהול אתרים</h1>
   <button class="btn btn-primary" onclick="Sites.openSiteModal()">➕ אתר חדש</button>
 </div>
 <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:var(--space-4);">היררכיה: אתר ← מבנה ← קומה ← אזור</p>
@@ -95,7 +95,7 @@ ddiv class="page-title-row">
 </div>
 
 <div class="modal-overlay" id="siteContextModal">
-  <div class="modal" style="max-width:760px; max-height:88vh; overflow:auto;">
+  <div class="modal workspace-detail-modal" style="max-width:900px; max-height:90vh; overflow:auto;">
     <h3 id="siteContextTitle">מרכז האתר</h3>
     <div id="siteContextBody"><div class="empty-state">טוען...</div></div>
     <div class="modal-actions"><button class="btn" onclick="Sites.closeModal('siteContextModal')">סגירה</button></div>
@@ -384,3 +384,5 @@ document.addEventListener('DOMContentLoaded', Sites.init);
 {% endblock %}
 
 <style>.page-subtitle{font-size:.82rem;margin-top:4px}.workspace-card{box-shadow:var(--shadow-sm)}@media(max-width:560px){.page-title-row .btn{width:100%}}</style>
+
+<style>.workspace-detail-modal{box-shadow:0 18px 60px rgba(0,0,0,.35)}.workspace-detail-modal .card{background:var(--bg);border-color:var(--border)}@media(max-width:560px){.workspace-detail-modal{max-width:none!important;max-height:94vh!important;margin:3vh 8px!important;padding:14px!important}.workspace-detail-modal .card{padding:10px!important}}</style>
