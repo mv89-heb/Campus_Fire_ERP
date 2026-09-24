@@ -190,9 +190,14 @@ const Equip = (() => {
       document.getElementById('eqContextTitle').innerText='🧯 '+(e?.equipment_type||'ציוד');
       modal.classList.add('open'); body.innerHTML='<div class="empty-state">טוען...</div>';
       try{const r=await fetch('/api/integration/equipment/'+id);const d=await r.json();if(!r.ok)throw Error(d.error||'שגיאה');
-        body.innerHTML='<div class="card"><b>📍 מיקום</b><div>'+esc(d.location.site_name||'ללא אתר')+' · '+esc(d.location.building_name||'')+' · '+esc(d.location.floor_name||'')+' · '+esc(d.location.area_name||'')+'</div></div>'+
-        '<div class="card"><b>🚚 ספק</b><div>'+esc(d.supplier?.company_name||'לא משויך')+(d.supplier?.phone?' · '+esc(d.supplier.phone):'')+'</div></div>'+
-        '<div class="card"><b>🗓️ בדיקות</b><div>אחרונה: '+esc(d.equipment.last_check_date||'—')+' · הבאה: '+esc(d.equipment.next_check_date||'—')+'</div></div>';
+        const link=(href,label)=>'<a class="btn btn-sm" style="display:inline-flex;margin-top:6px;text-decoration:none" href="'+href+'">'+label+'</a>';
+        body.innerHTML='<div class="card"><b>📍 מיקום</b><div>'+esc(d.location.site_name||'ללא אתר')+' · '+esc(d.location.building_name||'')+' · '+esc(d.location.floor_name||'')+' · '+esc(d.location.area_name||'')+'</div>'+(d.location.site_id?link('/sites?site_id='+d.location.site_id,'פתח אתר'):'' )+'</div>'+
+        '<div class="card"><b>🚚 ספק</b><div>'+esc(d.supplier?.company_name||'לא משויך')+(d.supplier?.phone?' · '+esc(d.supplier.phone):'')+'</div>'+(d.supplier?.id?link('/suppliers?supplier_id='+d.supplier.id,'פתח ספק'):'')+'</div>'+
+        '<div class="card"><b>🗓️ בדיקות</b><div>אחרונה: '+esc(d.equipment.last_check_date||'—')+' · הבאה: '+esc(d.equipment.next_check_date||'—')+'</div></div>'+
+        '<div class="card"><b>🔍 ביקורות באתר ('+d.audits.length+')</b>'+(d.audits.slice(0,5).map(a=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(a.audit_number||('#'+a.id))+' · '+esc(a.audit_date||'—')+' · '+esc(a.status)+'</div>').join('')||'<div class="muted">אין ביקורות</div>')+'</div>'+
+        '<div class="card"><b>⚠️ ליקויים פתוחים ('+d.deficiencies.length+')</b>'+(d.deficiencies.map(x=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(x.title)+' · '+esc(x.severity)+' · יעד '+esc(x.due_date||'—')+'</div>').join('')||'<div class="muted">אין ליקויים פתוחים</div>')+'</div>'+
+        '<div class="card"><b>📋 משימות ('+d.tasks.length+')</b>'+(d.tasks.slice(0,6).map(x=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(x.title)+' · '+esc(x.status)+' · '+esc(x.due_date||'—')+'</div>').join('')||'<div class="muted">אין משימות</div>')+'</div>'+
+        '<div class="card"><b>📄 מסמכים קשורים ('+d.documents.length+')</b>'+(d.documents.map(x=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);"><a href="/api/documents/'+x.id+'/file" target="_blank">'+esc(x.file_name)+'</a> · '+esc(x.ai_status)+'</div>').join('')||'<div class="muted">אין מסמכים</div>')+'</div>';
       }catch(e){body.innerHTML='<div class="error-state">⚠️ '+esc(e.message)+'</div>'}
     },
     openModal: (id) => {
