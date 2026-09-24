@@ -243,9 +243,13 @@ const Suppliers = (() => {
       document.getElementById('supplierContextTitle').innerText='🚚 '+(s?.company_name||'ספק');
       modal.classList.add('open'); body.innerHTML='<div class="empty-state">טוען...</div>';
       try{const r=await fetch('/api/integration/suppliers/'+id);const d=await r.json();if(!r.ok)throw Error(d.error||'שגיאה');
-        body.innerHTML='<div class="card"><b>📦 ציוד ('+d.equipment.length+')</b>'+ (d.equipment.slice(0,10).map(e=>'<div style="padding:5px 0;">'+esc(e.equipment_type)+' · '+esc(e.serial_number||'—')+' · '+esc(e.status)+'</div>').join('')||'<div class="muted">אין ציוד</div>')+'</div>'+
-        '<div class="card"><b>📄 מסמכים ('+d.documents.length+')</b>'+ (d.documents.slice(0,10).map(x=>'<div style="padding:5px 0;">'+esc(x.file_name)+' · '+esc(x.ai_status)+'</div>').join('')||'<div class="muted">אין מסמכים</div>')+'</div>'+
-        '<div class="card"><b>✅ משימות ('+d.tasks.length+')</b>'+ (d.tasks.slice(0,10).map(x=>'<div style="padding:5px 0;">'+esc(x.title)+' · '+esc(x.status)+'</div>').join('')||'<div class="muted">אין משימות</div>')+'</div>';
+        const link=(href,label)=>'<a class="btn btn-sm" style="display:inline-flex;margin-top:6px;text-decoration:none" href="'+href+'">'+label+'</a>';
+        body.innerHTML='<div class="card"><b>📦 ציוד ('+d.equipment.length+')</b>'+ (d.equipment.slice(0,10).map(e=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(e.equipment_type)+' · '+esc(e.serial_number||'—')+' · '+esc(e.status)+'</div>').join('')||'<div class="muted">אין ציוד</div>')+'</div>'+
+        '<div class="card"><b>🔍 ביקורות באתר ('+d.audits.length+')</b>'+ (d.audits.slice(0,6).map(a=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(a.audit_number||('#'+a.id))+' · '+esc(a.audit_date||'—')+' · '+esc(a.status)+'</div>').join('')||'<div class="muted">אין ביקורות</div>')+'</div>'+
+        '<div class="card"><b>⚠️ ליקויים פתוחים ('+d.deficiencies.length+')</b>'+ (d.deficiencies.map(x=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(x.title)+' · '+esc(x.severity)+' · יעד '+esc(x.due_date||'—')+'</div>').join('')||'<div class="muted">אין ליקויים פתוחים</div>')+'</div>'+
+        '<div class="card"><b>📄 מסמכים ('+d.documents.length+')</b>'+ (d.documents.slice(0,10).map(x=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);"><a href="/api/documents/'+x.id+'/file" target="_blank">'+esc(x.file_name)+'</a> · '+esc(x.ai_status)+'</div>').join('')||'<div class="muted">אין מסמכים</div>')+'</div>'+
+        '<div class="card"><b>✅ משימות ('+d.tasks.length+')</b>'+ (d.tasks.slice(0,10).map(x=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(x.title)+' · '+esc(x.status)+' · '+esc(x.due_date||'—')+'</div>').join('')||'<div class="muted">אין משימות</div>')+'</div>'+
+        (d.supplier?.site_id?link('/sites?site_id='+d.supplier.site_id,'פתח אתר הספק'):'');
       }catch(e){body.innerHTML='<div class="error-state">⚠️ '+esc(e.message)+'</div>}
     },
     openModal: (id) => {
