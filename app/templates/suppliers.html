@@ -234,7 +234,7 @@ const Suppliers = (() => {
 
   return {
     closeContext: () => document.getElementById('supplierContextModal').classList.remove('open'),
-    init: async () => { await refresh(); const id = new URLSearchParams(window.location.search).get('supplier_id'); if (id) Suppliers.openModal(Number(id)); },
+    init: async () => { await refresh(); const id = new URLSearchParams(window.location.search).get('supplier_id'); if (id) Suppliers.openContext(Number(id)); },
     refresh,
     applyFilters,
 
