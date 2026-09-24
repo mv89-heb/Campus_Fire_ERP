@@ -1,25 +1,19 @@
 {% extends "_shell.html" %}
 {% block title %}מרכז ניתוח מסמכים AI | בטיחות אש{% endblock %}
 {% block extra_style %}
-.ai-grid{display:grid;grid-template-columns:340px 1fr;gap:15px}.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:15px;margin-bottom:15px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.btn{padding:9px 14px;border-radius:var(--radius);border:1px solid var(--border-mid);background:var(--bg-hover);color:var(--text);cursor:pointer}.btn-primary{background:var(--accent);color:#000;border:0}.btn:disabled{opacity:.55;cursor:not-allowed}.doc{padding:10px;border-bottom:1px solid var(--border);cursor:pointer}.doc:hover{background:var(--bg-hover)}.finding{border:1px solid var(--border);border-radius:8px;padding:12px;margin:9px 0}.finding.high,.finding.critical{border-right:4px solid var(--critical)}.relationship{border:1px solid var(--border);border-radius:8px;padding:12px;margin:12px 0}.relationship-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.relationship-box{background:var(--bg-hover);border-radius:8px;padding:10px}.relationship-box select{width:100%;margin-top:7px;padding:8px;border:1px solid var(--border-mid);border-radius:6px;background:var(--bg-card);color:var(--text)}.relationship-ok{color:var(--valid)}.relationship-warn{color:var(--warning)}@media(max-width:850px){.relationship-grid{grid-template-columns:1fr}}.finding.medium{border-right:4px solid var(--warning)}.action{background:rgba(63,185,80,.06);padding:10px;border-radius:7px;margin-top:8px}.muted{color:var(--text-muted);font-size:.82rem}.progress{height:10px;background:var(--bg-hover);border-radius:999px;overflow:hidden;margin-top:10px}.progress>div{height:100%;width:0%;background:var(--accent);transition:width .2s}@media(max-width:850px){.ai-grid{grid-template-columns:1fr}}
+.ai-grid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:18px;align-items:start}.doc-list-card{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow:auto}.doc{padding:12px;border:1px solid transparent;border-radius:8px;margin-bottom:5px;cursor:pointer;transition:.15s}.doc:hover{background:var(--bg-hover);border-color:var(--border)}.doc b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.doc.selected{background:var(--tint-primary);border-color:var(--accent)}.ai-detail{min-width:0}@media(max-width:850px){.ai-grid{grid-template-columns:1fr}.doc-list-card{position:static;max-height:280px}}.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:15px;margin-bottom:15px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.btn{padding:9px 14px;border-radius:var(--radius);border:1px solid var(--border-mid);background:var(--bg-hover);color:var(--text);cursor:pointer}.btn-primary{background:var(--accent);color:#000;border:0}.btn:disabled{opacity:.55;cursor:not-allowed}.doc{padding:10px;border-bottom:1px solid var(--border);cursor:pointer}.doc:hover{background:var(--bg-hover)}.finding{border:1px solid var(--border);border-radius:8px;padding:12px;margin:9px 0}.finding.high,.finding.critical{border-right:4px solid var(--critical)}.relationship{border:1px solid var(--border);border-radius:8px;padding:12px;margin:12px 0}.relationship-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.relationship-box{background:var(--bg-hover);border-radius:8px;padding:10px}.relationship-box select{width:100%;margin-top:7px;padding:8px;border:1px solid var(--border-mid);border-radius:6px;background:var(--bg-card);color:var(--text)}.relationship-ok{color:var(--valid)}.relationship-warn{color:var(--warning)}@media(max-width:850px){.relationship-grid{grid-template-columns:1fr}}.finding.medium{border-right:4px solid var(--warning)}.action{background:rgba(63,185,80,.06);padding:10px;border-radius:7px;margin-top:8px}.muted{color:var(--text-muted);font-size:.82rem}.progress{height:10px;background:var(--bg-hover);border-radius:999px;overflow:hidden;margin-top:10px}.progress>div{height:100%;width:0%;background:var(--accent);transition:width .2s}@media(max-width:850px){.ai-grid{grid-template-columns:1fr}}
 {% endblock %}
 {% block content %}
+<div class="page-title-row"><div><h1>🤖 מסמכים ו-Gemini</h1><div class="muted" style="margin-top:4px">העלאה → ניתוח → קישור לאתר/ביקורת/ספק → ממצאים → פעולות</div></div><div class="toolbar"><button id="bulkBtn" class="btn btn-primary" onclick="AI.analyzeAll()">🤖 נתח מסמכים ממתינים</button><button class="btn" onclick="AI.load()">🔄 רענן</button></div></div>
 <div id="overview" class="card" style="margin-bottom:15px">טוען תמונת מצב...</div>
 <div class="card" id="bulkPanel" style="display:none">
   <b>⚙️ עיבוד המוני דרך הדפדפן</b>
   <div id="bulkText" class="muted" style="margin-top:6px">מכין...</div>
   <div class="progress"><div id="bulkProgress"></div></div>
 </div>
-<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:15px">
-  <h1>🤖 מרכז ניתוח מסמכים AI</h1>
-  <div class="toolbar">
-    <button id="bulkBtn" class="btn btn-primary" onclick="AI.analyzeAll()">🤖 ניתוח כל המסמכים</button>
-    <button class="btn" onclick="AI.load()">🔄 רענן</button>
-  </div>
-</div>
 <div class="ai-grid">
-  <div class="card"><b>מסמכים</b><div id="list" style="margin-top:10px">טוען...</div></div>
-  <div class="card"><div id="detail" class="muted">בחר מסמך</div></div>
+  <div class="card doc-list-card"><div class="card-title"><span>📄 מסמכים</span><span id="docCount" class="muted"></span></div><div id="list">טוען...</div></div>
+  <div class="card ai-detail"><div id="detail" class="muted">בחר מסמך מהרשימה כדי לראות את הסיכום, הקשרים והממצאים.</div></div>
 </div>
 {% endblock %}
 {% block extra_script %}
@@ -57,8 +51,9 @@ const AI=(()=>{
     const d=await r.json();
     if(!r.ok){document.getElementById('list').innerHTML='<span class="muted">שגיאה בטעינת המסמכים</span>';return}
     docs=d.documents||[];
+    document.getElementById('docCount').innerText=docs.length+' מסמכים';
     document.getElementById('list').innerHTML=docs.map(x=>
-      '<div class="doc" onclick="AI.open('+x.document_id+')"><b>'+esc(x.file_name)+'</b><br>'+
+      '<div id="doc-'+x.document_id+'" class="doc" onclick="AI.open('+x.document_id+')"><b>'+esc(x.file_name)+'</b><br>'+
       '<span class="muted">'+(labels[x.ai_status]||x.ai_status)+(x.review_required?' · ⚠️ בדיקה נדרשת':'')+'</span></div>'
     ).join('')||'<span class="muted">אין מסמכים</span>';
   }
@@ -106,6 +101,8 @@ const AI=(()=>{
   }
 
   async function open(id){
+    document.querySelectorAll('.doc.selected').forEach(el=>el.classList.remove('selected'));
+    const selected=document.getElementById('doc-'+id); if(selected) selected.classList.add('selected');
     const r=await fetch('/api/document-intelligence/'+id);
     const d=await r.json();
     if(!r.ok){document.getElementById('detail').innerHTML='<div class="finding critical">'+esc(d.error||'שגיאה')+'</div>';return}

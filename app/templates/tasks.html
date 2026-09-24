@@ -18,6 +18,11 @@
 .filters-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .filters-row input, .filters-row select { background: var(--bg); color: var(--text); border: 1px solid var(--border-mid); border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; outline: none; }
 .filters-row input { flex: 1; min-width: 160px; }
+.quick-filters { display:flex; gap:6px; flex-wrap:wrap; width:100%; }
+.quick-filter { border:1px solid var(--border); background:var(--bg-hover); color:var(--text-muted); border-radius:999px; padding:6px 11px; cursor:pointer; font-size:.78rem; }
+.quick-filter.active { background:var(--tint-primary); color:var(--accent); border-color:var(--accent); }
+.task-actions { display:flex; gap:6px; flex-wrap:wrap; padding-top:8px; border-top:1px solid var(--border); margin-top:4px; }
+@media (min-width:700px){.quick-filters{width:auto; margin-left:auto; order:2}.task-filters{align-items:center}.task-filters input{order:1}.task-filters select{order:1}}
 .task-list { display: flex; flex-direction: column; gap: 10px; }
 .task-card { animation: fadeIn 0.25s ease; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; background: rgba(255,255,255,0.015); display: flex; flex-direction: column; gap: 6px; }
 .task-card.done { opacity: 0.55; }
@@ -68,7 +73,13 @@
 
 <div class="card">
   <div class="card-title"><span>📋 רשימת משימות</span></div>
-  <div class="filters-row">
+  <div class="filters-row task-filters">
+    <div class="quick-filters" aria-label="מסננים מהירים">
+      <button type="button" class="quick-filter active" onclick="Tasks.quickFilter('all', this)">הכול</button>
+      <button type="button" class="quick-filter" onclick="Tasks.quickFilter('open', this)">פתוחות</button>
+      <button type="button" class="quick-filter" onclick="Tasks.quickFilter('overdue', this)">באיחור</button>
+      <button type="button" class="quick-filter" onclick="Tasks.quickFilter('urgent', this)">דחופות</button>
+    </div>
     <input type="text" id="filterQ" placeholder="חיפוש..." oninput="clearTimeout(window._filterDebounce); window._filterDebounce = setTimeout(() => Tasks.applyFilters(), 150)">
     <select id="filterStatus" onchange="Tasks.applyFilters()">
       <option value="">כל הסטטוסים</option>
@@ -224,6 +235,19 @@ const Tasks = (() => {
     } else {
       bar.classList.remove('visible');
     }
+  }
+
+  function quickFilter(type, button) {
+    document.querySelectorAll('.quick-filter').forEach(b => b.classList.remove('active'));
+    if (button) button.classList.add('active');
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('filterPriority').value = '';
+    const today = new Date().toISOString().slice(0,10);
+    let list = _all;
+    if (type === 'open') list = list.filter(t => ['open','in_progress'].includes(t.status));
+    if (type === 'urgent') list = list.filter(t => ['urgent','high'].includes(t.priority) && t.status !== 'done' && t.status !== 'cancelled');
+    if (type === 'overdue') list = list.filter(t => t.due_date && t.due_date < today && t.status !== 'done' && t.status !== 'cancelled');
+    render(list);
   }
 
   function applyFilters() {

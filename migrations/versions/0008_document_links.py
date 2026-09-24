@@ -13,16 +13,19 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column("documents", sa.Column("site_id", sa.Integer(), nullable=True))
-    op.add_column("documents", sa.Column("audit_id", sa.Integer(), nullable=True))
-    op.add_column("documents", sa.Column("supplier_id", sa.Integer(), nullable=True))
-    op.create_foreign_key("fk_documents_site_id", "documents", "sites", ["site_id"], ["id"])
-    op.create_foreign_key("fk_documents_audit_id", "documents", "audits", ["audit_id"], ["id"])
-    op.create_foreign_key("fk_documents_supplier_id", "documents", "suppliers", ["supplier_id"], ["id"])
-    op.create_index("ix_documents_site_id", "documents", ["site_id"])
-    op.create_index("ix_documents_audit_id", "documents", ["audit_id"])
-    op.create_index("ix_documents_supplier_id", "documents", ["supplier_id"])
-
+    # batch_alter_table keeps this migration portable to SQLite (CI/test) and
+    # PostgreSQL (production). SQLite cannot add a foreign-key constraint to
+    # an existing table using plain ALTER TABLE.
+    with op.batch_alter_table("documents", schema=None) as batch:
+        batch.add_column(sa.Column("site_id", sa.Integer(), nullable=True))
+        batch.add_column(sa.Column("audit_id", sa.Integer(), nullable=True))
+        batch.add_column(sa.Column("supplier_id", sa.Integer(), nullable=True))
+        batch.create_foreign_key("fk_documents_site_id", "sites", ["site_id"], ["id"])
+        batch.create_foreign_key("fk_documents_audit_id", "audits", ["audit_id"], ["id"])
+        batch.create_foreign_key("fk_documents_supplier_id", "suppliers", ["supplier_id"], ["id"])
+        batch.create_index("ix_documents_site_id", ["site_id"])
+        batch.create_index("ix_documents_audit_id", ["audit_id"])
+        batch.create_index("ix_documents_supplier_id", ["supplier_id"])
 
 def downgrade():
     op.drop_index("ix_documents_supplier_id", table_name="documents")

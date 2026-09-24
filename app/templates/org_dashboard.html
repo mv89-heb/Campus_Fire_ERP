@@ -5,8 +5,8 @@
 .page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
 .page-title-row h1 { font-size: var(--text-xl); }
 
-.kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 15px; }
-@media (min-width: 768px) { .kpi-grid { grid-template-columns: repeat(4, 1fr); } }
+.kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 18px; }
+@media (min-width: 768px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
 .kpi-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; text-align: center; }
 .kpi-value { font-size: 1.8rem; font-weight: 800; }
 .kpi-label { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
@@ -53,12 +53,10 @@ tr:last-child td { border-bottom: none; }
   <button class="btn" onclick="loadDashboard(true)" title="רענון מיידי (עוקף מטמון)">🔄 רענן</button>
 </div>
 
-<div class="kpi-grid" id="kpiGrid">
-  <div class="skeleton skeleton-kpi"></div>
-  <div class="skeleton skeleton-kpi"></div>
-  <div class="skeleton skeleton-kpi"></div>
-  <div class="skeleton skeleton-kpi"></div>
-</div>
+<section aria-label="מדדי מפתח"><div class="kpi-grid" id="kpiGrid">
+  <div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div>
+  <div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div>
+</div></section>
 
 <div class="card" id="actionCenter" style="border-right:4px solid var(--critical);">
   <div class="card-title">🎯 דורש טיפול עכשיו</div>
@@ -138,17 +136,13 @@ async function loadDashboard(forceRefresh = false) {
     document.getElementById('kpiGrid').innerHTML = `
       <div class="kpi-card ${d.readiness_score >= 80 ? 'good' : d.readiness_score >= 50 ? 'warn' : 'bad'}">
         <div class="kpi-value">${d.readiness_score != null ? d.readiness_score + '%' : '—'}</div>
-        <div class="kpi-label">מדד מוכנות כללי</div>
+        <div class="kpi-label">מוכנות כללית</div>
       </div>
       <div class="kpi-card good"><div class="kpi-value">${d.permits.active_count}</div><div class="kpi-label">אישורים תקינים</div></div>
-      <div class="kpi-card warn"><div class="kpi-value">${d.permits.warning_30_count}</div><div class="kpi-label">פגים ב-30 יום</div></div>
-      <div class="kpi-card bad"><div class="kpi-value">${d.permits.expired_count}</div><div class="kpi-label">פג תוקף</div></div>
-      <div class="kpi-card"><div class="kpi-value">${d.suppliers.total_count}</div><div class="kpi-label">ספקים</div></div>
+      <div class="kpi-card warn"><div class="kpi-value">${d.permits.warning_30_count}</div><div class="kpi-label">אישורים לקראת פקיעה</div></div>
       <div class="kpi-card warn"><div class="kpi-value">${d.tasks.open_count}</div><div class="kpi-label">משימות פתוחות</div></div>
-      <div class="kpi-card"><div class="kpi-value">${d.audits.this_week.length}</div><div class="kpi-label">ביקורות השבוע</div></div>
       <div class="kpi-card bad"><div class="kpi-value">${d.deficiencies.open_count}</div><div class="kpi-label">ליקויים פתוחים</div></div>
       <div class="kpi-card bad"><div class="kpi-value">${d.equipment.faulty_count}</div><div class="kpi-label">ציוד לא תקין</div></div>
-      <div class="kpi-card warn"><div class="kpi-value">${d.equipment.checks_due_count || 0}</div><div class="kpi-label">בדיקות ציוד שהגיע מועדן</div></div>
     `;
 
     const actions = [
