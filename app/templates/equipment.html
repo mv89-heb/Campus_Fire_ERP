@@ -49,8 +49,8 @@
 {% endblock %}
 
 {% block content %}
-ddiv class="page-title-row">
-  dh1>🧯 ציוד כיבוי אש</h1>
+<div class="page-title-row">
+  <h1>🧯 ציוד כיבוי אש</h1>
   <button class="btn btn-primary" onclick="Equip.openModal()">➕ ציוד חדש</button>
 </div>
 <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:var(--space-4);">מטפים, גלגלונים, גלאים ועוד</p>
@@ -245,3 +245,5 @@ document.addEventListener('DOMContentLoaded', Equip.init);
 {% endblock %}
 
 <style>.page-subtitle{font-size:.82rem;margin-top:4px}.workspace-card{box-shadow:var(--shadow-sm)}@media(max-width:560px){.page-title-row .btn{width:100%}}</style>
+
+<style>.workspace-detail-modal{box-shadow:0 18px 60px rgba(0,0,0,.35)}.workspace-detail-modal .card{background:var(--bg);border-color:var(--border)}@media(max-width:560px){.workspace-detail-modal{max-width:none!important;max-height:94vh!important;margin:3vh 8px!important;padding:14px!important}.workspace-detail-modal .card{padding:10px!important}}</style>
