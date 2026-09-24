@@ -62,12 +62,12 @@
 
 {% block content %}
 <div class="page-title-row">
-  <h1>🔍 ביקורות וליקויים</h1>
+  <div><h1>🔍 ביקורות וליקויים</h1><div class="muted page-subtitle">מעקב מהביקורת ועד לסגירת הליקויים והמשימות</div></div>
   <button class="btn btn-primary" onclick="Audits.openAuditModal()">➕ ביקורת חדשה</button>
 </div>
 
-<div class="card">
-  <div class="card-title"><span>🔍 רשימת ביקורות</span></div>
+<div class="card workspace-card">
+  <div class="card-title"><span>🔍 ביקורות</span><span id="auditsCount" class="muted"></span></div>
   <div class="filters-row">
     <select id="filterStatus" onchange="Audits.refresh()">
       <option value="">כל הסטטוסים</option>
@@ -203,6 +203,7 @@ const Audits = (() => {
       if (result) params.set('result', result);
       const res = await fetch('/api/audits?' + params.toString());
       _audits = await res.json();
+      const count = document.getElementById('auditsCount'); if (count) count.innerText = _audits.length + ' ביקורות';
       render();
     } catch (e) {
       document.getElementById('auditsList').innerHTML = `<div class="error-state">⚠️ שגיאה בטעינת ביקורות<button class="retry-btn" onclick="Audits.init()">🔄 נסה שוב</button></div>`;
@@ -533,3 +534,4 @@ const Audits = (() => {
 document.addEventListener('DOMContentLoaded', Audits.init);
 </script>
 {% endblock %}
+<style>.page-subtitle{font-size:.82rem;margin-top:4px}.workspace-card{box-shadow:var(--shadow-sm)}.audit-header{padding:15px 16px}.audit-block{border-radius:var(--radius-lg)}.audit-header .audit-meta{line-height:1.5}.deficiency-item{background:var(--bg-card);padding:12px}.deficiency-actions .btn{min-width:0}@media(max-width:560px){.page-title-row .btn{width:100%}.audit-header{align-items:flex-start}.score-badge{font-size:1.1rem}}</style>
