@@ -293,49 +293,38 @@ def equipment_context(equipment_id: int) -> dict:
     building = db.session.get(Building, floor.building_id) if floor else None
     site = db.session.get(Site, building.site_id) if building else None
     supplier = db.session.get(Supplier, eq.supplier_id) if eq.supplier_id else None
+    site_id = site.id if site else None
+    audits = Audit.query.filter_by(site_id=site_id).order_by(Audit.audit_date.desc().nullslast(), Audit.id.desc()).limit(8).all() if site_id else []
+    audit_ids = [a.id for a in audits]
+    deficiencies = Deficiency.query.filter(Deficiency.audit_id.in_(audit_ids), Deficiency.status != "resolved").order_by(Deficiency.due_date.asc().nullslast()).limit(8).all() if audit_ids else []
+    tasks = Task.query.filter_by(site_id=site_id).order_by(Task.due_date.asc().nullslast(), Task.id.desc()).limit(8).all() if site_id else []
+    documents = Document.query.filter(db.or_(Document.site_id == site_id, Document.supplier_id == eq.supplier_id), Document.status.notin_(["deleted", "archived"])).order_by(Document.uploaded_at.desc()).limit(8).all() if (site_id or eq.supplier_id) else []
     return {
-        "equipment": {
-            "id": eq.id, "equipment_type": eq.equipment_type, "serial_number": eq.serial_number,
-            "manufacturer": eq.manufacturer, "model": eq.model, "status": eq.status,
-            "last_check_date": eq.last_check_date.isoformat() if eq.last_check_date else None,
-            "next_check_date": eq.next_check_date.isoformat() if eq.next_check_date else None,
-        },
-        "location": {
-            "site_id": site.id if site else None, "site_name": site.name if site else None,
-            "building_id": building.id if building else None, "building_name": building.name if building else None,
-            "floor_id": floor.id if floor else None, "floor_name": floor.name if floor else None,
-            "area_id": area.id if area else None, "area_name": area.name if area else None,
-        },
+        "equipment": {"id": eq.id, "equipment_type": eq.equipment_type, "serial_number": eq.serial_number, "manufacturer": eq.manufacturer, "model": eq.model, "status": eq.status, "last_check_date": eq.last_check_date.isoformat() if eq.last_check_date else None, "next_check_date": eq.next_check_date.isoformat() if eq.next_check_date else None},
+        "location": {"site_id": site_id, "site_name": site.name if site else None, "building_id": building.id if building else None, "building_name": building.name if building else None, "floor_id": floor.id if floor else None, "floor_name": floor.name if floor else None, "area_id": area.id if area else None, "area_name": area.name if area else None},
         "supplier": {"id": supplier.id, "company_name": supplier.company_name, "phone": supplier.phone} if supplier else None,
+        "audits": [{"id": a.id, "audit_number": a.audit_number, "audit_date": a.audit_date.isoformat() if a.audit_date else None, "status": a.status, "result": a.result} for a in audits],
+        "deficiencies": [{"id": d.id, "audit_id": d.audit_id, "title": d.title, "severity": d.severity, "due_date": d.due_date.isoformat() if d.due_date else None} for d in deficiencies],
+        "tasks": [{"id": t.id, "title": t.title, "status": t.status, "priority": t.priority, "due_date": t.due_date.isoformat() if t.due_date else None} for t in tasks],
+        "documents": [_document_summary(d) for d in documents],
     }
-
 
 def supplier_context(supplier_id: int) -> dict:
     supplier = db.session.get(Supplier, supplier_id)
     if not supplier:
         raise ValueError("הספק לא נמצא")
     equipment = Equipment.query.filter_by(supplier_id=supplier.id).order_by(Equipment.equipment_type).all()
-    documents = Document.query.filter(
-        Document.supplier_id == supplier.id,
-        Document.status.notin_(["deleted", "archived"]),
-    ).order_by(Document.uploaded_at.desc()).all()
+    documents = Document.query.filter(Document.supplier_id == supplier.id, Document.status.notin_(["deleted", "archived"])).order_by(Document.uploaded_at.desc()).all()
     tasks = Task.query.filter_by(supplier_id=supplier.id).order_by(Task.due_date.asc().nullslast(), Task.id.desc()).all()
+    audits = Audit.query.filter_by(site_id=supplier.site_id).order_by(Audit.audit_date.desc().nullslast(), Audit.id.desc()).limit(8).all() if supplier.site_id else []
+    audit_ids = [a.id for a in audits]
+    deficiencies = Deficiency.query.filter(Deficiency.audit_id.in_(audit_ids), Deficiency.status != "resolved").order_by(Deficiency.due_date.asc().nullslast()).limit(8).all() if audit_ids else []
     return {
-        "supplier": {
-            "id": supplier.id, "company_name": supplier.company_name, "supplier_number": supplier.supplier_number,
-            "contact_name": supplier.contact_name, "phone": supplier.phone, "email": supplier.email,
-            "service_type": supplier.service_type, "status": supplier.status,
-            "contract_expiry": supplier.contract_expiry.isoformat() if supplier.contract_expiry else None,
-            "insurance_expiry": supplier.insurance_expiry.isoformat() if supplier.insurance_expiry else None,
-            "site_id": supplier.site_id,
-        },
-        "equipment": [{
-            "id": e.id, "equipment_type": e.equipment_type, "serial_number": e.serial_number,
-            "status": e.status, "next_check_date": e.next_check_date.isoformat() if e.next_check_date else None,
-        } for e in equipment],
+        "supplier": {"id": supplier.id, "company_name": supplier.company_name, "supplier_number": supplier.supplier_number, "contact_name": supplier.contact_name, "phone": supplier.phone, "email": supplier.email, "service_type": supplier.service_type, "status": supplier.status, "contract_expiry": supplier.contract_expiry.isoformat() if supplier.contract_expiry else None, "insurance_expiry": supplier.insurance_expiry.isoformat() if supplier.insurance_expiry else None, "site_id": supplier.site_id},
+        "equipment": [{"id": e.id, "equipment_type": e.equipment_type, "serial_number": e.serial_number, "status": e.status, "next_check_date": e.next_check_date.isoformat() if e.next_check_date else None} for e in equipment],
         "documents": [_document_summary(d) for d in documents],
-        "tasks": [{
-            "id": t.id, "title": t.title, "status": t.status, "priority": t.priority,
-            "due_date": t.due_date.isoformat() if t.due_date else None,
-        } for t in tasks],
+        "tasks": [{"id": t.id, "title": t.title, "status": t.status, "priority": t.priority, "due_date": t.due_date.isoformat() if t.due_date else None} for t in tasks],
+        "audits": [{"id": a.id, "audit_number": a.audit_number, "audit_date": a.audit_date.isoformat() if a.audit_date else None, "status": a.status, "result": a.result} for a in audits],
+        "deficiencies": [{"id": d.id, "audit_id": d.audit_id, "title": d.title, "severity": d.severity, "due_date": d.due_date.isoformat() if d.due_date else None} for d in deficiencies],
     }
+
