@@ -53,7 +53,7 @@ const AI=(()=>{
     docs=d.documents||[];
     document.getElementById('docCount').innerText=docs.length+' מסמכים';
     document.getElementById('list').innerHTML=docs.map(x=>
-      '<div class="doc" onclick="AI.open('+x.document_id+')"><b>'+esc(x.file_name)+'</b><br>'+
+      '<div id="doc-'+x.document_id+'" class="doc" onclick="AI.open('+x.document_id+')"><b>'+esc(x.file_name)+'</b><br>'+
       '<span class="muted">'+(labels[x.ai_status]||x.ai_status)+(x.review_required?' · ⚠️ בדיקה נדרשת':'')+'</span></div>'
     ).join('')||'<span class="muted">אין מסמכים</span>';
   }
@@ -101,6 +101,8 @@ const AI=(()=>{
   }
 
   async function open(id){
+    document.querySelectorAll('.doc.selected').forEach(el=>el.classList.remove('selected'));
+    const selected=document.getElementById('doc-'+id); if(selected) selected.classList.add('selected');
     const r=await fetch('/api/document-intelligence/'+id);
     const d=await r.json();
     if(!r.ok){document.getElementById('detail').innerHTML='<div class="finding critical">'+esc(d.error||'שגיאה')+'</div>';return}
