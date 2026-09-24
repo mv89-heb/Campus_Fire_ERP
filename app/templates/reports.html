@@ -8,7 +8,8 @@
 @media (min-width: 768px) { .reports-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1100px) { .reports-grid { grid-template-columns: repeat(4, 1fr); } }
 .report-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; }
-.report-title { font-weight: 700; margin-bottom: 10px; }
+.report-title { font-weight: 700; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.report-count { font-size:.72rem; color:var(--color-text-muted); background:var(--tint-neutral); border-radius:999px; padding:3px 8px; }
 .report-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .report-actions .ds-btn { flex: 1; min-width: 70px; padding: 6px 8px; font-size: 0.78rem; min-height: 32px; }
 .kpi-summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: var(--space-5); }
@@ -23,8 +24,6 @@
   <h1>📈 דוחות</h1>
 </div>
 <p style="color:var(--color-text-muted); font-size:var(--text-sm); margin-bottom:var(--space-4);">ייצוא ל-PDF / Excel / CSV</p>
-
-<div class="kpi-summary-grid" id="kpiSummaryGrid"></div>
 
 <div class="reports-grid" id="reportsGrid"></div>
 
@@ -53,7 +52,7 @@ const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','
 
 document.getElementById('reportsGrid').innerHTML = REPORTS.map(r => `
   <div class="report-card">
-    <div class="report-title">${r.icon} ${r.label}</div>
+    <div class="report-title"><span>${r.icon} ${r.label}</span><span class="report-count" id="count-${r.key}">—</span></div>
     <div class="report-actions">
       <button class="ds-btn" onclick="preview('${r.key}', '${esc(r.label)}')">👁️ תצוגה</button>
       <a class="ds-btn" href="/reports/${r.key}/print" target="_blank">🖨️ PDF</a>
@@ -62,24 +61,17 @@ document.getElementById('reportsGrid').innerHTML = REPORTS.map(r => `
     </div>
   </div>`).join('');
 
-async function loadKpiSummary() {
-  const grid = document.getElementById('kpiSummaryGrid');
-  grid.innerHTML = REPORTS.map(r => `<div class="ds-kpi-card kpi-summary-card" id="kpi-${r.key}" onclick="preview('${r.key}', '${esc(r.label)}')">
-    <div class="ds-kpi-value">…</div><div class="ds-kpi-label">${r.icon} ${r.label}</div>
-  </div>`).join('');
+async function loadReportCounts() {
   await Promise.all(REPORTS.map(async r => {
     try {
-      const res = await fetch(`/api/reports/${r.key}`);
+      const res = await fetch('/api/reports/' + r.key);
       const data = await res.json();
-      const card = document.getElementById(`kpi-${r.key}`);
-      const count = data.rows.length;
-      const isWarn = ['expired_permits', 'expiring_permits', 'deficiencies'].includes(r.key) && count > 0;
-      card.querySelector('.ds-kpi-value').innerText = count;
-      if (isWarn) card.classList.add(r.key === 'expired_permits' ? 'bad' : 'warn');
-    } catch (e) { /* לא קריטי */ }
+      const el = document.getElementById('count-' + r.key);
+      if (el) el.innerText = (data.rows || []).length + ' רשומות';
+    } catch (e) {}
   }));
 }
-loadKpiSummary();
+loadReportCounts();
 
 async function preview(key, label) {
   try {
