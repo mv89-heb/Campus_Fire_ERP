@@ -17,6 +17,16 @@
 @media (min-width: 1100px) { .kpi-summary-grid { grid-template-columns: repeat(8, 1fr); } }
 .kpi-summary-card { cursor: pointer; text-align: center; }
 .kpi-summary-card .ds-kpi-value { font-size: var(--text-xl); }
+.ai-full-section { margin-top: 20px; }
+.ai-full-toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+.ai-full-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:16px; margin-bottom:12px; }
+.ai-full-card h3 { margin:0 0 6px; font-size:1rem; }
+.ai-full-meta { color:var(--color-text-muted); font-size:.82rem; margin-bottom:10px; }
+.ai-full-summary { white-space:pre-wrap; line-height:1.6; background:var(--tint-neutral); border-radius:8px; padding:12px; }
+.ai-full-findings { margin-top:10px; }
+.ai-full-finding { border:1px solid var(--color-border); border-radius:8px; padding:10px; margin-top:7px; }
+.ai-full-finding b { display:block; margin-bottom:4px; }
+.ai-full-actions { display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; }
 {% endblock %}
 
 {% block content %}
