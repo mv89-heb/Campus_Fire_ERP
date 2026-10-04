@@ -150,3 +150,84 @@ def get_report(report_key):
 
 def list_report_types():
     return [{"key": k, "label": v["label"]} for k, v in REPORTS.items()]
+
+
+def _json_object(value, default):
+    try:
+        parsed = json.loads(value or "")
+        return parsed if isinstance(parsed, type(default)) else default
+    except (TypeError, ValueError):
+        return default
+
+
+def get_ai_full_reports():
+    """Return complete, human-readable Gemini reports for every completed document."""
+    documents = (
+        Document.query
+        .filter(Document.ai_status == 'completed')
+        .filter(Document.status.notin_(['archived', 'deleted']))
+        .order_by(Document.ai_analyzed_at.desc().nullslast(), Document.uploaded_at.desc())
+        .all()
+    )
+    reports = []
+    for d in documents:
+        site = db.session.get(Site, d.site_id) if d.site_id else None
+        audit = db.session.get(Audit, d.audit_id) if d.audit_id else None
+        supplier = db.session.get(Supplier, d.supplier_id) if d.supplier_id else None
+        findings = _json_object(d.ai_findings_json, [])
+        actions = _json_object(d.ai_actions_json, {})
+        deficiencies = (
+            Deficiency.query
+            .filter(Deficiency.notes.ilike(f"%document:{d.id}%"))
+            .order_by(Deficiency.severity.desc(), Deficiency.id.asc())
+            .all()
+        )
+        operational = []
+        for deficiency in deficiencies:
+            task = db.session.get(Task, deficiency.task_id) if deficiency.task_id else None
+            operational.append({
+                "deficiency_id": deficiency.id,
+                "title": deficiency.title,
+                "severity": deficiency.severity,
+                "description": deficiency.description or "",
+                "responsible": deficiency.responsible or "",
+                "due_date": str(deficiency.due_date) if deficiency.due_date else None,
+                "status": deficiency.status,
+                "task_id": task.id if task else None,
+                "task_title": task.title if task else None,
+                "task_status": task.status if task else None,
+                "task_due_date": str(task.due_date) if task and task.due_date else None,
+            })
+        reports.append({
+            "document_id": d.id,
+            "file_name": d.file_name,
+            "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
+            "analyzed_at": d.ai_analyzed_at.isoformat() if d.ai_analyzed_at else None,
+            "ai_model": d.ai_model,
+            "document_type": d.ai_document_type,
+            "category": d.category,
+            "site": site.name if site else actions.get("site_name"),
+            "site_address": site.address if site else actions.get("site_address"),
+            "audit_number": audit.audit_number if audit else actions.get("audit_number"),
+            "audit_date": str(audit.audit_date) if audit and audit.audit_date else actions.get("audit_date"),
+            "inspector_name": audit.inspector_name if audit else actions.get("inspector_name"),
+            "supplier": supplier.company_name if supplier else actions.get("supplier_name"),
+            "supplier_number": supplier.supplier_number if supplier else actions.get("supplier_number"),
+            "issue_date": str(d.issue_date) if d.issue_date else None,
+            "expiry_date": str(d.expiry_date) if d.expiry_date else None,
+            "analysis_expiry_date": str(d.analysis_expiry_date) if d.analysis_expiry_date else None,
+            "validity_status": d.analysis_validity_status,
+            "validity_source": d.analysis_validity_source,
+            "validity_rule": d.analysis_validity_rule_label or d.analysis_validity_rule,
+            "validity_evidence": d.analysis_validity_rule_evidence,
+            "analysis_confidence": d.analysis_confidence,
+            "ai_confidence": d.ai_confidence,
+            "review_required": bool(d.analysis_review_required),
+            "summary": d.ai_summary or "",
+            "findings": findings,
+            "missing_items": actions.get("missing_items", []),
+            "contradictions": actions.get("contradictions", []),
+            "follow_up_questions": actions.get("follow_up_questions", []),
+            "operational_actions": operational,
+        })
+    return reports
