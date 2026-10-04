@@ -23,7 +23,10 @@ class Config:
         None if IS_PRODUCTION else secrets.token_hex(32)
     )
 
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', f'sqlite:///{DB_PATH}')
+    _database_url = os.environ.get('DATABASE_URL')
+    if _database_url and _database_url.startswith('postgresql://'):
+        _database_url = 'postgresql+psycopg2://' + _database_url[len('postgresql://'):]
+    SQLALCHEMY_DATABASE_URI = _database_url or f'sqlite:///{DB_PATH}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
