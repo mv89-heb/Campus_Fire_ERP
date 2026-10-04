@@ -5,6 +5,7 @@ Service Layer עבור מערכת דוחות (שלב 11).
 CSV/Excel/הדפסה יכולים לצרוך בלי לדעת על המודל שמאחורי הדוח.
 """
 from datetime import date
+import json
 
 from app.models import Document, Supplier, Equipment, Deficiency, Audit, Task, Site
 from app.extensions import db
@@ -161,7 +162,7 @@ def _json_object(value, default):
 
 
 def get_ai_full_reports():
-    """Return complete, human-readable Gemini reports for every completed document."""
+    """Return the complete persisted Gemini analysis, without dropping detail."""
     documents = (
         Document.query
         .filter(Document.ai_status == 'completed')
@@ -174,12 +175,17 @@ def get_ai_full_reports():
         site = db.session.get(Site, d.site_id) if d.site_id else None
         audit = db.session.get(Audit, d.audit_id) if d.audit_id else None
         supplier = db.session.get(Supplier, d.supplier_id) if d.supplier_id else None
-        findings = _json_object(d.ai_findings_json, [])
+
+        findings = _json_list(_json_object(d.ai_findings_json, []))
         actions = _json_object(d.ai_actions_json, {})
+        missing_items = _json_list(actions.get("missing_items"))
+        contradictions = _json_list(actions.get("contradictions"))
+        follow_up_questions = _json_list(actions.get("follow_up_questions"))
+
         deficiencies = (
             Deficiency.query
             .filter(Deficiency.notes.ilike(f"%document:{d.id}%"))
-            .order_by(Deficiency.severity.desc(), Deficiency.id.asc())
+            .order_by(Deficiency.id.asc())
             .all()
         )
         operational = []
@@ -198,6 +204,7 @@ def get_ai_full_reports():
                 "task_status": task.status if task else None,
                 "task_due_date": str(task.due_date) if task and task.due_date else None,
             })
+
         reports.append({
             "document_id": d.id,
             "file_name": d.file_name,
@@ -205,11 +212,14 @@ def get_ai_full_reports():
             "analyzed_at": d.ai_analyzed_at.isoformat() if d.ai_analyzed_at else None,
             "ai_model": d.ai_model,
             "document_type": d.ai_document_type,
+            "document_purpose": actions.get("document_purpose"),
             "category": d.category,
+            "overall_status": actions.get("overall_status"),
             "site": site.name if site else actions.get("site_name"),
             "site_address": site.address if site else actions.get("site_address"),
             "audit_number": audit.audit_number if audit else actions.get("audit_number"),
             "audit_date": str(audit.audit_date) if audit and audit.audit_date else actions.get("audit_date"),
+            "audit_status": audit.status if audit else None,
             "inspector_name": audit.inspector_name if audit else actions.get("inspector_name"),
             "supplier": supplier.company_name if supplier else actions.get("supplier_name"),
             "supplier_number": supplier.supplier_number if supplier else actions.get("supplier_number"),
@@ -221,13 +231,15 @@ def get_ai_full_reports():
             "validity_rule": d.analysis_validity_rule_label or d.analysis_validity_rule,
             "validity_evidence": d.analysis_validity_rule_evidence,
             "analysis_confidence": d.analysis_confidence,
+            "analysis_confidence_percent": _confidence_percent(d.analysis_confidence),
             "ai_confidence": d.ai_confidence,
+            "ai_confidence_percent": _confidence_percent(d.ai_confidence),
             "review_required": bool(d.analysis_review_required),
             "summary": d.ai_summary or "",
             "findings": findings,
-            "missing_items": actions.get("missing_items", []),
-            "contradictions": actions.get("contradictions", []),
-            "follow_up_questions": actions.get("follow_up_questions", []),
+            "missing_items": missing_items,
+            "contradictions": contradictions,
+            "follow_up_questions": follow_up_questions,
             "operational_actions": operational,
         })
     return reports
