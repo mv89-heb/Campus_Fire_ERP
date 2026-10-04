@@ -12,8 +12,8 @@ and indexes. Existing installations that already recorded 0001 are not
 re-run.
 """
 from alembic import op
-from app import create_app
 from app.extensions import db
+from app import models  # noqa: F401 - register all SQLAlchemy models
 
 revision = "0001_schema_baseline"
 down_revision = None
@@ -21,9 +21,7 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
-    app = create_app()
-    with app.app_context():
-        db.metadata.create_all(bind=op.get_bind())
+    db.metadata.create_all(bind=op.get_bind())
 
 def downgrade():
     pass
