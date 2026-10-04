@@ -1,28 +1,29 @@
-"""Baseline marker for the pre-Alembic production schema.
+"""Baseline/provisioning marker for the production schema.
 
 Revision ID: 0001_schema_baseline
 Revises:
 Create Date: 2026-08-13
+
+Fresh production databases may be completely empty. The original baseline
+only stamped the revision and therefore could not provision a new Postgres
+database. This revision now creates the current SQLAlchemy schema
+non-destructively; later migrations remain responsible for additive repairs
+and indexes. Existing installations that already recorded 0001 are not
+re-run.
 """
-
 from alembic import op
-
+from app import create_app
+from app.extensions import db
 
 revision = "0001_schema_baseline"
 down_revision = None
 branch_labels = None
 depends_on = None
 
-
 def upgrade():
-    # Existing installations were created with SQLAlchemy create_all(). This
-    # revision deliberately records that schema as the migration baseline
-    # without attempting a destructive rebuild or guessing the live schema.
-    pass
-
+    app = create_app()
+    with app.app_context():
+        db.metadata.create_all(bind=op.get_bind())
 
 def downgrade():
-    # The baseline has no reversible schema operation. Dropping every table
-    # here would be unsafe and would turn a versioning marker into a destructive
-    # database command.
     pass
