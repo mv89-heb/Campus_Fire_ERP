@@ -7,7 +7,7 @@ gunicorn
 werkzeug==3.0.1
 python-dotenv==1.0.0
 openpyxl==3.1.2
-psycopg2-binary==2.9.12
+psycopg==3.2.10
 supabase==2.31.0
 pywin32==306 ; sys_platform == 'win32'
 google-genai==2.25.0
