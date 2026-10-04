@@ -28,6 +28,8 @@ table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid 
 <h2>פרטי המסמך והקשר</h2>
 <div class="grid">
 <div class="field"><div class="label">סוג מסמך</div><div class="value">{{ r.document_type or '—' }}</div></div>
+<div class="field"><div class="label">מטרת המסמך</div><div class="value">{{ r.document_purpose or '—' }}</div></div>
+<div class="field"><div class="label">סטטוס כולל</div><div class="value">{{ r.overall_status or '—' }}</div></div>
 <div class="field"><div class="label">קטגוריה</div><div class="value">{{ r.category or '—' }}</div></div>
 <div class="field"><div class="label">אתר</div><div class="value">{{ r.site or '—' }}</div></div>
 <div class="field"><div class="label">כתובת</div><div class="value">{{ r.site_address or '—' }}</div></div>
