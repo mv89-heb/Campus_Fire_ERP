@@ -13,6 +13,8 @@ h1{font-size:24px;margin-bottom:5px}.meta{color:#667085;font-size:13px}.grid{dis
 <div class="meta">מסמך #{{ report.document_id }} · {{ report.analyzed_at or '—' }} · {{ report.ai_model or '—' }}</div>
 <h2>פרטי המסמך</h2><div class="grid">
 <div class="field"><div class="label">סוג</div><div class="value">{{ report.document_type or '—' }}</div></div>
+<div class="field"><div class="label">מטרת המסמך</div><div class="value">{{ report.document_purpose or '—' }}</div></div>
+<div class="field"><div class="label">סטטוס כולל</div><div class="value">{{ report.overall_status or '—' }}</div></div>
 <div class="field"><div class="label">קטגוריה</div><div class="value">{{ report.category or '—' }}</div></div>
 <div class="field"><div class="label">אתר</div><div class="value">{{ report.site or '—' }}</div></div>
 <div class="field"><div class="label">כתובת</div><div class="value">{{ report.site_address or '—' }}</div></div>
