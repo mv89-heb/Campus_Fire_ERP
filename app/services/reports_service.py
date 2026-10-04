@@ -161,6 +161,24 @@ def _json_object(value, default):
         return default
 
 
+def _json_list(value):
+    if isinstance(value, list):
+        return value
+    if value is None:
+        return []
+    return [value]
+
+
+def _confidence_percent(value):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number <= 1:
+        number *= 100
+    return round(number)
+
+
 def get_ai_full_reports():
     """Return the complete persisted Gemini analysis, without dropping detail."""
     documents = (
