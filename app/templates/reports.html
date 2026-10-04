@@ -27,6 +27,15 @@
 .ai-full-finding { border:1px solid var(--color-border); border-radius:8px; padding:10px; margin-top:7px; }
 .ai-full-finding b { display:block; margin-bottom:4px; }
 .ai-full-actions { display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; }
+.ai-full-detail { margin-top:12px; border-top:1px solid var(--color-border); padding-top:10px; }
+.ai-full-section-title { font-size:.9rem; font-weight:700; margin:12px 0 6px; }
+.ai-full-list { margin:6px 0; padding-right:22px; line-height:1.65; }
+.ai-full-finding p { margin:7px 0; line-height:1.6; white-space:pre-wrap; }
+.ai-full-finding .finding-meta { color:var(--color-text-muted); font-size:.78rem; }
+.ai-full-operational { border:1px solid var(--color-border); border-radius:8px; padding:10px; margin-top:8px; }
+.ai-full-empty { color:var(--color-text-muted); padding:12px; }
+.ai-full-status { font-weight:700; }
+
 {% endblock %}
 
 {% block content %}
@@ -40,6 +49,19 @@
 <div class="ds-card" id="previewCard" style="display:none; margin-top:var(--space-4);">
   <div style="font-weight:700; margin-bottom:10px;" id="previewTitle"></div>
   <div style="overflow-x:auto;"><table class="ds-table" id="previewTable"></table></div>
+</div>
+
+<div class="ai-full-section">
+  <div class="ai-full-toolbar">
+    <div>
+      <h2 style="margin:0;">🤖 דוחות ניתוח Gemini מלאים</h2>
+      <div style="color:var(--color-text-muted); font-size:var(--text-sm); margin-top:4px;">
+        כאן מופיע התוכן המלא שנשמר מהניתוח: סיכום, כל הממצאים, למה זה חשוב, מה לבצע, ראיות לסגירה, חוסרים, סתירות, שאלות המשך והפעולות התפעוליות שנוצרו.
+      </div>
+    </div>
+    <a class="ds-btn" href="/reports/ai-full/print" target="_blank">🖨️ הדפס את כל הדוחות</a>
+  </div>
+  <div id="aiFullReports"></div>
 </div>
 {% endblock %}
 
@@ -100,5 +122,116 @@ async function preview(key, label) {
     document.getElementById('previewCard').scrollIntoView({ behavior: 'smooth' });
   } catch (e) { alert('שגיאה בטעינת הדוח'); }
 }
+<script>
+function esc(s) {
+  return (s === null || s === undefined ? '' : String(s))
+    .replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function valueOrDash(v) { return v === null || v === undefined || v === '' ? '—' : esc(v); }
+function percent(v) { return v === null || v === undefined ? '—' : esc(v) + '%'; }
+function renderList(items) {
+  if (!Array.isArray(items) || !items.length) return '<div class="ai-full-empty">אין</div>';
+  return '<ul class="ai-full-list">' + items.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
+}
+function severityLabel(s) {
+  return ({critical:'קריטי',high:'גבוהה',medium:'בינונית',low:'נמוכה',info:'מידע',unclear:'לא ברור'}[s] || s || '—');
+}
+function statusLabel(s) {
+  return ({ok:'תקין',needs_attention:'דורש תשומת לב',critical:'קריטי',unclear:'לא ברור',open:'פתוח',closed:'סגור',in_progress:'בטיפול'}[s] || s || '—');
+}
+function renderFinding(f, i) {
+  return `
+    <div class="ai-full-finding">
+      <b>${i + 1}. ${valueOrDash(f.title)}</b>
+      <div class="finding-meta">חומרה: ${severityLabel(f.severity)} · ביטחון: ${percent(f.confidence <= 1 ? Math.round(f.confidence * 100) : Math.round(f.confidence))}${f.status ? ' · סטטוס: ' + statusLabel(f.status) : ''}${f.source_page ? ' · עמוד: ' + esc(f.source_page) : ''}</div>
+      <p><b>תיאור הממצא:</b><br>${valueOrDash(f.description)}</p>
+      <p><b>למה זה חשוב:</b><br>${valueOrDash(f.why_it_matters)}</p>
+      <p><b>מה צריך לעשות:</b><br>${valueOrDash(f.recommended_action)}</p>
+      <p><b>איך סוגרים / ראיה לסגירה:</b><br>${valueOrDash(f.evidence_to_close)}</p>
+      <p><b>אחראי מומלץ:</b> ${valueOrDash(f.responsible_role)} · <b>יעד:</b> ${f.due_days === null || f.due_days === undefined ? '—' : esc(f.due_days) + ' ימים'}</p>
+      ${f.source_quote ? '<p><b>ציטוט מקור:</b><br>' + esc(f.source_quote) + '</p>' : ''}
+    </div>`;
+}
+function renderReport(r) {
+  const findings = Array.isArray(r.findings) ? r.findings : [];
+  const operational = Array.isArray(r.operational_actions) ? r.operational_actions : [];
+  return `
+  <article class="ai-full-card">
+    <div class="ai-full-toolbar">
+      <div>
+        <h3>🤖 ${valueOrDash(r.file_name)}</h3>
+        <div class="ai-full-meta">מסמך #${valueOrDash(r.document_id)} · נותח: ${valueOrDash(r.analyzed_at)} · מודל: ${valueOrDash(r.ai_model)}</div>
+      </div>
+      <a class="ds-btn" href="/reports/ai-full/${encodeURIComponent(r.document_id)}/print" target="_blank">🖨️ הדפס דוח מלא</a>
+    </div>
+
+    <div class="ai-full-meta">
+      <b>סוג מסמך:</b> ${valueOrDash(r.document_type)}
+      · <b>מטרת המסמך:</b> ${valueOrDash(r.document_purpose)}
+      · <b>קטגוריה:</b> ${valueOrDash(r.category)}
+      · <b>סטטוס ניתוח:</b> <span class="ai-full-status">${statusLabel(r.overall_status)}</span>
+      · <b>ביטחון Gemini:</b> ${percent(r.ai_confidence_percent)}
+      ${r.review_required ? ' · ⚠️ נדרשת בדיקה אנושית' : ''}
+    </div>
+
+    <div class="ai-full-detail">
+      <div class="ai-full-section-title">פרטי מסמך וקשרים</div>
+      <div class="ai-full-meta">
+        <b>אתר:</b> ${valueOrDash(r.site)} · <b>כתובת:</b> ${valueOrDash(r.site_address)}<br>
+        <b>ביקורת:</b> ${valueOrDash(r.audit_number)} · <b>תאריך:</b> ${valueOrDash(r.audit_date)} · <b>בודק:</b> ${valueOrDash(r.inspector_name)}<br>
+        <b>ספק:</b> ${valueOrDash(r.supplier)} · <b>מספר ספק:</b> ${valueOrDash(r.supplier_number)}<br>
+        <b>תאריך בדיקה/הנפקה:</b> ${valueOrDash(r.issue_date)} · <b>תוקף:</b> ${valueOrDash(r.expiry_date)} · <b>סטטוס תוקף:</b> ${valueOrDash(r.validity_status)}
+      </div>
+    </div>
+
+    <div class="ai-full-detail">
+      <div class="ai-full-section-title">סיכום מלא</div>
+      <div class="ai-full-summary">${valueOrDash(r.summary)}</div>
+    </div>
+
+    <div class="ai-full-detail">
+      <div class="ai-full-section-title">ממצאים מלאים (${findings.length})</div>
+      ${findings.length ? findings.map(renderFinding).join('') : '<div class="ai-full-empty">לא נשמרו ממצאים.</div>'}
+    </div>
+
+    <div class="ai-full-detail">
+      <div class="ai-full-section-title">חוסרים</div>
+      ${renderList(r.missing_items)}
+    </div>
+    <div class="ai-full-detail">
+      <div class="ai-full-section-title">סתירות</div>
+      ${renderList(r.contradictions)}
+    </div>
+    <div class="ai-full-detail">
+      <div class="ai-full-section-title">שאלות להמשך בירור</div>
+      ${renderList(r.follow_up_questions)}
+    </div>
+
+    <div class="ai-full-detail">
+      <div class="ai-full-section-title">ליקויים ומשימות שנוצרו במערכת</div>
+      ${operational.length ? operational.map(x => `
+        <div class="ai-full-operational">
+          <b>${valueOrDash(x.title)}</b>
+          <div class="finding-meta">חומרה: ${severityLabel(x.severity)} · סטטוס: ${statusLabel(x.status)} · אחראי: ${valueOrDash(x.responsible)} · יעד: ${valueOrDash(x.due_date)}</div>
+          <p style="white-space:pre-wrap;line-height:1.6;"><b>פירוט:</b><br>${valueOrDash(x.description)}</p>
+          <div class="finding-meta">משימה: ${valueOrDash(x.task_title)} · סטטוס משימה: ${statusLabel(x.task_status)} · יעד משימה: ${valueOrDash(x.task_due_date)}</div>
+        </div>`).join('') : '<div class="ai-full-empty">לא נוצרו ליקויים/משימות תפעוליות.</div>'}
+    </div>
+  </article>`;
+}
+async function loadAiFullReports() {
+  const root = document.getElementById('aiFullReports');
+  try {
+    const res = await fetch('/api/reports/ai-full');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    root.innerHTML = data.reports && data.reports.length
+      ? data.reports.map(renderReport).join('')
+      : '<div class="ds-empty-state">אין עדיין מסמכי Gemini שהושלמו.</div>';
+  } catch (e) {
+    root.innerHTML = '<div class="ds-empty-state">שגיאה בטעינת דוחות Gemini מלאים.</div>';
+  }
+}
+loadAiFullReports();
 </script>
 {% endblock %}
