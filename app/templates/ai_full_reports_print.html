@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>דוחות ניתוח Gemini מלאים</title>
+<style>
+*{box-sizing:border-box}body{font-family:Arial,"Segoe UI",sans-serif;color:#18212b;background:#fff;margin:0;padding:28px}
+.toolbar{position:sticky;top:0;background:#fff;padding:10px 0 16px;border-bottom:1px solid #ddd;margin-bottom:20px;z-index:5}
+button{padding:9px 16px;border:1px solid #aaa;border-radius:7px;background:#f3f4f6;font-weight:700;cursor:pointer}
+.report{max-width:1000px;margin:0 auto 34px;border:1px solid #d7dce1;border-radius:12px;padding:24px;page-break-after:always}
+h1{font-size:24px;margin:0 0 8px}h2{font-size:18px;margin:22px 0 9px;border-bottom:2px solid #333;padding-bottom:5px}
+h3{font-size:15px;margin:14px 0 5px}.meta{color:#5d6873;font-size:13px;line-height:1.7}
+.summary{background:#f7f8fa;border-right:4px solid #555;padding:13px;line-height:1.7;white-space:pre-wrap}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.field{border:1px solid #ddd;border-radius:7px;padding:8px}.label{font-size:11px;color:#69737d}.value{font-weight:600;margin-top:2px}
+.finding{border:1px solid #ddd;border-radius:8px;padding:12px;margin:10px 0;break-inside:avoid}.critical,.high{border-right:5px solid #b42318}.medium{border-right:5px solid #b54708}.low{border-right:5px solid #667085}
+ul{margin:7px 0;padding-right:22px;line-height:1.7}.small{font-size:12px;color:#667085}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ddd;padding:7px;text-align:right}th{background:#f3f4f6}
+@media print{body{padding:0}.toolbar{display:none}.report{border:0;margin:0;padding:0;min-height:100vh}.report:last-child{page-break-after:auto}}
+</style>
+</head>
+<body>
+<div class="toolbar"><button onclick="window.print()">🖨️ הדפסה / שמירה כ-PDF</button> <span class="small">דוחות מלאים של כל מסמכי Gemini שנותחו</span></div>
+{% if not reports %}<p>אין עדיין מסמכים שנותחו בהצלחה.</p>{% endif %}
+{% for r in reports %}
+<article class="report">
+<h1>🤖 דוח ניתוח Gemini — {{ r.file_name }}</h1>
+<div class="meta">מסמך #{{ r.document_id }} · נותח: {{ r.analyzed_at or '—' }} · מודל: {{ r.ai_model or '—' }}</div>
+<h2>פרטי המסמך והקשר</h2>
+<div class="grid">
+<div class="field"><div class="label">סוג מסמך</div><div class="value">{{ r.document_type or '—' }}</div></div>
+<div class="field"><div class="label">קטגוריה</div><div class="value">{{ r.category or '—' }}</div></div>
+<div class="field"><div class="label">אתר</div><div class="value">{{ r.site or '—' }}</div></div>
+<div class="field"><div class="label">כתובת</div><div class="value">{{ r.site_address or '—' }}</div></div>
+<div class="field"><div class="label">מספר ביקורת</div><div class="value">{{ r.audit_number or '—' }}</div></div>
+<div class="field"><div class="label">תאריך ביקורת</div><div class="value">{{ r.audit_date or '—' }}</div></div>
+<div class="field"><div class="label">בודק</div><div class="value">{{ r.inspector_name or '—' }}</div></div>
+<div class="field"><div class="label">ספק</div><div class="value">{{ r.supplier or '—' }}</div></div>
+<div class="field"><div class="label">תאריך בדיקה/הנפקה</div><div class="value">{{ r.issue_date or '—' }}</div></div>
+<div class="field"><div class="label">תוקף</div><div class="value">{{ r.expiry_date or '—' }}</div></div>
+<div class="field"><div class="label">סטטוס תוקף</div><div class="value">{{ r.validity_status or '—' }}</div></div>
+<div class="field"><div class="label">ביטחון Gemini</div><div class="value">{{ ((r.ai_confidence or 0) * 100)|round(0) }}%</div></div>
+</div>
+{% if r.review_required %}<p><b>⚠️ נדרשת בדיקה אנושית</b></p>{% endif %}
+<h2>סיכום מלא</h2><div class="summary">{{ r.summary or 'לא הוחזר סיכום.' }}</div>
+{% if r.findings %}
+<h2>ממצאים</h2>
+{% for f in r.findings %}
+<div class="finding {{ f.severity or '' }}">
+<h3>{{ loop.index }}. {{ f.title or 'ממצא' }}</h3>
+<div class="small">חומרה: {{ f.severity or '—' }} · ביטחון: {{ ((f.confidence or 0)*100)|round(0) }}%{% if f.source_page %} · עמוד {{ f.source_page }}{% endif %}</div>
+<p>{{ f.description or '' }}</p>
+<p><b>למה זה חשוב:</b> {{ f.why_it_matters or '—' }}</p>
+<p><b>פעולה מומלצת:</b> {{ f.recommended_action or '—' }}</p>
+<p><b>ראיה לסגירה:</b> {{ f.evidence_to_close or '—' }}</p>
+{% if f.source_quote %}<p class="small"><b>מקור:</b> {{ f.source_quote }}</p>{% endif %}
+</div>
+{% endfor %}
+{% endif %}
+{% if r.missing_items %}<h2>חוסרים</h2><ul>{% for x in r.missing_items %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+{% if r.contradictions %}<h2>סתירות</h2><ul>{% for x in r.contradictions %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+{% if r.follow_up_questions %}<h2>שאלות להמשך בירור</h2><ul>{% for x in r.follow_up_questions %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+{% if r.operational_actions %}
+<h2>ליקויים ומשימות שנוצרו במערכת</h2>
+<table><thead><tr><th>ליקוי</th><th>חומרה</th><th>אחראי</th><th>יעד</th><th>סטטוס</th><th>משימה</th></tr></thead><tbody>
+{% for x in r.operational_actions %}<tr><td>{{ x.title }}</td><td>{{ x.severity }}</td><td>{{ x.responsible or '—' }}</td><td>{{ x.due_date or '—' }}</td><td>{{ x.status }}</td><td>{{ x.task_title or '—' }}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
+</article>
+{% endfor %}
+</body></html>
