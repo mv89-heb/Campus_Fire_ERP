@@ -145,6 +145,8 @@ def persist(document, result):
     document.ai_summary = result.get("summary")
     document.ai_findings_json = json.dumps(result.get("key_findings", []), ensure_ascii=False)
     document.ai_actions_json = json.dumps({
+        "document_purpose": result.get("document_purpose"),
+        "overall_status": result.get("overall_status"),
         "audit_number": result.get("audit_number"),
         "audit_date": result.get("audit_date"),
         "inspector_name": result.get("inspector_name"),
