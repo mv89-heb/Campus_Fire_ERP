@@ -30,6 +30,26 @@ def report_print_page(report_key):
     return render_template('report_print.html', report=report)
 
 
+@reports_bp.route('/reports/ai-full/print')
+def ai_full_reports_print_page():
+    reports = svc.get_ai_full_reports()
+    return render_template('ai_full_reports_print.html', reports=reports)
+
+
+@reports_bp.route('/reports/ai-full/<int:document_id>/print')
+def ai_full_report_print_page(document_id):
+    reports = [r for r in svc.get_ai_full_reports() if r["document_id"] == document_id]
+    if not reports:
+        return "הדוח לא נמצא", 404
+    return render_template('ai_full_report_print.html', report=reports[0])
+
+
+@reports_bp.route('/api/reports/ai-full', methods=['GET'])
+def api_get_ai_full_reports():
+    reports = svc.get_ai_full_reports()
+    return jsonify({"reports": reports, "count": len(reports)})
+
+
 @reports_bp.route('/api/reports', methods=['GET'])
 def api_list_reports():
     return jsonify(svc.list_report_types())
