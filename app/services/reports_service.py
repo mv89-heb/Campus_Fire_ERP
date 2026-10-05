@@ -49,18 +49,14 @@ def report_suppliers():
 
 
 def report_equipment():
-    items = Equipment.query.order_by(Equipment.equipment_type).all()
+    items = Equipment.query.options(joinedload(Equipment.area)).order_by(Equipment.equipment_type).all()
+    site_ids = {e.area.floor.building.site_id for e in items if e.area and e.area.floor and e.area.floor.building and e.area.floor.building.site_id}
+    sites = {s.id: s for s in Site.query.filter(Site.id.in_(site_ids)).all()} if site_ids else {}
     headers = ["סוג ציוד", "מספר סידורי", "יצרן", "דגם", "אתר", "סטטוס", "בדיקה הבאה"]
     rows = []
     for e in items:
-        site_name = ''
-        if e.area_id:
-            from app.models import Area, Floor, Building
-            area = db.session.get(Area, e.area_id)
-            floor = db.session.get(Floor, area.floor_id) if area else None
-            building = db.session.get(Building, floor.building_id) if floor else None
-            site = db.session.get(Site, building.site_id) if building else None
-            site_name = site.name if site else ''
+        site = e.area.floor.building.site_id if e.area and e.area.floor and e.area.floor.building else None
+        site_name = sites.get(site).name if site and sites.get(site) else ''
         rows.append([e.equipment_type, e.serial_number or '', e.manufacturer or '', e.model or '',
                      site_name, e.status, str(e.next_check_date) if e.next_check_date else ''])
     return headers, rows
