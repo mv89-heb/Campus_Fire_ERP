@@ -92,28 +92,29 @@ def report_tasks():
 
 def report_documents():
     items = Document.query.filter(Document.status.notin_(['archived', 'deleted'])).order_by(Document.uploaded_at.desc()).all()
+    site_ids = {d.site_id for d in items if d.site_id}
+    audit_ids = {d.audit_id for d in items if d.audit_id}
+    supplier_ids = {d.supplier_id for d in items if d.supplier_id}
+    sites = {s.id: s for s in Site.query.filter(Site.id.in_(site_ids)).all()} if site_ids else {}
+    audits = {a.id: a for a in Audit.query.filter(Audit.id.in_(audit_ids)).all()} if audit_ids else {}
+    suppliers = {s.id: s for s in Supplier.query.filter(Supplier.id.in_(supplier_ids)).all()} if supplier_ids else {}
     headers = ["מסמך", "קטגוריה", "אתר", "ביקורת", "ספק", "AI", "בדיקה נדרשת", "תפוגה"]
-    rows = []
-    for d in items:
-        site = db.session.get(Site, d.site_id) if d.site_id else None
-        audit = db.session.get(Audit, d.audit_id) if d.audit_id else None
-        supplier = db.session.get(Supplier, d.supplier_id) if d.supplier_id else None
-        rows.append([d.file_name, d.category or '', site.name if site else '',
-                     audit.audit_number if audit else '', supplier.company_name if supplier else '',
-                     d.ai_status, 'כן' if d.analysis_review_required else 'לא',
-                     str(d.expiry_date) if d.expiry_date else ''])
+    rows = [[d.file_name, d.category or '', sites.get(d.site_id).name if d.site_id and sites.get(d.site_id) else '',
+             audits.get(d.audit_id).audit_number if d.audit_id and audits.get(d.audit_id) else '',
+             suppliers.get(d.supplier_id).company_name if d.supplier_id and suppliers.get(d.supplier_id) else '',
+             d.ai_status, 'כן' if d.analysis_review_required else 'לא',
+             str(d.expiry_date) if d.expiry_date else ''] for d in items]
     return headers, rows
 
 
 def report_ai_findings():
     items = Document.query.filter(Document.ai_findings_json.isnot(None)).order_by(Document.ai_analyzed_at.desc()).all()
+    site_ids = {d.site_id for d in items if d.site_id}
+    sites = {s.id: s for s in Site.query.filter(Site.id.in_(site_ids)).all()} if site_ids else {}
     headers = ["מסמך", "אתר", "AI", "ביטחון", "בדיקה", "סיכום"]
-    rows = []
-    for d in items:
-        site = db.session.get(Site, d.site_id) if d.site_id else None
-        rows.append([d.file_name, site.name if site else '', d.ai_status,
-                     round(d.ai_confidence * 100) if d.ai_confidence is not None else '',
-                     'כן' if d.analysis_review_required else 'לא', d.ai_summary or ''])
+    rows = [[d.file_name, sites.get(d.site_id).name if d.site_id and sites.get(d.site_id) else '', d.ai_status,
+              round(d.ai_confidence * 100) if d.ai_confidence is not None else '',
+              'כן' if d.analysis_review_required else 'לא', d.ai_summary or ''] for d in items]
     return headers, rows
 
 
