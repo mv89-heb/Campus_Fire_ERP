@@ -144,6 +144,8 @@ def _install_security_headers(app):
         response.headers.setdefault('X-Frame-Options', 'DENY')
         response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
         response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+        if request.path.startswith('/static/'):
+            response.headers.setdefault('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800')
         if app.config.get('IS_PRODUCTION'):
             response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
         csrf_token = session.get('csrf_token')
