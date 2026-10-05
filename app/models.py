@@ -201,6 +201,7 @@ class Deficiency(db.Model):
     task_id = db.Column(db.Integer, db.ForeignKey('tasks.id'), nullable=True)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    deficiencies = db.relationship('Deficiency', backref='task', lazy=True)
 
 class DocumentHistory(db.Model):
     __tablename__ = 'document_history'
