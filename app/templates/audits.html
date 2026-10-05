@@ -30,6 +30,13 @@
 .badge.critical { background: rgba(248,81,73,0.3); color: var(--critical); }
 .badge.open { background: rgba(110,118,129,0.15); color: var(--text-muted); }
 .badge.resolved { background: rgba(63,185,80,0.15); color: var(--valid); }
+.date-safety { display:inline-flex; align-items:center; gap:4px; padding:2px 7px; border-radius:999px; font-size:.7rem; font-weight:700; }
+.date-safety.last-year { background:rgba(63,185,80,.14); color:var(--valid); }
+.date-safety.overdue { background:rgba(248,81,73,.18); color:var(--critical); }
+.date-safety.due-soon { background:rgba(227,179,65,.18); color:var(--warning); }
+.date-safety.latest { background:rgba(88,166,255,.16); color:#58a6ff; }
+.audit-block.audit-latest { border-color:rgba(88,166,255,.55); box-shadow:0 0 0 1px rgba(88,166,255,.08); }
+.audit-block.audit-recent { border-color:rgba(63,185,80,.35); }
 
 .deficiency-item { border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 8px; background: rgba(0,0,0,0.15); }
 .deficiency-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
@@ -227,13 +234,24 @@ const Audits = (() => {
   }
 
   function renderAudit(a) {
+    const siteAudits = _audits.filter(x => String(x.site_id || '') === String(a.site_id || ''));
+    const latest = siteAudits.reduce((best, x) => {
+      if (!x.audit_date) return best;
+      if (!best || String(x.audit_date) > String(best.audit_date)) return x;
+      return best;
+    }, null);
+    const period = latest && a.audit_date ? auditPeriodState(a.audit_date, latest.audit_date) : 'unknown';
+    const auditClass = latest && a.id === latest.id ? 'audit-latest' : (period === 'last_year' ? 'audit-recent' : '');
+    const dateBadge = latest && a.id === latest.id
+      ? '<span class="date-safety latest">⭐ ביקורת אחרונה</span>'
+      : period === 'last_year' ? '<span class="date-safety last-year">✓ ב־12 החודשים האחרונים</span>' : '';
     return `
-      <div class="audit-block">
+      <div class="audit-block ${auditClass}">
         <div class="audit-header" onclick="Audits.openDetail(${a.id})">
           <div>
             <div class="audit-title">🔍 ${esc(a.audit_number || ('ביקורת #' + a.id))} ${a.site_name ? '· ' + esc(a.site_name) : ''}</div>
             <div class="audit-meta">
-              ${a.audit_date ? formatDateIL(a.audit_date) : 'ללא תאריך'} ${a.inspector_name ? '· בודק: ' + esc(a.inspector_name) : ''}
+              ${a.audit_date ? formatDateIL(a.audit_date) : 'ללא תאריך'} ${dateBadge} ${a.inspector_name ? '· בודק: ' + esc(a.inspector_name) : ''}
               · <span class="badge ${a.status}">${statusLabel[a.status] || a.status}</span>
               ${a.result ? `<span class="badge ${a.result}">${resultLabel[a.result]}</span>` : ''}
               ${a.open_deficiency_count ? `· ${a.open_deficiency_count} ליקויים פתוחים` : ''}
@@ -278,7 +296,7 @@ const Audits = (() => {
             </div>
           </div>
           <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">
-            ${d.responsible ? '👤 ' + esc(d.responsible) + ' · ' : ''}${d.due_date ? '📅 יעד: ' + esc(formatDateIL(d.due_date)) : ''}
+            ${d.responsible ? '👤 ' + esc(d.responsible) + ' · ' : ''}${d.due_date ? (() => { const st = fireSafetyDateState(d.due_date); const badge = st === 'overdue' ? '<span class="date-safety overdue">🔴 באיחור</span>' : st === 'due_soon' ? '<span class="date-safety due-soon">🟠 קרוב למועד</span>' : ''; return '📅 יעד: ' + esc(formatDateIL(d.due_date)) + ' ' + badge; })() : ''}
           </div>
           <div class="deficiency-actions">
             <button class="btn btn-sm" onclick="Audits.openDeficiencyModal(${auditId}, ${d.id})">✏️ עריכה</button>
