@@ -224,6 +224,16 @@ def create_app(config_class=Config):
                     f'Database initialization failed; DB operations may fail: {e}'
                 )
 
+        # Backfill the operational ERP tables from all previously completed
+        # Gemini analyses. This is idempotent and does not call Gemini.
+        if os.environ.get('RECONCILE_AI_DATA_ON_STARTUP', 'true').lower() in {'1', 'true', 'yes', 'on'}:
+            try:
+                from app.services.ai_entity_sync_service import reconcile_all_ai_documents
+                reconciliation = reconcile_all_ai_documents(create_actions=True)
+                app.logger.info('AI entity reconciliation completed: %s', reconciliation)
+            except Exception as e:
+                app.logger.exception('AI entity reconciliation failed: %s', e)
+
     from .api.routes import main_bp
     app.register_blueprint(main_bp)
     from .api.sites_routes import sites_bp
