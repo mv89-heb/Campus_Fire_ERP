@@ -251,6 +251,54 @@ def analyze_and_persist(document_id):
         db.session.commit()
         raise
 
+
+def reanalyze_all_completed(include_archived=False):
+    """One-time controlled Gemini refresh of existing analyzed PDFs.
+
+    This is deliberately explicit and is never called from application startup.
+    Each document is processed and committed independently so one bad PDF does
+    not roll back the rest.
+    """
+    query = Document.query.filter(Document.ai_status == "completed")
+    if not include_archived:
+        query = query.filter(Document.status.notin_(["archived", "deleted"]))
+    documents = query.order_by(Document.id.asc()).all()
+
+    updated, failed = [], []
+    for document in documents:
+        try:
+            result = analyze(document)
+            persist(document, result)
+            updated.append({
+                "document_id": document.id,
+                "file_name": document.file_name,
+                "status": "updated",
+                "supplier": result.get("supplier_name"),
+                "site": result.get("site_name"),
+                "buildings": len(result.get("buildings") or []),
+                "equipment": len(result.get("equipment") or []),
+            })
+        except Exception as exc:
+            db.session.rollback()
+            failed.append({
+                "document_id": document.id,
+                "file_name": document.file_name,
+                "status": "failed",
+                "error": str(exc)[:2000],
+            })
+
+    return {
+        "success": not failed,
+        "total": len(documents),
+        "updated": updated,
+        "failed": failed,
+        "counts": {
+            "total": len(documents),
+            "updated": len(updated),
+            "failed": len(failed),
+        },
+    }
+
 def findings(document):
     try:
         value = json.loads(document.ai_findings_json or "[]")
