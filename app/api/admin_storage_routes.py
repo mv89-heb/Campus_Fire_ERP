@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request, current_app, session, render_temp
 from app.services import storage_health_service as svc
 from app.services import storage_migration_service as migration_svc
 from app.services import document_reanalysis_service as reanalysis_svc
+from app.services import gemini_document_service as gemini_svc
 from app.services import storage
 from app.services.auth_service import AuthServiceError
 from app.api.auth_routes import admin_required
@@ -83,10 +84,7 @@ def api_documents_gemini_reanalyze():
     """Explicit one-time Gemini refresh for previously completed documents."""
     try:
         include_archived = bool((request.get_json(silent=True) or {}).get('include_archived', False))
-        result = reanalysis_svc.reanalyze_all_with_gemini(include_archived=include_archived) if hasattr(reanalysis_svc, 'reanalyze_all_with_gemini') else None
-        if result is None:
-            from app.services import gemini_document_service as gemini_svc
-            result = gemini_svc.reanalyze_all_completed(include_archived=include_archived)
+        result = gemini_svc.reanalyze_all_completed(include_archived=include_archived)
         return jsonify(_json_safe(result)), (200 if result.get('success') else 409)
     except Exception as exc:
         current_app.logger.exception('Gemini document reanalysis failed')
