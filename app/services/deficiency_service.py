@@ -4,6 +4,7 @@ Service Layer עבור מערכת ליקויים (שלב 6).
 from datetime import date, datetime
 
 from app.extensions import db
+from sqlalchemy.orm import joinedload
 from app.models import Deficiency, Task, Audit
 from app.services import audit_log_service as alog
 from app.services import integration_service as integration_svc
@@ -39,7 +40,7 @@ def _require(value, field_name):
 
 
 def list_deficiencies(audit_id=None, severity=None, status=None):
-    query = Deficiency.query
+    query = Deficiency.query.options(joinedload(Deficiency.audit))
     if audit_id:
         query = query.filter(Deficiency.audit_id == audit_id)
     if severity:
@@ -115,6 +116,6 @@ def serialize_deficiency(d):
         "opened_at": str(d.opened_at) if d.opened_at else None,
         "due_date": str(d.due_date) if d.due_date else None,
         "status": d.status, "task_id": d.task_id, "notes": d.notes,
-        "site_id": (db.session.get(Audit, d.audit_id).site_id if d.audit_id and db.session.get(Audit, d.audit_id) else None),
+        "site_id": (d.audit.site_id if d.audit else None),
         "source": "audit" if d.audit_id else ("ai_document" if d.notes and "document:" in d.notes else "manual"),
     }
