@@ -119,7 +119,7 @@ def compute_suggested_score(audit_id):
     return max(0, 100 - penalty)
 
 
-def serialize_audit(audit, include_deficiencies=True):
+def serialize_audit(audit, include_deficiencies=True, include_linked_documents=True):
     site = audit.site if audit.site_id else None
     building = audit.building if audit.building_id else None
     floor = audit.floor if audit.floor_id else None
@@ -140,21 +140,41 @@ def serialize_audit(audit, include_deficiencies=True):
         data["deficiencies"] = [serialize_deficiency(d) for d in audit.deficiencies]
 
     linked_documents = []
-    if audit.audit_number:
-        for doc in Document.query.filter(Document.status.notin_(["deleted", "archived"])).all():
+    if include_linked_documents and audit.audit_number:
+        # Prefer direct FK links; only inspect AI metadata for detail views.
+        direct_docs = Document.query.filter(
+            Document.audit_id == audit.id,
+            Document.status.notin_(["deleted", "archived"]),
+        ).all()
+        seen = set()
+        for doc in direct_docs:
+            seen.add(doc.id)
+            linked_documents.append({
+                "id": doc.id, "file_name": doc.file_name, "ai_status": doc.ai_status,
+                "ai_summary": doc.ai_summary, "link_source": "direct",
+            })
+        # Metadata fallback is intentionally limited to documents for this site.
+        candidate_docs = Document.query.filter(
+            Document.site_id == audit.site_id,
+            Document.status.notin_(["deleted", "archived"]),
+            Document.ai_actions_json.isnot(None),
+        ).all()
+        for doc in candidate_docs:
+            if doc.id in seen:
+                continue
             try:
                 meta = json.loads(doc.ai_actions_json or "{}")
             except (TypeError, ValueError):
                 meta = {}
-            direct_link = doc.audit_id == audit.id
-            metadata_link = (isinstance(meta, dict) and audit.audit_number and str(meta.get("audit_number") or "").strip().lower() == str(audit.audit_number).strip().lower())
-            if direct_link or metadata_link:
+            metadata_link = (
+                isinstance(meta, dict)
+                and str(meta.get("audit_number") or "").strip().lower()
+                == str(audit.audit_number).strip().lower()
+            )
+            if metadata_link:
                 linked_documents.append({
-                    "id": doc.id,
-                    "file_name": doc.file_name,
-                    "ai_status": doc.ai_status,
-                    "ai_summary": doc.ai_summary,
-                    "link_source": "direct" if direct_link else "ai",
+                    "id": doc.id, "file_name": doc.file_name, "ai_status": doc.ai_status,
+                    "ai_summary": doc.ai_summary, "link_source": "ai",
                 })
     data["linked_documents"] = linked_documents
     return data
