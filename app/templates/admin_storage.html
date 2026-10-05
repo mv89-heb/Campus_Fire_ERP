@@ -220,43 +220,57 @@ const StorageAdmin = (() => {
     init: () => loadDashboard(), runScan: () => loadDashboard(), runMigrationScan, runMigration,
     runGeminiSync: async () => {
       const btn = document.getElementById('btnGeminiSync');
-      if (!confirm('פעולה חד-פעמית: להריץ Gemini מחדש על כל המסמכים שכבר נותחו, לחלץ את כל המידע הזמין ולסנכרן אותו למסכי ה-ERP? הפעולה תעבד מסמך אחד בכל בקשה כדי למנוע timeout, ועלולה לצרוך מכסת Gemini.')) return;
+      if (!confirm('פעולה חד-פעמית: להריץ Gemini מחדש ברקע על כל המסמכים שכבר נותחו, לחלץ את כל המידע הזמין ולסנכרן אותו למסכי ה-ERP? התהליך עשוי להימשך זמן ולצרוך מכסת Gemini. אפשר לסגור את החלון לאחר שהעיבוד התחיל.')) return;
       btn.disabled = true;
-      btn.innerHTML = '⏳ Gemini מנתח ומסנכרן...';
+      btn.innerHTML = '⏳ מפעיל עיבוד Gemini ברקע...';
       const result = document.getElementById('geminiSyncResult');
-      let offset = 0, total = null, updated = 0, failed = 0;
-      const failedItems = [];
       try {
-        while (true) {
-          result.innerHTML = '<span class="ds-badge ds-badge-warning">⏳ מעבד מסמך ' + (offset + 1) + (total ? ' מתוך ' + total : '') + '... אין לסגור את החלון.</span>';
-          const res = await fetch('/api/admin/documents/gemini-reanalyze', {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({offset, limit:1}),
-            credentials:'same-origin'
-          });
+        const startRes = await fetch('/api/admin/documents/gemini-reanalyze', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:'{}',
+          credentials:'same-origin'
+        });
+        const startText = await startRes.text();
+        let startData;
+        try { startData = JSON.parse(startText); }
+        catch (_) { throw new Error('השרת החזיר HTTP ' + startRes.status + ' במקום JSON בעת הפעלת משימת Gemini.'); }
+        if (!startRes.ok) throw new Error(startData.error || 'לא ניתן להפעיל את המשימה');
+        result.innerHTML = '<span class="ds-badge ds-badge-warning">⏳ Gemini עובד ברקע...</span>';
+        btn.innerHTML = '⏳ Gemini עובד ברקע...';
+        const poll = async () => {
+          const res = await fetch('/api/admin/documents/gemini-reanalyze/status', {credentials:'same-origin'});
           const text = await res.text();
           let data;
           try { data = JSON.parse(text); }
-          catch (_) {
-            throw new Error('השרת החזיר תשובה שאינה JSON (HTTP ' + res.status + '). ייתכן שהבקשה פגה בזמן. נסה שוב; התהליך מעבד מסמך אחד בכל בקשה.');
+          catch (_) { throw new Error('השרת החזיר HTTP ' + res.status + ' במקום JSON בעת בדיקת סטטוס.'); }
+          if (!res.ok) throw new Error(data.error || 'שגיאה בבדיקת סטטוס');
+          const j = data.job || {};
+          const total = j.total || 0, processed = j.processed || 0;
+          result.innerHTML = '<span class="ds-badge ds-badge-warning">⏳ Gemini מעבד ברקע: ' +
+            processed + (total ? ' / ' + total : '') + ' מסמכים · עודכנו ' + (j.updated || 0) +
+            ' · נכשלו ' + (j.failed || 0) + '</span>';
+          if (j.running) {
+            setTimeout(() => poll().catch(err => {
+              result.innerHTML = '<span class="ds-badge ds-badge-danger">❌ ' + esc(err.message) + '</span>';
+              btn.disabled = false;
+              btn.innerHTML = '🤖 Gemini: ניתוח מחדש וסנכרון ERP';
+            }), 3000);
+            return;
           }
-          if (!res.ok && !data) throw new Error('הפעולה נכשלה (HTTP ' + res.status + ')');
-          if (total == null) total = data.total || 0;
-          updated += (data.updated || []).length;
-          failed += (data.failed || []).length;
-          failedItems.push(...(data.failed || []));
-          offset = data.next_offset == null ? offset + (data.processed || 0) : data.next_offset;
-          if (!data.has_more) break;
-        }
-        result.innerHTML = '<span class="ds-badge ds-badge-success">✅ הושלם: ' + updated + ' מסמכים עודכנו</span> ' +
-          (failed ? '<span class="ds-badge ds-badge-danger">❌ נכשלו: ' + failed + '</span>' : '<span class="ds-badge ds-badge-success">ללא כשלים</span>');
-        showToast('Gemini הושלם: ' + updated + ' עודכנו' + (failed ? ', ' + failed + ' נכשלו' : ''));
-        loadDashboard();
+          const ok = !(j.errors || []).length;
+          result.innerHTML = '<span class="ds-badge ' + (ok ? 'ds-badge-success' : 'ds-badge-danger') + '">' +
+            (ok ? '✅ Gemini הושלם בהצלחה' : '⚠️ Gemini הושלם עם שגיאות') +
+            ': ' + (j.updated || 0) + ' עודכנו, ' + (j.failed || 0) + ' נכשלו</span>';
+          showToast('Gemini הושלם: ' + (j.updated || 0) + ' עודכנו' + ((j.failed || 0) ? ', ' + j.failed + ' נכשלו' : ''), ok ? 'success' : 'warning');
+          btn.disabled = false;
+          btn.innerHTML = '🤖 Gemini: ניתוח מחדש וסנכרון ERP';
+          loadDashboard();
+        };
+        await poll();
       } catch (e) {
         result.innerHTML = '<span class="ds-badge ds-badge-danger">❌ ' + esc(e.message) + '</span>';
-        showToast('ניתוח Gemini נעצר: ' + e.message, 'error');
-      } finally {
+        showToast('הפעלת Gemini נכשלה: ' + e.message, 'error');
         btn.disabled = false;
         btn.innerHTML = '🤖 Gemini: ניתוח מחדש וסנכרון ERP';
       }
