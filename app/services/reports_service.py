@@ -9,6 +9,7 @@ import json
 
 from app.models import Document, Supplier, Equipment, Deficiency, Audit, Task, Site
 from app.extensions import db
+from sqlalchemy.orm import joinedload
 from app.services import audit_log_service
 
 
