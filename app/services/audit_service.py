@@ -132,8 +132,8 @@ def serialize_audit(audit, include_deficiencies=True, include_linked_documents=T
         "audit_date": str(audit.audit_date) if audit.audit_date else None,
         "status": audit.status, "result": audit.result, "score": audit.score,
         "notes": audit.notes, "has_signature": bool(audit.signature_data),
-        "deficiency_count": Deficiency.query.filter_by(audit_id=audit.id).count(),
-        "open_deficiency_count": Deficiency.query.filter_by(audit_id=audit.id).filter(Deficiency.status != 'resolved').count(),
+        "deficiency_count": len(audit.deficiencies),
+        "open_deficiency_count": sum(1 for d in audit.deficiencies if d.status != 'resolved'),
     }
     if include_deficiencies:
         from app.services.deficiency_service import serialize_deficiency
