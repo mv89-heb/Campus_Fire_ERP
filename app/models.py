@@ -144,6 +144,7 @@ class Equipment(db.Model):
     manufacturer = db.Column(db.String(120), nullable=True)
     model = db.Column(db.String(120), nullable=True)
     area_id = db.Column(db.Integer, db.ForeignKey('areas.id'), nullable=True)
+    area = db.relationship('Area', foreign_keys=[area_id], lazy='joined')
     install_date = db.Column(db.Date, nullable=True)
     last_check_date = db.Column(db.Date, nullable=True)
     next_check_date = db.Column(db.Date, nullable=True)
