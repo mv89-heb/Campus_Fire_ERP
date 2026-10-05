@@ -186,11 +186,35 @@ def get_ai_full_reports():
         .order_by(Document.ai_analyzed_at.desc().nullslast(), Document.uploaded_at.desc())
         .all()
     )
+    if not documents:
+        return []
+
+    site_ids = {d.site_id for d in documents if d.site_id}
+    audit_ids = {d.audit_id for d in documents if d.audit_id}
+    supplier_ids = {d.supplier_id for d in documents if d.supplier_id}
+    sites = {s.id: s for s in Site.query.filter(Site.id.in_(site_ids)).all()} if site_ids else {}
+    audits = {a.id: a for a in Audit.query.filter(Audit.id.in_(audit_ids)).all()} if audit_ids else {}
+    suppliers = {s.id: s for s in Supplier.query.filter(Supplier.id.in_(supplier_ids)).all()} if supplier_ids else {}
+
+    document_tokens = [f"document:{d.id}" for d in documents]
+    deficiencies = Deficiency.query.filter(
+        db.or_(*[Deficiency.notes.ilike(f"%{token}%") for token in document_tokens])
+    ).order_by(Deficiency.id.asc()).all() if document_tokens else []
+    deficiency_by_document = {d.id: [] for d in documents}
+    task_ids = {d.task_id for d in deficiencies if d.task_id}
+    tasks = {t.id: t for t in Task.query.filter(Task.id.in_(task_ids)).all()} if task_ids else {}
+    for deficiency in deficiencies:
+        notes = deficiency.notes or ""
+        for document in documents:
+            if f"document:{document.id}" in notes:
+                deficiency_by_document[document.id].append(deficiency)
+                break
+
     reports = []
     for d in documents:
-        site = db.session.get(Site, d.site_id) if d.site_id else None
-        audit = db.session.get(Audit, d.audit_id) if d.audit_id else None
-        supplier = db.session.get(Supplier, d.supplier_id) if d.supplier_id else None
+        site = sites.get(d.site_id)
+        audit = audits.get(d.audit_id)
+        supplier = suppliers.get(d.supplier_id)
 
         findings = _json_list(_json_object(d.ai_findings_json, []))
         actions = _json_object(d.ai_actions_json, {})
@@ -198,15 +222,9 @@ def get_ai_full_reports():
         contradictions = _json_list(actions.get("contradictions"))
         follow_up_questions = _json_list(actions.get("follow_up_questions"))
 
-        deficiencies = (
-            Deficiency.query
-            .filter(Deficiency.notes.ilike(f"%document:{d.id}%"))
-            .order_by(Deficiency.id.asc())
-            .all()
-        )
         operational = []
-        for deficiency in deficiencies:
-            task = db.session.get(Task, deficiency.task_id) if deficiency.task_id else None
+        for deficiency in deficiency_by_document.get(d.id, []):
+            task = tasks.get(deficiency.task_id) if deficiency.task_id else None
             operational.append({
                 "deficiency_id": deficiency.id,
                 "title": deficiency.title,
