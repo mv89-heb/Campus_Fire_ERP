@@ -224,15 +224,7 @@ def create_app(config_class=Config):
                     f'Database initialization failed; DB operations may fail: {e}'
                 )
 
-        # Historical AI reconciliation is an explicit one-time migration.
-        # It is disabled by default and must never run during normal startup.
-        if os.environ.get('RUN_AI_ENTITY_BACKFILL', 'false').lower() in {'1', 'true', 'yes', 'on'}:
-            try:
-                from app.services.ai_entity_sync_service import reconcile_all_ai_documents
-                reconciliation = reconcile_all_ai_documents(create_actions=True)
-                app.logger.info('ONE-TIME AI entity backfill completed: %s', reconciliation)
-            except Exception as e:
-                app.logger.exception('ONE-TIME AI entity backfill failed: %s', e)
+        # Historical AI reconciliation is intentionally not part of application startup.\n        # New documents are synchronized during their own Gemini persistence flow.
 
     from .api.routes import main_bp
     app.register_blueprint(main_bp)
