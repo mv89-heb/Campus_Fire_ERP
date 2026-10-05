@@ -259,6 +259,35 @@ def _merge_audits():
     return merged
 
 
+
+def _repair_safe_links():
+    """Repair relationships only when the source document gives an unambiguous link."""
+    repaired = {"deficiencies_to_audit": 0, "equipment_to_area": 0}
+
+    for deficiency in Deficiency.query.filter(Deficiency.audit_id.is_(None)).all():
+        match = re.search(r"(?:^|;)document:(\d+)(?:;|$)", deficiency.notes or "")
+        if not match:
+            continue
+        document = db.session.get(Document, int(match.group(1)))
+        if document and document.audit_id:
+            deficiency.audit_id = document.audit_id
+            repaired["deficiencies_to_audit"] += 1
+
+    for equipment in Equipment.query.filter(Equipment.area_id.is_(None)).all():
+        if not equipment.supplier_id:
+            continue
+        supplier = db.session.get(Supplier, equipment.supplier_id)
+        if not supplier or not supplier.site_id:
+            continue
+        area_rows = (Area.query.join(Floor, Area.floor_id == Floor.id)
+                     .join(Building, Floor.building_id == Building.id)
+                     .filter(Building.site_id == supplier.site_id)
+                     .order_by(Area.id.asc()).all())
+        if len(area_rows) == 1:
+            equipment.area_id = area_rows[0].id
+            repaired["equipment_to_area"] += 1
+    return repaired
+
 def repair():
     """Safely merge exact normalized master duplicates and return the result."""
     before = scan()
@@ -272,10 +301,11 @@ def repair():
         merged["areas"] = _merge_areas()
         merged["equipment"] = _merge_equipment()
         merged["audits"] = _merge_audits()
+        safe_links = _repair_safe_links()
         db.session.flush()
         db.session.commit()
     except Exception:
         db.session.rollback()
         raise
     after = scan()
-    return {"before": before, "merged": merged, "after": after}
+    return {"before": before, "merged": merged, "safe_links": safe_links, "after": after}
