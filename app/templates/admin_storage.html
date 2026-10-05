@@ -220,28 +220,48 @@ const StorageAdmin = (() => {
     init: () => loadDashboard(), runScan: () => loadDashboard(), runMigrationScan, runMigration,
     runGeminiSync: async () => {
       const btn = document.getElementById('btnGeminiSync');
-      if (!confirm('פעולה חד-פעמית: להריץ Gemini מחדש על כל המסמכים שכבר נותחו, לחלץ את כל המידע הזמין ולסנכרן אותו למסכי ה-ERP? הפעולה עשויה להימשך זמן ולצרוך מכסת Gemini.')) return;
+      if (!confirm('פעולה חד-פעמית: להריץ Gemini מחדש על כל המסמכים שכבר נותחו, לחלץ את כל המידע הזמין ולסנכרן אותו למסכי ה-ERP? הפעולה תעבד מסמך אחד בכל בקשה כדי למנוע timeout, ועלולה לצרוך מכסת Gemini.')) return;
       btn.disabled = true;
       btn.innerHTML = '⏳ Gemini מנתח ומסנכרן...';
       const result = document.getElementById('geminiSyncResult');
-      result.innerHTML = '<span class="ds-badge ds-badge-warning">⏳ התהליך פועל — אין לסגור את החלון.</span>';
+      let offset = 0, total = null, updated = 0, failed = 0;
+      const failedItems = [];
       try {
-        const res = await fetch('/api/admin/documents/gemini-reanalyze', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}', credentials:'same-origin'});
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.details || 'הניתוח נכשל');
-        const counts = data.counts || {}, failed = data.failed || [];
-        result.innerHTML = '<span class="ds-badge ds-badge-success">✅ הושלם: ' + (counts.updated || 0) + ' מסמכים</span> ' +
-          (failed.length ? '<span class="ds-badge ds-badge-danger">❌ נכשלו: ' + failed.length + '</span>' : '<span class="ds-badge ds-badge-success">ללא כשלים</span>');
-        showToast('Gemini הושלם: ' + (counts.updated || 0) + ' מסמכים');
+        while (true) {
+          result.innerHTML = '<span class="ds-badge ds-badge-warning">⏳ מעבד מסמך ' + (offset + 1) + (total ? ' מתוך ' + total : '') + '... אין לסגור את החלון.</span>';
+          const res = await fetch('/api/admin/documents/gemini-reanalyze', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({offset, limit:1}),
+            credentials:'same-origin'
+          });
+          const text = await res.text();
+          let data;
+          try { data = JSON.parse(text); }
+          catch (_) {
+            throw new Error('השרת החזיר תשובה שאינה JSON (HTTP ' + res.status + '). ייתכן שהבקשה פגה בזמן. נסה שוב; התהליך מעבד מסמך אחד בכל בקשה.');
+          }
+          if (!res.ok && !data) throw new Error('הפעולה נכשלה (HTTP ' + res.status + ')');
+          if (total == null) total = data.total || 0;
+          updated += (data.updated || []).length;
+          failed += (data.failed || []).length;
+          failedItems.push(...(data.failed || []));
+          offset = data.next_offset == null ? offset + (data.processed || 0) : data.next_offset;
+          if (!data.has_more) break;
+        }
+        result.innerHTML = '<span class="ds-badge ds-badge-success">✅ הושלם: ' + updated + ' מסמכים עודכנו</span> ' +
+          (failed ? '<span class="ds-badge ds-badge-danger">❌ נכשלו: ' + failed + '</span>' : '<span class="ds-badge ds-badge-success">ללא כשלים</span>');
+        showToast('Gemini הושלם: ' + updated + ' עודכנו' + (failed ? ', ' + failed + ' נכשלו' : ''));
         loadDashboard();
       } catch (e) {
         result.innerHTML = '<span class="ds-badge ds-badge-danger">❌ ' + esc(e.message) + '</span>';
-        showToast('ניתוח Gemini נכשל: ' + e.message, 'error');
+        showToast('ניתוח Gemini נעצר: ' + e.message, 'error');
       } finally {
         btn.disabled = false;
         btn.innerHTML = '🤖 Gemini: ניתוח מחדש וסנכרון ERP';
       }
     },
+
     loadPreview: async () => { try { const res=await fetch('/api/admin/storage/cleanup-preview',{method:'POST'}); const d=await res.json(); if(!res.ok) throw new Error(d.error||'שגיאה'); _orphans=d.orphaned_items||[]; renderOrphanTable(); showToast('הרשימה עודכנה'); } catch(e){showToast('שגיאה ברענון הרשימה: '+e.message,'error');} },
     toggleSelect: (path, checked) => { if(checked)_selected.add(path); else _selected.delete(path); updateCleanupBar(); },
     selectAll: () => { document.querySelectorAll('#orphanBody input[type=checkbox]').forEach(cb=>cb.checked=true); _orphans.forEach(o=>_selected.add(o.path)); updateCleanupBar(); },
