@@ -50,31 +50,32 @@ def scan_and_generate(force=False):
         return 0
 
     today = date.today()
+    horizon = today.fromordinal(today.toordinal() + max(WINDOWS))
     active = Notification.query.filter(Notification.dismissed.is_(False)).all()
     existing_by_ref = {(n.ref_type, n.ref_id): n for n in active}
 
-    for doc in Document.query.filter(Document.expiry_date.isnot(None), Document.status.notin_(['archived', 'deleted'])).all():
+    for doc in Document.query.filter(Document.expiry_date.isnot(None), Document.expiry_date <= horizon, Document.status.notin_(['archived', 'deleted'])).all():
         days_left = (doc.expiry_date - today).days
         bucket = _bucket_for(days_left)
         if bucket is not None:
             label = "פג תוקף" if bucket == 0 else f"פג בעוד {days_left} ימים"
             _upsert('permit', doc.id, bucket, f"אישור עומד לפוג: {doc.file_name}", label, existing_by_ref)
 
-    for task in Task.query.filter(Task.due_date.isnot(None), Task.status.notin_(['done', 'cancelled'])).all():
+    for task in Task.query.filter(Task.due_date.isnot(None), Task.due_date <= horizon, Task.status.notin_(['done', 'cancelled'])).all():
         days_left = (task.due_date - today).days
         bucket = _bucket_for(days_left)
         if bucket is not None:
             label = "עבר המועד" if bucket == 0 and days_left < 0 else f"יעד בעוד {days_left} ימים"
             _upsert('task', task.id, bucket, f"משימה מתקרבת ליעד: {task.title}", label, existing_by_ref)
 
-    for audit in Audit.query.filter(Audit.audit_date.isnot(None), Audit.status == 'scheduled').all():
+    for audit in Audit.query.filter(Audit.audit_date.isnot(None), Audit.audit_date <= horizon, Audit.status == 'scheduled').all():
         days_left = (audit.audit_date - today).days
         bucket = _bucket_for(days_left)
         if bucket is not None:
             label = f"מתוכננת בעוד {days_left} ימים" if days_left >= 0 else "המועד עבר"
             _upsert('audit', audit.id, bucket, f"ביקורת מתקרבת: {audit.audit_number or ('#' + str(audit.id))}", label, existing_by_ref)
 
-    for eq in Equipment.query.filter(Equipment.next_check_date.isnot(None)).all():
+    for eq in Equipment.query.filter(Equipment.next_check_date.isnot(None), Equipment.next_check_date <= horizon).all():
         days_left = (eq.next_check_date - today).days
         bucket = _bucket_for(days_left)
         if bucket is not None:
