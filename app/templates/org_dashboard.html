@@ -188,7 +188,7 @@ async function loadDashboard(forceRefresh = false) {
     expEl.innerHTML = d.permits.upcoming_expirations.length ? `
       <table><thead><tr><th>מסמך</th><th>תוקף</th><th>ימים</th></tr></thead><tbody>
         ${d.permits.upcoming_expirations.map(p => `
-          <tr><td>${esc(p.permit_number || p.file_name)}</td><td>${esc(p.expiry_date)}</td>
+          <tr><td>${esc(p.permit_number || p.file_name)}</td><td>${p.expiry_date ? formatDateIL(p.expiry_date) + (fireSafetyDateState(p.expiry_date)==='overdue' ? ' 🔴' : fireSafetyDateState(p.expiry_date)==='due_soon' ? ' 🟠' : '') : '—'}</td>
           <td><span class="pill ${p.days_left < 0 ? 'expired' : p.days_left <= 14 ? 'warning' : 'valid'}">${p.days_left} ימים</span></td></tr>`).join('')}
       </tbody></table>` : '<div class="empty-state">אין אישורים שפגים בקרוב</div>';
 
@@ -196,13 +196,13 @@ async function loadDashboard(forceRefresh = false) {
     taskEl.innerHTML = d.tasks.urgent_tasks.length ? `
       <table><thead><tr><th>משימה</th><th>עדיפות</th><th>יעד</th></tr></thead><tbody>
         ${d.tasks.urgent_tasks.map(t => `
-          <tr><td>${esc(t.title)}</td><td><span class="pill ${t.priority === 'urgent' ? 'critical' : 'high'}">${t.priority}</span></td><td>${esc(t.due_date || '—')}</td></tr>`).join('')}
+          <tr><td>${esc(t.title)}</td><td><span class="pill ${t.priority === 'urgent' ? 'critical' : 'high'}">${t.priority}</span></td><td>${t.due_date ? formatDateIL(t.due_date) + (fireSafetyDateState(t.due_date)==='overdue' ? ' 🔴' : fireSafetyDateState(t.due_date)==='due_soon' ? ' 🟠' : '') : '—'}</td></tr>`).join('')}
       </tbody></table>` : '<div class="empty-state">אין משימות דחופות</div>';
 
     const auditEl = document.getElementById('tblAudits');
     auditEl.innerHTML = d.audits.this_week.length ? `
       <table><thead><tr><th>מספר ביקורת</th><th>תאריך</th></tr></thead><tbody>
-        ${d.audits.this_week.map(a => `<tr><td>${esc(a.audit_number || ('#' + a.id))}</td><td>${esc(a.audit_date)}</td></tr>`).join('')}
+        ${d.audits.this_week.map(a => `<tr><td>${esc(a.audit_number || ('#' + a.id))}</td><td>${formatDateIL(a.audit_date)}</td></tr>`).join('')}
       </tbody></table>` : '<div class="empty-state">אין ביקורות מתוכננות השבוע</div>';
 
     const eqEl = document.getElementById('tblEquipment');
