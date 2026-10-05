@@ -202,7 +202,7 @@ const Tasks = (() => {
         </div>
         <div class="task-meta">
           ${t.assignee ? `<span>👤 ${esc(t.assignee)}</span>` : ''}
-          ${t.due_date ? `<span>📅 ${esc(t.due_date)}</span>` : ''}
+          ${t.due_date ? `<span>📅 ${formatDateIL(t.due_date)}</span>` : ''}
           ${t.site_id ? `<a href="/sites?site_id=${t.site_id}" style="color:inherit;">🏢 אתר #${t.site_id}</a>` : ''}
           ${t.source_deficiency_id ? `<a href="/audits?deficiency_id=${t.source_deficiency_id}" style="color:inherit;">⚠️ מליקוי #${t.source_deficiency_id}</a>` : ''}
           ${t.is_recurring ? `<span>🔁 חוזר (${esc(t.recurrence_rule || '')})</span>` : ''}
