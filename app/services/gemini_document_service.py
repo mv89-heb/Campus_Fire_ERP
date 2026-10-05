@@ -252,20 +252,26 @@ def analyze_and_persist(document_id):
         raise
 
 
-def reanalyze_all_completed(include_archived=False):
-    """One-time controlled Gemini refresh of existing analyzed PDFs.
+def reanalyze_completed_batch(offset=0, limit=1, include_archived=False):
+    """Process a small explicit batch so web requests never wait for the full corpus."""
+    try:
+        offset = max(0, int(offset))
+    except (TypeError, ValueError):
+        offset = 0
+    try:
+        limit = min(5, max(1, int(limit)))
+    except (TypeError, ValueError):
+        limit = 1
 
-    This is deliberately explicit and is never called from application startup.
-    Each document is processed and committed independently so one bad PDF does
-    not roll back the rest.
-    """
     query = Document.query.filter(Document.ai_status == "completed")
     if not include_archived:
         query = query.filter(Document.status.notin_(["archived", "deleted"]))
     documents = query.order_by(Document.id.asc()).all()
+    total = len(documents)
+    batch = documents[offset:offset + limit]
 
     updated, failed = [], []
-    for document in documents:
+    for document in batch:
         try:
             result = analyze(document)
             persist(document, result)
@@ -287,13 +293,51 @@ def reanalyze_all_completed(include_archived=False):
                 "error": str(exc)[:2000],
             })
 
+    next_offset = offset + len(batch)
     return {
         "success": not failed,
-        "total": len(documents),
+        "total": total,
+        "offset": offset,
+        "processed": len(batch),
+        "next_offset": next_offset,
+        "has_more": next_offset < total,
         "updated": updated,
         "failed": failed,
         "counts": {
-            "total": len(documents),
+            "total": total,
+            "updated": len(updated),
+            "failed": len(failed),
+            "processed": len(batch),
+        },
+    }
+
+
+def reanalyze_all_completed(include_archived=False):
+    """One-time controlled Gemini refresh of existing analyzed PDFs.
+
+    This remains available for internal callers, but the admin HTTP endpoint
+    uses small batches to avoid gateway/request timeouts.
+    """
+    offset = 0
+    updated, failed = [], []
+    while True:
+        result = reanalyze_completed_batch(
+            offset=offset,
+            limit=5,
+            include_archived=include_archived,
+        )
+        updated.extend(result.get("updated") or [])
+        failed.extend(result.get("failed") or [])
+        offset = result.get("next_offset", offset)
+        if not result.get("has_more"):
+            break
+    return {
+        "success": not failed,
+        "total": len(updated) + len(failed),
+        "updated": updated,
+        "failed": failed,
+        "counts": {
+            "total": len(updated) + len(failed),
             "updated": len(updated),
             "failed": len(failed),
         },
