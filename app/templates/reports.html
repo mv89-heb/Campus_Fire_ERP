@@ -235,3 +235,43 @@ async function loadAiFullReports() {
 loadAiFullReports();
 </script>
 {% endblock %}
+  const listEl=document.getElementById('aiFullReports');
+  const detailEl=document.getElementById('previewCard');
+  let reports=[]; let selectedId=null;
+  const esc=v=>v===null||v===undefined?'':String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const val=v=>v===null||v===undefined||v===''?'—':esc(v);
+  const pct=v=>v===null||v===undefined||v===''?'—':esc(v)+'%';
+  const sev=s=>({critical:'קריטי',high:'גבוהה',medium:'בינונית',low:'נמוכה',info:'מידע',unclear:'לא ברור'}[s]||s||'—');
+  const stat=s=>({completed:'הושלם',ok:'תקין',needs_attention:'דורש תשומת לב',critical:'קריטי',open:'פתוח',closed:'סגור',in_progress:'בטיפול'}[s]||s||'—');
+  function renderList(){
+    listEl.innerHTML=reports.length?reports.map(r=>'<button type="button" class="ai-report-item '+(r.document_id===selectedId?'active':'')+'" data-id="'+r.document_id+'"><div class="ai-report-item-title">📄 '+val(r.file_name)+'</div><div class="ai-report-item-meta">'+val(r.document_type)+'<br>נותח: '+val(r.analyzed_at)+'</div><span class="ai-report-badge">'+stat(r.overall_status)+' · '+pct(r.ai_confidence_percent)+'</span></button>').join(''):'<div class="ai-empty">אין דוחות Gemini שהושלמו.</div>';
+    listEl.querySelectorAll('.ai-report-item').forEach(b=>b.onclick=()=>openReport(Number(b.dataset.id)));
+  }
+  function finding(f,i){
+    const p=f.confidence==null?'—':Math.round(Number(f.confidence)<=1?Number(f.confidence)*100:Number(f.confidence))+'%';
+    return '<div class="ai-finding '+esc(f.severity||'')+'"><div class="ai-finding-title">'+(i+1)+'. '+val(f.title)+'</div><div class="ai-finding-meta">חומרה: '+sev(f.severity)+' · ביטחון: '+p+(f.status?' · סטטוס: '+stat(f.status):'')+(f.source_page?' · עמוד: '+esc(f.source_page):'')+'</div><p><b>תיאור:</b><br>'+val(f.description)+'</p><p><b>למה זה חשוב:</b><br>'+val(f.why_it_matters)+'</p><p><b>מה צריך לעשות:</b><br>'+val(f.recommended_action)+'</p><p><b>ראיה לסגירה:</b><br>'+val(f.evidence_to_close)+'</p><p><b>אחראי:</b> '+val(f.responsible_role)+' · <b>יעד:</b> '+(f.due_days==null?'—':esc(f.due_days)+' ימים')+'</p>'+(f.source_quote?'<p><b>ציטוט מקור:</b><br>'+esc(f.source_quote)+'</p>':'')+'</div>';
+  }
+  function openReport(id){
+    selectedId=id; renderList();
+    const r=reports.find(x=>x.document_id===id); if(!r)return;
+    const findings=Array.isArray(r.findings)?r.findings:[], ops=Array.isArray(r.operational_actions)?r.operational_actions:[];
+    const ul=items=>Array.isArray(items)&&items.length?'<ul class="ai-list">'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'<div class="ai-empty">אין</div>';
+    detailEl.style.display='block';
+    detailEl.innerHTML='<div class="ai-detail-toolbar"><div><div class="ai-detail-title">🤖 '+val(r.file_name)+'</div><div class="ai-detail-meta">מסמך #'+val(r.document_id)+' · נותח: '+val(r.analyzed_at)+' · מודל: '+val(r.ai_model)+'</div></div><a class="ds-btn" href="/reports/ai-full/'+encodeURIComponent(r.document_id)+'/print" target="_blank">🖨️ הדפס דוח זה</a></div>'+
+    '<div class="ai-detail-grid">'+
+    [['סוג מסמך',r.document_type],['מטרת המסמך',r.document_purpose],['סטטוס כולל',stat(r.overall_status)],['קטגוריה',r.category],['אתר',r.site],['כתובת',r.site_address],['מספר ביקורת',r.audit_number],['תאריך ביקורת',r.audit_date],['בודק',r.inspector_name],['ספק',r.supplier],['תאריך הנפקה/בדיקה',r.issue_date],['תוקף',r.expiry_date],['סטטוס תוקף',r.validity_status],['ביטחון Gemini',pct(r.ai_confidence_percent)]].map(x=>'<div class="ai-field"><div class="ai-field-label">'+x[0]+'</div><div class="ai-field-value">'+val(x[1])+'</div></div>').join('')+'</div>'+
+    (r.review_required?'<div class="ai-detail-section"><b>⚠️ נדרשת בדיקה אנושית</b></div>':'')+
+    '<div class="ai-detail-section"><h3>סיכום מלא</h3><div class="ai-summary">'+val(r.summary)+'</div></div>'+
+    '<div class="ai-detail-section"><h3>ממצאים מלאים ('+findings.length+')</h3>'+(findings.length?findings.map(finding).join(''):'<div class="ai-empty">לא נשמרו ממצאים.</div>')+'</div>'+
+    '<div class="ai-detail-section"><h3>חוסרים</h3>'+ul(r.missing_items)+'</div><div class="ai-detail-section"><h3>סתירות</h3>'+ul(r.contradictions)+'</div><div class="ai-detail-section"><h3>שאלות להמשך בירור</h3>'+ul(r.follow_up_questions)+'</div>'+
+    '<div class="ai-detail-section"><h3>ליקויים ומשימות שנוצרו במערכת</h3>'+(ops.length?ops.map(x=>'<div class="ai-operational"><b>'+val(x.title)+'</b><div class="ai-finding-meta">חומרה: '+sev(x.severity)+' · סטטוס: '+stat(x.status)+' · אחראי: '+val(x.responsible)+' · יעד: '+val(x.due_date)+'</div><p style="white-space:pre-wrap;line-height:1.6"><b>פירוט:</b><br>'+val(x.description)+'</p><div class="ai-finding-meta">משימה: '+val(x.task_title)+' · סטטוס משימה: '+stat(x.task_status)+' · יעד משימה: '+val(x.task_due_date)+'</div></div>').join(''):'<div class="ai-empty">לא נוצרו ליקויים או משימות תפעוליות.</div>')+'</div>';
+    if(window.innerWidth<=900){document.getElementById('reportsGrid').style.display='none';document.getElementById('aiFullReports').scrollIntoView({behavior:'smooth'});}
+  }
+  async function loadAiReports(){
+    try{const res=await fetch('/api/reports/ai-full');if(!res.ok)throw new Error(res.status);const data=await res.json();reports=Array.isArray(data.reports)?data.reports:[];renderList();}
+    catch(e){listEl.innerHTML='<div class="ai-empty">שגיאה בטעינת רשימת הדוחות.</div>';}
+  }
+  loadAiReports();
+</script>
+{% endblock %}
+{% endblock %}
