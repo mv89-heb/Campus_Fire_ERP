@@ -1,71 +1,13 @@
-{% extends "_shell.html" %}
-{% block title %}דוחות | בטיחות אש Enterprise{% endblock %}
-
 {% block extra_style %}
-.page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
-.page-title-row h1 { font-size: var(--text-xl); }
-.reports-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-@media (min-width: 768px) { .reports-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 1100px) { .reports-grid { grid-template-columns: repeat(4, 1fr); } }
-.report-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; }
-.report-title { font-weight: 700; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
-.report-count { font-size:.72rem; color:var(--color-text-muted); background:var(--tint-neutral); border-radius:999px; padding:3px 8px; }
-.report-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.report-actions .ds-btn { flex: 1; min-width: 70px; padding: 6px 8px; font-size: 0.78rem; min-height: 32px; }
-.kpi-summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: var(--space-5); }
-@media (min-width: 768px) { .kpi-summary-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (min-width: 1100px) { .kpi-summary-grid { grid-template-columns: repeat(8, 1fr); } }
-.kpi-summary-card { cursor: pointer; text-align: center; }
-.kpi-summary-card .ds-kpi-value { font-size: var(--text-xl); }
-.ai-full-section { margin-top: 20px; }
-.ai-full-toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
-.ai-full-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:16px; margin-bottom:12px; }
-.ai-full-card h3 { margin:0 0 6px; font-size:1rem; }
-.ai-full-meta { color:var(--color-text-muted); font-size:.82rem; margin-bottom:10px; }
-.ai-full-summary { white-space:pre-wrap; line-height:1.6; background:var(--tint-neutral); border-radius:8px; padding:12px; }
-.ai-full-findings { margin-top:10px; }
-.ai-full-finding { border:1px solid var(--color-border); border-radius:8px; padding:10px; margin-top:7px; }
-.ai-full-finding b { display:block; margin-bottom:4px; }
-.ai-full-actions { display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; }
-.ai-full-detail { margin-top:12px; border-top:1px solid var(--color-border); padding-top:10px; }
-.ai-full-section-title { font-size:.9rem; font-weight:700; margin:12px 0 6px; }
-.ai-full-list { margin:6px 0; padding-right:22px; line-height:1.65; }
-.ai-full-finding p { margin:7px 0; line-height:1.6; white-space:pre-wrap; }
-.ai-full-finding .finding-meta { color:var(--color-text-muted); font-size:.78rem; }
-.ai-full-operational { border:1px solid var(--color-border); border-radius:8px; padding:10px; margin-top:8px; }
-.ai-full-empty { color:var(--color-text-muted); padding:12px; }
-.ai-full-status { font-weight:700; }
-
-{% endblock %}
-
-{% block content %}
-<div class="page-title-row">
-  <h1>📈 דוחות</h1>
-</div>
-<p style="color:var(--color-text-muted); font-size:var(--text-sm); margin-bottom:var(--space-4);">ייצוא ל-PDF / Excel / CSV</p>
-
-<div class="reports-grid" id="reportsGrid"></div>
-
-<div class="ds-card" id="previewCard" style="display:none; margin-top:var(--space-4);">
-  <div style="font-weight:700; margin-bottom:10px;" id="previewTitle"></div>
-  <div style="overflow-x:auto;"><table class="ds-table" id="previewTable"></table></div>
-</div>
-
-<div class="ai-full-section">
-  <div class="ai-full-toolbar">
-    <div>
-      <h2 style="margin:0;">🤖 דוחות ניתוח Gemini מלאים</h2>
-      <div style="color:var(--color-text-muted); font-size:var(--text-sm); margin-top:4px;">
-        כאן מופיע התוכן המלא שנשמר מהניתוח: סיכום, כל הממצאים, למה זה חשוב, מה לבצע, ראיות לסגירה, חוסרים, סתירות, שאלות המשך והפעולות התפעוליות שנוצרו.
-      </div>
-    </div>
-    <a class="ds-btn" href="/reports/ai-full/print" target="_blank">🖨️ הדפס את כל הדוחות</a>
-  </div>
-  <div id="aiFullReports"></div>
-</div>
-{% endblock %}
-
-{% block extra_script %}
+.reports-header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}.reports-header h1{margin:0}.reports-subtitle{color:var(--color-text-muted);font-size:var(--text-sm);margin-top:5px}
+.ai-layout{display:grid;grid-template-columns:minmax(290px,360px) 1fr;gap:18px;align-items:start}.ai-list{display:flex;flex-direction:column;gap:9px}.ai-report-item{width:100%;text-align:right;background:var(--color-surface);border:1px solid var(--color-border);border-radius:10px;padding:13px;cursor:pointer}.ai-report-item:hover{border-color:var(--color-primary)}.ai-report-item.active{border:2px solid var(--color-primary);padding:12px}.ai-report-item-title{font-weight:700;line-height:1.45}.ai-report-item-meta{font-size:.78rem;color:var(--color-text-muted);margin-top:6px;line-height:1.55}.ai-badge{display:inline-block;border-radius:999px;padding:2px 8px;font-size:.72rem;margin-top:7px;background:var(--tint-neutral)}
+.ai-detail{background:var(--color-surface);border:1px solid var(--color-border);border-radius:12px;padding:20px;min-height:300px}.ai-toolbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--color-border);padding-bottom:14px;margin-bottom:14px}.ai-title{font-size:1.15rem;font-weight:800;line-height:1.45}.ai-meta{font-size:.8rem;color:var(--color-text-muted);margin-top:5px;line-height:1.6}.ai-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.ai-field{border:1px solid var(--color-border);border-radius:8px;padding:9px}.ai-label{font-size:.72rem;color:var(--color-text-muted);margin-bottom:3px}.ai-value{font-weight:600;line-height:1.45;white-space:pre-wrap}.ai-section{border-top:1px solid var(--color-border);padding-top:14px;margin-top:14px}.ai-section h3{font-size:.95rem;margin:0 0 9px}.ai-summary{background:var(--tint-neutral);border-radius:8px;padding:12px;line-height:1.7;white-space:pre-wrap}.ai-finding{border:1px solid var(--color-border);border-radius:9px;padding:12px;margin-top:9px}.ai-finding.critical,.ai-finding.high{border-right:4px solid #b42318}.ai-finding.medium{border-right:4px solid #b54708}.ai-finding-title{font-weight:800}.ai-finding-meta{font-size:.76rem;color:var(--color-text-muted);margin:4px 0 8px}.ai-finding p{margin:7px 0;line-height:1.6;white-space:pre-wrap}.ai-list-items{margin:5px 0;padding-right:22px;line-height:1.7}.ai-op{border:1px solid var(--color-border);border-radius:8px;padding:10px;margin-top:8px}.ai-empty{color:var(--color-text-muted);padding:25px;text-align:center}
+@media(max-width:900px){.ai-layout{grid-template-columns:1fr}.ai-detail{display:none}.ai-detail.mobile-open{display:block}.ai-grid{grid-template-columns:1fr}.ai-list.mobile-hidden{display:none}}
+@media print{.reports-header,.ai-list{display:none!important}.ai-detail{border:0}}
+{% endblock %}{% block content %}
+<div class="reports-header"><div><h1>📋 דוחות ניתוח Gemini</h1><div class="reports-subtitle">כל מסמך שנותח בהצלחה מופיע ברשימה. בחר דוח כדי לפתוח את מלוא הניתוח והאפשרות להדפסה.</div></div><a class="ds-btn" href="/reports/ai-full/print" target="_blank">🖨️ הדפס את כל הדוחות</a></div>
+<div class="ai-layout"><section id="aiFullReports" class="ai-list"><div class="ai-empty">טוען רשימת דוחות…</div></section><section id="previewCard" class="ai-detail"><div class="ai-empty">בחר דוח מהרשימה כדי לראות את הפירוט המלא.</div></section></div>
+{% endblock %}{% block extra_script %}
 <script>
 const REPORTS = [
   { key: 'expired_permits', label: 'אישורים שפגו', icon: '❌' },
