@@ -68,14 +68,16 @@ def _find_supplier(name, number):
     return None
 
 
-def _find_audit(number):
+def _find_audit(number, site_id=None):
     number = _clean(number)
     if not number:
         return None
-    return (Audit.query
-            .filter(db.func.lower(Audit.audit_number) == number.lower())
-            .order_by(Audit.id.desc())
-            .first())
+    query = Audit.query.filter(
+        db.func.lower(Audit.audit_number) == number.lower()
+    )
+    if site_id:
+        query = query.filter(Audit.site_id == site_id)
+    return query.order_by(Audit.id.desc()).first()
 
 
 def sync_document_entities(document: Document, create_missing: bool = True) -> dict:
@@ -171,7 +173,7 @@ def sync_document_entities(document: Document, create_missing: bool = True) -> d
 
     audit = db.session.get(Audit, document.audit_id) if document.audit_id else None
     if not audit and audit_number:
-        audit = _find_audit(audit_number)
+        audit = _find_audit(audit_number, site.id if site else document.site_id)
     if not audit and create_missing and audit_number:
         result_value = {
             "critical": "needs_attention",
@@ -243,12 +245,23 @@ def sync_document_entities(document: Document, create_missing: bool = True) -> d
             if not etype:
                 continue
             serial = _clean(equipment_data.get("serial_number"))
-            equipment = Equipment.query.filter_by(serial_number=serial).first() if serial else None
+            manufacturer = _clean(equipment_data.get("manufacturer"))
+            model = _clean(equipment_data.get("model"))
+            equipment = None
+            if serial:
+                equipment = (Equipment.query
+                             .filter(db.func.lower(Equipment.serial_number) == serial.lower())
+                             .filter(Equipment.manufacturer == manufacturer)
+                             .filter(Equipment.model == model)
+                             .filter(Equipment.supplier_id == document.supplier_id)
+                             .order_by(Equipment.id.asc())
+                             .first())
             if not equipment:
                 equipment = Equipment.query.filter_by(
                     supplier_id=document.supplier_id,
                     equipment_type=etype,
-                    model=_clean(equipment_data.get("model"))
+                    model=model,
+                    manufacturer=manufacturer
                 ).first()
             if not equipment:
                 equipment = Equipment(equipment_type=etype, supplier_id=document.supplier_id)
@@ -256,8 +269,8 @@ def sync_document_entities(document: Document, create_missing: bool = True) -> d
                 db.session.flush()
             for attr, value in {
                 "serial_number": serial,
-                "manufacturer": _clean(equipment_data.get("manufacturer")),
-                "model": _clean(equipment_data.get("model")),
+                "manufacturer": manufacturer,
+                "model": model,
                 "install_date": _parse_date(equipment_data.get("install_date")),
                 "last_check_date": _parse_date(equipment_data.get("last_check_date")),
                 "next_check_date": _parse_date(equipment_data.get("next_check_date")),
