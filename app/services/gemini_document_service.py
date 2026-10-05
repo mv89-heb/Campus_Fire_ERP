@@ -13,6 +13,7 @@ from app.models import Document, Deficiency, Task, Audit
 from app.services import storage
 from app.services import integration_service as integration_svc
 from app.services import document_link_service as link_svc
+from app.services import ai_entity_sync_service as entity_sync_svc
 
 log = logging.getLogger(__name__)
 
@@ -164,18 +165,10 @@ def persist(document, result):
         document.ai_confidence = None
     document.ai_error = None
 
-    # Turn AI entity extraction into explicit ERP relationships.
-    audit_number = str(result.get("audit_number") or "").strip()
-    if audit_number:
-        linked_audit = (
-            Audit.query
-            .filter(db.func.lower(Audit.audit_number) == audit_number.lower())
-            .order_by(Audit.id.desc())
-            .first()
-        )
-        if linked_audit:
-            document.audit_id = linked_audit.id
-            document.site_id = linked_audit.site_id
+    # Materialize every extracted business entity into the ERP first.
+    # This is what makes Gemini data visible in Suppliers/Sites/Audits and
+    # allows the downstream screens to share the same records.
+    entity_sync_svc.sync_document_entities(document, create_missing=True)
     link_svc.resolve_document(document, persist=False)
 
     document.analysis_review_required = (
@@ -186,6 +179,9 @@ def persist(document, result):
     )
     db.session.commit()
     link_svc.resolve_document(document, persist=True)
+    # Findings become canonical deficiencies/tasks as part of successful AI
+    # ingestion. The operation is idempotent and will not duplicate actions.
+    create_operational_actions(document)
 
 def analyze_and_persist(document_id):
     document = db.session.get(Document, document_id)
