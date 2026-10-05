@@ -221,7 +221,13 @@ def _merge_areas():
 def _merge_equipment():
     groups = _groups(
         Equipment.query.order_by(Equipment.id.asc()).all(),
-        lambda x: "serial:" + normalize(x.serial_number) if normalize(x.serial_number) else "",
+        lambda x: (
+            "serial:" + normalize(x.serial_number)
+            + "|manufacturer:" + normalize(x.manufacturer)
+            + "|model:" + normalize(x.model)
+            + "|supplier:" + str(x.supplier_id or "")
+            if normalize(x.serial_number) else ""
+        ),
     )
     merged = 0
     fields = [
