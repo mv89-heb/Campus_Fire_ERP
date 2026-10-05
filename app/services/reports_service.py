@@ -6,6 +6,7 @@ CSV/Excel/הדפסה יכולים לצרוך בלי לדעת על המודל ש�
 """
 from datetime import date
 import json
+from sqlalchemy import or_
 
 from app.models import Document, Supplier, Equipment, Deficiency, Audit, Task, Site
 from app.extensions import db
@@ -198,7 +199,7 @@ def get_ai_full_reports():
 
     document_tokens = [f"document:{d.id}" for d in documents]
     deficiencies = Deficiency.query.filter(
-        db.or_(*[Deficiency.notes.ilike(f"%{token}%") for token in document_tokens])
+        or_(*[Deficiency.notes.ilike(f"%{token}%") for token in document_tokens])
     ).order_by(Deficiency.id.asc()).all() if document_tokens else []
     deficiency_by_document = {d.id: [] for d in documents}
     task_ids = {d.task_id for d in deficiencies if d.task_id}
