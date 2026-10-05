@@ -163,6 +163,6 @@ def serialize_task(task):
         "due_date": str(task.due_date) if task.due_date else None,
         "is_recurring": task.is_recurring, "recurrence_rule": task.recurrence_rule,
         "checklist": checklist, "site_id": task.site_id, "supplier_id": task.supplier_id,
-        "source_deficiency_id": next((d.id for d in Deficiency.query.filter_by(task_id=task.id).limit(1).all()), None),
+        "source_deficiency_id": next((d.id for d in task.deficiencies), None),
         "completed_at": task.completed_at.isoformat() if task.completed_at else None,
     }
