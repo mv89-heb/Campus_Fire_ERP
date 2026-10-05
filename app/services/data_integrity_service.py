@@ -42,7 +42,12 @@ def _fill_empty(target, source, fields):
 
 
 def scan():
-    site_dupes = _groups(Site.query.order_by(Site.id.asc()).all(), lambda x: normalize(x.name) or normalize(x.address))
+    site_dupes = _groups(Site.query.order_by(Site.id.asc()).all(), lambda x: (
+        "nameaddr:" + normalize(x.name) + "|" + normalize(x.address)
+        if normalize(x.name) and normalize(x.address)
+        else "name:" + normalize(x.name) if normalize(x.name)
+        else "addr:" + normalize(x.address)
+    ))
     supplier_dupes = _groups(
         Supplier.query.order_by(Supplier.id.asc()).all(),
         lambda x: "num:" + normalize(x.supplier_number) if normalize(x.supplier_number)
@@ -66,7 +71,10 @@ def scan():
     )
     audit_dupes = _groups(
         Audit.query.order_by(Audit.id.asc()).all(),
-        lambda x: "num:" + normalize(x.audit_number) if normalize(x.audit_number) else "",
+        lambda x: (
+            "num:" + normalize(x.audit_number) + "|site:" + str(x.site_id or "")
+            if normalize(x.audit_number) else ""
+        ),
     )
 
     orphan = {
@@ -108,7 +116,12 @@ def scan():
 
 
 def _merge_sites():
-    groups = _groups(Site.query.order_by(Site.id.asc()).all(), lambda x: normalize(x.name) or normalize(x.address))
+    groups = _groups(Site.query.order_by(Site.id.asc()).all(), lambda x: (
+        "nameaddr:" + normalize(x.name) + "|" + normalize(x.address)
+        if normalize(x.name) and normalize(x.address)
+        else "name:" + normalize(x.name) if normalize(x.name)
+        else "addr:" + normalize(x.address)
+    ))
     merged = 0
     fields = ["address", "contact_name", "contact_phone", "contact_email", "map_lat", "map_lng", "notes"]
     for rows in groups.values():
