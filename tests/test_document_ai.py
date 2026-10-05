@@ -6,6 +6,7 @@ from app.extensions import db
 from app.models import Document, Site, Supplier, Audit
 from app.services.document_link_service import resolve_document
 from app.services.gemini_document_service import findings, actions
+from app.services.ai_entity_sync_service import sync_document_entities
 
 class TestDocumentAI(unittest.TestCase):
     def setUp(self):
@@ -46,6 +47,34 @@ class TestDocumentAI(unittest.TestCase):
         links=resolve_document(d,persist=False)
         self.assertIsNone(d.site_id)
         self.assertEqual(links["site"]["status"],"candidate")
+
+
+    def test_extracted_entities_are_materialized(self):
+        d=Document(
+            file_name="audit.pdf", file_path="audit.pdf", file_hash="e"*64,
+            contact_name="דוד כהן", issuing_body="חברת בדיקות אש",
+            ai_actions_json=json.dumps({
+                "site_name":"פנימיית ראשית",
+                "site_address":"בית שמש",
+                "supplier_name":"ספק בטיחות ראשית",
+                "supplier_number":"SUP-8855",
+                "audit_number":"8855",
+                "audit_date":"2026-08-18",
+                "inspector_name":"יוסי כהן",
+                "overall_status":"critical",
+            }, ensure_ascii=False),
+            ai_status="completed",
+        )
+        db.session.add(d); db.session.flush()
+        result=sync_document_entities(d, create_missing=True)
+        db.session.commit()
+        self.assertIsNotNone(d.site_id)
+        self.assertIsNotNone(d.supplier_id)
+        self.assertIsNotNone(d.audit_id)
+        self.assertEqual(db.session.get(Site,d.site_id).address,"בית שמש")
+        self.assertEqual(db.session.get(Supplier,d.supplier_id).supplier_number,"SUP-8855")
+        self.assertEqual(db.session.get(Audit,d.audit_id).inspector_name,"יוסי כהן")
+        self.assertEqual(result["audit_id"],d.audit_id)
 
     def test_json(self):
         d=Document(file_name="x.pdf",file_path="x.pdf",file_hash="b"*64,
