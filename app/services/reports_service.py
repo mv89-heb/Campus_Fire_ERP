@@ -81,12 +81,12 @@ def report_audits():
 
 def report_tasks():
     items = Task.query.order_by(Task.due_date.asc().nullslast()).all()
+    site_ids = {t.site_id for t in items if t.site_id}
+    sites = {s.id: s for s in Site.query.filter(Site.id.in_(site_ids)).all()} if site_ids else {}
     headers = ["כותרת", "שיוך", "עדיפות", "סטטוס", "יעד", "אתר"]
-    rows = []
-    for t in items:
-        site = db.session.get(Site, t.site_id) if t.site_id else None
-        rows.append([t.title, t.assignee or '', t.priority, t.status,
-                     str(t.due_date) if t.due_date else '', site.name if site else ''])
+    rows = [[t.title, t.assignee or '', t.priority, t.status,
+             str(t.due_date) if t.due_date else '', sites.get(t.site_id).name if t.site_id and sites.get(t.site_id) else '']
+            for t in items]
     return headers, rows
 
 
