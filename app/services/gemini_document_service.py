@@ -369,7 +369,12 @@ def create_operational_actions(document):
     audit_number = result_meta.get("audit_number") if isinstance(result_meta, dict) else None
     audit = db.session.get(Audit, document.audit_id) if document.audit_id else None
     if not audit and audit_number:
-        audit = Audit.query.filter(db.func.lower(Audit.audit_number) == str(audit_number).strip().lower()).order_by(Audit.id.desc()).first()
+        audit_query = Audit.query.filter(
+            db.func.lower(Audit.audit_number) == str(audit_number).strip().lower()
+        )
+        if document.site_id:
+            audit_query = audit_query.filter(Audit.site_id == document.site_id)
+        audit = audit_query.order_by(Audit.id.desc()).first()
 
     for item in findings(document):
         severity = item.get("severity")
