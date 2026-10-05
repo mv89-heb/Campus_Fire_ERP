@@ -40,6 +40,7 @@
   <div class="section-title">
     <span>🔄 שחזור והעברת מסמכים ישנים ל-Supabase</span>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="ds-btn ds-btn-primary ds-btn-sm" id="btnGeminiSync" onclick="StorageAdmin.runGeminiSync()">🤖 Gemini: ניתוח מחדש וסנכרון ERP</button>
       <button class="ds-btn ds-btn-sm" id="btnMigrationScan" onclick="StorageAdmin.runMigrationScan()">🔎 בדוק התאמה</button>
       <button class="ds-btn ds-btn-primary ds-btn-sm" id="btnMigrationRun" onclick="StorageAdmin.runMigration()">☁️ העבר/שחזר ל-Supabase</button>
     </div>
@@ -55,6 +56,7 @@
     <div class="ds-kpi-card warn"><div class="ds-kpi-value" id="migAmbiguous">-</div><div class="ds-kpi-label">שמות כפולים</div></div>
   </div>
   <div id="migrationResult" style="font-size:var(--text-sm);"></div>
+  <div id="geminiSyncResult" style="font-size:var(--text-sm); margin-top:10px;"></div>
 </div>
 
 <div class="ds-card" style="margin-bottom:var(--space-5);">
@@ -216,6 +218,30 @@ const StorageAdmin = (() => {
 
   return {
     init: () => loadDashboard(), runScan: () => loadDashboard(), runMigrationScan, runMigration,
+    runGeminiSync: async () => {
+      const btn = document.getElementById('btnGeminiSync');
+      if (!confirm('פעולה חד-פעמית: להריץ Gemini מחדש על כל המסמכים שכבר נותחו, לחלץ את כל המידע הזמין ולסנכרן אותו למסכי ה-ERP? הפעולה עשויה להימשך זמן ולצרוך מכסת Gemini.')) return;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Gemini מנתח ומסנכרן...';
+      const result = document.getElementById('geminiSyncResult');
+      result.innerHTML = '<span class="ds-badge ds-badge-warning">⏳ התהליך פועל — אין לסגור את החלון.</span>';
+      try {
+        const res = await fetch('/api/admin/documents/gemini-reanalyze', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}', credentials:'same-origin'});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.details || 'הניתוח נכשל');
+        const counts = data.counts || {}, failed = data.failed || [];
+        result.innerHTML = '<span class="ds-badge ds-badge-success">✅ הושלם: ' + (counts.updated || 0) + ' מסמכים</span> ' +
+          (failed.length ? '<span class="ds-badge ds-badge-danger">❌ נכשלו: ' + failed.length + '</span>' : '<span class="ds-badge ds-badge-success">ללא כשלים</span>');
+        showToast('Gemini הושלם: ' + (counts.updated || 0) + ' מסמכים');
+        loadDashboard();
+      } catch (e) {
+        result.innerHTML = '<span class="ds-badge ds-badge-danger">❌ ' + esc(e.message) + '</span>';
+        showToast('ניתוח Gemini נכשל: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🤖 Gemini: ניתוח מחדש וסנכרון ERP';
+      }
+    },
     loadPreview: async () => { try { const res=await fetch('/api/admin/storage/cleanup-preview',{method:'POST'}); const d=await res.json(); if(!res.ok) throw new Error(d.error||'שגיאה'); _orphans=d.orphaned_items||[]; renderOrphanTable(); showToast('הרשימה עודכנה'); } catch(e){showToast('שגיאה ברענון הרשימה: '+e.message,'error');} },
     toggleSelect: (path, checked) => { if(checked)_selected.add(path); else _selected.delete(path); updateCleanupBar(); },
     selectAll: () => { document.querySelectorAll('#orphanBody input[type=checkbox]').forEach(cb=>cb.checked=true); _orphans.forEach(o=>_selected.add(o.path)); updateCleanupBar(); },
