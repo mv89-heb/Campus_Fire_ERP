@@ -58,6 +58,11 @@ tr:last-child td { border-bottom: none; }
   <div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div>
 </div></section>
 
+<div class="card" id="dataIntegrityCard" style="border-right:4px solid var(--warning);">
+  <div class="card-title">🧹 איכות וסדר הנתונים</div>
+  <div id="dataIntegrityBody" class="empty-state">בודק כפילויות וקשרים...</div>
+</div>
+
 <div class="card" id="actionCenter" style="border-right:4px solid var(--critical);">
   <div class="card-title">🎯 דורש טיפול עכשיו</div>
   <div id="actionCenterBody" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
@@ -129,9 +134,24 @@ function renderBarChart(elId, dataObj, labelMap = {}) {
 
 async function loadDashboard(forceRefresh = false) {
   try {
-    const res = await fetch('/api/org-dashboard' + (forceRefresh ? '?refresh=true' : ''));
-    if (!res.ok) throw new Error('שגיאת שרת');
-    const d = await res.json();
+    const [dashboardRes, integrityRes] = await Promise.all([
+      fetch('/api/org-dashboard' + (forceRefresh ? '?refresh=true' : '')),
+      fetch('/api/data-integrity')
+    ]);
+    if (!dashboardRes.ok || !integrityRes.ok) throw new Error('שגיאת שרת');
+    const d = await dashboardRes.json();
+    const integrity = await integrityRes.json();
+    const dup = Object.values(integrity.duplicates || {}).reduce((a, b) => a + Number(b || 0), 0);
+    const orphan = Object.values(integrity.orphans || {}).reduce((a, b) => a + Number(b || 0), 0);
+    const integrityBody = document.getElementById('dataIntegrityBody');
+    if (dup === 0 && orphan === 0) {
+      integrityBody.innerHTML = '<span class="pill valid">✓ הנתונים נקיים מבחינת כפילויות וקשרים בסיסיים</span>';
+    } else {
+      const parts = [];
+      if (dup) parts.push('כפילויות: ' + dup);
+      if (orphan) parts.push('קשרים חסרים/יתומים: ' + orphan);
+      integrityBody.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;"><span class="pill warning">⚠ ' + esc(parts.join(' · ')) + '</span><button class="btn" onclick="repairDataIntegrity()">🧹 נקה כפילויות בטוחות</button></div>';
+    }
 
     document.getElementById('kpiGrid').innerHTML = `
       <div class="kpi-card ${d.readiness_score >= 80 ? 'good' : d.readiness_score >= 50 ? 'warn' : 'bad'}">
@@ -195,6 +215,19 @@ async function loadDashboard(forceRefresh = false) {
         ⚠️ שגיאה בטעינת הדשבורד
         <button class="retry-btn" onclick="loadDashboard(true)">🔄 נסה שוב</button>
       </div>`;
+  }
+}
+
+async function repairDataIntegrity() {
+  const body = document.getElementById('dataIntegrityBody');
+  if (!confirm('המערכת תמזג רק כפילויות זהות לאחר נרמול, ותשמור על הרשומה הוותיקה. ליקויים לא ימוזגו. להמשיך?')) return;
+  body.innerHTML = 'מבצע ניקוי בטוח...';
+  try {
+    const res = await fetch('/api/data-integrity/repair', {method:'POST', headers:{'X-CSRF-Token': document.cookie.split('; ').find(x => x.startsWith('erp_csrf_token='))?.split('=')[1] || ''}});
+    if (!res.ok) throw new Error('repair failed');
+    await loadDashboard(true);
+  } catch (e) {
+    body.innerHTML = '<span class="pill critical">ניקוי הנתונים נכשל. נסה שוב.</span>';
   }
 }
 
