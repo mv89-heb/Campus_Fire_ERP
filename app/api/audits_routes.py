@@ -49,7 +49,7 @@ def api_list_audits():
         status=request.args.get('status'),
         result=request.args.get('result'),
     )
-    return jsonify([audit_svc.serialize_audit(a, include_deficiencies=False) for a in audits])
+    return jsonify([audit_svc.serialize_audit(a, include_deficiencies=False, include_linked_documents=False) for a in audits])
 
 
 @audits_bp.route('/api/audits', methods=['POST'])
