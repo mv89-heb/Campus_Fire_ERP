@@ -233,7 +233,7 @@ const Audits = (() => {
           <div>
             <div class="audit-title">🔍 ${esc(a.audit_number || ('ביקורת #' + a.id))} ${a.site_name ? '· ' + esc(a.site_name) : ''}</div>
             <div class="audit-meta">
-              ${a.audit_date ? esc(a.audit_date) : 'ללא תאריך'} ${a.inspector_name ? '· בודק: ' + esc(a.inspector_name) : ''}
+              ${a.audit_date ? formatDateIL(a.audit_date) : 'ללא תאריך'} ${a.inspector_name ? '· בודק: ' + esc(a.inspector_name) : ''}
               · <span class="badge ${a.status}">${statusLabel[a.status] || a.status}</span>
               ${a.result ? `<span class="badge ${a.result}">${resultLabel[a.result]}</span>` : ''}
               ${a.open_deficiency_count ? `· ${a.open_deficiency_count} ליקויים פתוחים` : ''}
@@ -262,7 +262,7 @@ const Audits = (() => {
       let cmpHtml = '';
       if (previous.length) {
         cmpHtml = `<div style="margin-top:16px;"><div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:4px;">📈 השוואה לביקורות קודמות באתר</div>` +
-          previous.map(p => `<div class="compare-row"><span>${esc(p.audit_date || '')}</span><span>${p.score != null ? p.score : '-'}</span></div>`).join('') + `</div>`;
+          previous.map(p => `<div class="compare-row"><span>${esc(formatDateIL(p.audit_date))}</span><span>${p.score != null ? p.score : '-'}</span></div>`).join('') + `</div>`;
       }
 
       const defHtml = (full.deficiencies || []).map(d => `
@@ -278,7 +278,7 @@ const Audits = (() => {
             </div>
           </div>
           <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">
-            ${d.responsible ? '👤 ' + esc(d.responsible) + ' · ' : ''}${d.due_date ? '📅 יעד: ' + esc(d.due_date) : ''}
+            ${d.responsible ? '👤 ' + esc(d.responsible) + ' · ' : ''}${d.due_date ? '📅 יעד: ' + esc(formatDateIL(d.due_date)) : ''}
           </div>
           <div class="deficiency-actions">
             <button class="btn btn-sm" onclick="Audits.openDeficiencyModal(${auditId}, ${d.id})">✏️ עריכה</button>
@@ -301,7 +301,7 @@ const Audits = (() => {
             ${timelineItems.map(t => `
               <div class="ds-timeline-item">
                 <div class="ds-timeline-dot"></div>
-                <div class="ds-timeline-time">${new Date(t.created_at).toLocaleString('he-IL')} · ${esc(t.username)}</div>
+                <div class="ds-timeline-time">${formatDateTimeIL(t.created_at)} · ${esc(t.username)}</div>
                 <div class="ds-timeline-label">הביקורת ${timelineActionLabel[t.action] || t.action}</div>
               </div>`).join('')}
           </div>
