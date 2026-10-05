@@ -234,9 +234,9 @@ const Sites = (() => {
           [['ביקורות',counts.audits],['ליקויים פתוחים',counts.open_deficiencies],['משימות פתוחות',counts.open_tasks],['ציוד',counts.equipment],['ספקים',counts.suppliers],['מסמכים',counts.documents]]
           .map(x => '<div class="card" style="margin:0;text-align:center;padding:10px;"><b>'+x[1]+'</b><div style="font-size:.75rem;color:var(--text-muted)">'+x[0]+'</div></div>').join('') + '</div>' +
           '<div style="font-weight:700;margin:12px 0 6px;">ביקורות אחרונות</div>' +
-          (d.audits.slice(0,5).map(a => '<div style="padding:7px 0;border-bottom:1px solid var(--border);"><b>'+esc(a.audit_number || ('#'+a.id))+'</b> · '+esc(a.audit_date || 'ללא תאריך')+' · '+esc(a.status)+(a.open_deficiency_count ? ' · ⚠️ '+a.open_deficiency_count : '')+'</div>').join('') || '<div class="empty-state">אין ביקורות</div>') +
+          (d.audits.slice(0,5).map(a => '<div style="padding:7px 0;border-bottom:1px solid var(--border);"><b>'+esc(a.audit_number || ('#'+a.id))+'</b> · '+formatDateIL(a.audit_date)+' · '+esc(a.status)+(a.open_deficiency_count ? ' · ⚠️ '+a.open_deficiency_count : '')+'</div>').join('') || '<div class="empty-state">אין ביקורות</div>') +
           '<div style="font-weight:700;margin:12px 0 6px;">ליקויים פתוחים</div>' +
-          (d.deficiencies.filter(x=>x.status!=='resolved').slice(0,8).map(x => '<div style="padding:7px 0;border-bottom:1px solid var(--border);"><b>'+esc(x.title)+'</b> · '+esc(x.severity)+' · יעד '+esc(x.due_date || '—')+'</div>').join('') || '<div class="empty-state">אין ליקויים פתוחים</div>') +
+          (d.deficiencies.filter(x=>x.status!=='resolved').slice(0,8).map(x => '<div style="padding:7px 0;border-bottom:1px solid var(--border);"><b>'+esc(x.title)+'</b> · '+esc(x.severity)+' · יעד '+formatDateIL(x.due_date)+'</div>').join('') || '<div class="empty-state">אין ליקויים פתוחים</div>') +
           '<div style="font-weight:700;margin:12px 0 6px;">מסמכים</div>' +
           (d.documents.slice(0,8).map(x => '<div style="padding:7px 0;border-bottom:1px solid var(--border);"><a href="/api/documents/'+x.id+'/file" target="_blank">'+esc(x.file_name)+'</a> · '+esc(x.ai_status)+'</div>').join('') || '<div class="empty-state">אין מסמכים מקושרים</div>');
       } catch (e) { body.innerHTML = '<div class="error-state">⚠️ ' + esc(e.message) + '</div>'; }
