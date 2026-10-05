@@ -77,6 +77,22 @@ def api_documents_reanalyze():
         return jsonify({'success': False, 'error': 'ניתוח מחדש של המסמכים נכשל', 'details': str(exc)}), 500
 
 
+@admin_storage_bp.route('/api/admin/documents/gemini-reanalyze', methods=['POST'])
+@admin_required
+def api_documents_gemini_reanalyze():
+    """Explicit one-time Gemini refresh for previously completed documents."""
+    try:
+        include_archived = bool((request.get_json(silent=True) or {}).get('include_archived', False))
+        result = reanalysis_svc.reanalyze_all_with_gemini(include_archived=include_archived) if hasattr(reanalysis_svc, 'reanalyze_all_with_gemini') else None
+        if result is None:
+            from app.services import gemini_document_service as gemini_svc
+            result = gemini_svc.reanalyze_all_completed(include_archived=include_archived)
+        return jsonify(_json_safe(result)), (200 if result.get('success') else 409)
+    except Exception as exc:
+        current_app.logger.exception('Gemini document reanalysis failed')
+        return jsonify({'success': False, 'error': 'ניתוח Gemini מחדש נכשל', 'details': str(exc)}), 500
+
+
 @admin_storage_bp.route('/api/admin/storage/cleanup-preview', methods=['POST'])
 @admin_required
 def api_cleanup_preview():
