@@ -89,6 +89,24 @@
 <div class="ds-toast-container" id="toastContainer" role="status" aria-live="polite"></div>
 
 <script>
+// Central Israeli date/time formatting. Date-only values are parsed as local
+// calendar dates (never through UTC) so YYYY-MM-DD stays on the same calendar day.
+window.formatDateIL = (value) => {
+  if (!value) return '—';
+  const raw = String(value).trim();
+  const m = raw.match(/^(\\d{4})-(\\d{2})-(\\d{2})(?:$|T)/);
+  if (m) return m[3] + '/' + m[2] + '/' + m[1];
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw;
+  return new Intl.DateTimeFormat('he-IL', {day:'2-digit', month:'2-digit', year:'numeric'}).format(d);
+};
+window.formatDateTimeIL = (value) => {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return new Intl.DateTimeFormat('he-IL', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}).format(d);
+};
+
 const Shell = (() => {
   const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   let searchTimer = null;
