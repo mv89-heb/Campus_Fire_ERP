@@ -223,7 +223,7 @@ async function repairDataIntegrity() {
   if (!confirm('המערכת תמזג רק כפילויות זהות לאחר נרמול, ותשמור על הרשומה הוותיקה. ליקויים לא ימוזגו. להמשיך?')) return;
   body.innerHTML = 'מבצע ניקוי בטוח...';
   try {
-    const res = await fetch('/api/data-integrity/repair', {method:'POST', headers:{'X-CSRF-Token': document.cookie.split('; ').find(x => x.startsWith('erp_csrf_token='))?.split('=')[1] || ''}});
+    const res = await fetch('/api/data-integrity/repair', {method:'POST'});
     if (!res.ok) throw new Error('repair failed');
     await loadDashboard(true);
   } catch (e) {
