@@ -196,8 +196,8 @@ const Suppliers = (() => {
         ${s.contact_name ? `<div class="supplier-row">👤 ${esc(s.contact_name)}</div>` : ''}
         ${s.phone ? `<div class="supplier-row">📞 ${esc(s.phone)}</div>` : ''}
         ${s.email ? `<div class="supplier-row">✉️ ${esc(s.email)}</div>` : ''}
-        ${s.contract_expiry ? `<div class="supplier-row">📄 חוזה עד ${formatDateIL(s.contract_expiry)}</div>` : ''}
-        ${s.insurance_expiry ? `<div class="supplier-row">🛡️ ביטוח עד ${formatDateIL(s.insurance_expiry)}</div>` : ''}
+        ${s.contract_expiry ? `<div class="supplier-row">📄 חוזה עד ${formatDateIL(s.contract_expiry)} ${fireSafetyDateState(s.contract_expiry)==='overdue' ? '🔴' : fireSafetyDateState(s.contract_expiry)==='due_soon' ? '🟠' : ''}</div>` : ''}
+        ${s.insurance_expiry ? `<div class="supplier-row">🛡️ ביטוח עד ${formatDateIL(s.insurance_expiry)} ${fireSafetyDateState(s.insurance_expiry)==='overdue' ? '🔴' : fireSafetyDateState(s.insurance_expiry)==='due_soon' ? '🟠' : ''}</div>` : ''}
         <div class="supplier-actions">
           <button class="btn btn-sm" style="flex:1" onclick="Suppliers.openContext(${s.id})">🔗 קשרים</button><button class="btn btn-sm" onclick="Suppliers.openModal(${s.id})">✏️ עריכה</button>
           <button class="btn btn-sm btn-danger" onclick="Suppliers.remove(${s.id})">🗑️</button>
