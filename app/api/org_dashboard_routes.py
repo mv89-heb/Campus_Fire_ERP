@@ -2,10 +2,13 @@
 API עבור הדשבורד הארגוני (שלב 1). Blueprint נפרד; אינו נוגע ב-main_bp.
 """
 from flask import Blueprint, jsonify, render_template
+import time
 from app.services import org_dashboard_service as svc
 from app.services import data_integrity_service as integrity_svc
 
 org_dashboard_bp = Blueprint('org_dashboard', __name__)
+_INTEGRITY_CACHE = {'data': None, 'expires_at': 0}
+_INTEGRITY_CACHE_TTL = 60
 
 
 @org_dashboard_bp.route('/org-dashboard')
@@ -22,9 +25,16 @@ def api_org_dashboard():
 
 @org_dashboard_bp.route('/api/data-integrity', methods=['GET'])
 def api_data_integrity():
-    return jsonify(integrity_svc.scan())
+    now = time.time()
+    if _INTEGRITY_CACHE['data'] is None or _INTEGRITY_CACHE['expires_at'] <= now:
+        _INTEGRITY_CACHE['data'] = integrity_svc.scan()
+        _INTEGRITY_CACHE['expires_at'] = now + _INTEGRITY_CACHE_TTL
+    return jsonify(_INTEGRITY_CACHE['data'])
 
 
 @org_dashboard_bp.route('/api/data-integrity/repair', methods=['POST'])
 def api_data_integrity_repair():
-    return jsonify(integrity_svc.repair())
+    result = integrity_svc.repair()
+    _INTEGRITY_CACHE['data'] = result.get('after')
+    _INTEGRITY_CACHE['expires_at'] = time.time() + _INTEGRITY_CACHE_TTL
+    return jsonify(result)
