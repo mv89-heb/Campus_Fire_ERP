@@ -4,6 +4,7 @@ Service Layer עבור ניהול ציוד כיבוי אש (שלב 8).
 from datetime import date, datetime
 
 from app.extensions import db
+from sqlalchemy.orm import joinedload
 from app.models import Equipment, Area, Floor, Building, Site
 from app.services import audit_log_service as alog
 
@@ -39,7 +40,7 @@ def _require(value, field_name):
 
 
 def list_equipment(q=None, equipment_type=None, status=None, site_id=None):
-    query = Equipment.query
+    query = Equipment.query.options(joinedload(Equipment.area))
     if q:
         like = f"%{q}%"
         query = query.filter(db.or_(
@@ -112,7 +113,7 @@ def list_equipment_types():
 
 
 def serialize_equipment(eq):
-    area = db.session.get(Area, eq.area_id) if eq.area_id else None
+    area = eq.area if eq.area_id else None
     return {
         "id": eq.id, "serial_number": eq.serial_number, "qr_code": eq.qr_code, "barcode": eq.barcode,
         "equipment_type": eq.equipment_type, "manufacturer": eq.manufacturer, "model": eq.model,
