@@ -67,7 +67,12 @@ def scan():
     )
     equipment_dupes = _groups(
         Equipment.query.order_by(Equipment.id.asc()).all(),
-        lambda x: "serial:" + normalize(x.serial_number) if normalize(x.serial_number) else "",
+        lambda x: (
+            "serial:" + normalize(x.serial_number)
+            + "|manufacturer:" + normalize(x.manufacturer)
+            + "|model:" + normalize(x.model)
+            if normalize(x.serial_number) else ""
+        ),
     )
     audit_dupes = _groups(
         Audit.query.order_by(Audit.id.asc()).all(),
@@ -236,7 +241,10 @@ def _merge_equipment():
 def _merge_audits():
     groups = _groups(
         Audit.query.order_by(Audit.id.asc()).all(),
-        lambda x: "num:" + normalize(x.audit_number) if normalize(x.audit_number) else "",
+        lambda x: (
+            "num:" + normalize(x.audit_number) + "|site:" + str(x.site_id or "")
+            if normalize(x.audit_number) else ""
+        ),
     )
     merged = 0
     fields = ["site_id", "building_id", "floor_id", "inspector_name", "audit_date", "status", "result", "score", "notes", "signature_data"]
