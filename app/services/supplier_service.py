@@ -6,6 +6,7 @@ from datetime import date, datetime
 from app.extensions import db
 from app.models import Supplier
 from app.services import audit_log_service as alog
+from app.services import ai_entity_sync_service as entity_sync_svc
 
 
 class SupplierServiceError(Exception):
@@ -40,6 +41,11 @@ def _require(value, field_name):
 
 
 def list_suppliers(q=None, service_type=None, status=None, site_id=None):
+    # Self-heal the Suppliers screen when historical Gemini analyses already
+    # contain supplier metadata but the ERP entity rows were never materialized.
+    # This is idempotent and only runs the backfill when the table is empty.
+    if not Supplier.query.first():
+        entity_sync_svc.reconcile_all_ai_documents(create_actions=False)
     query = Supplier.query
     if q:
         like = f"%{q}%"
