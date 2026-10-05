@@ -38,7 +38,7 @@ def ai_full_reports_print_page():
 
 @reports_bp.route('/reports/ai-full/<int:document_id>/print')
 def ai_full_report_print_page(document_id):
-    reports = [r for r in svc.get_ai_full_reports() if r["document_id"] == document_id]
+    reports = svc.get_ai_full_reports(document_id=document_id)
     if not reports:
         return "הדוח לא נמצא", 404
     return render_template('ai_full_report_print.html', report=reports[0])
