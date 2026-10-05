@@ -3,6 +3,7 @@ Service Layer עבור ניהול היררכיית אתרים (Site -> Building 
 מפריד לוגיקה עסקית/ולידציה מה-routes, בהתאם לדרישת הארכיטקטורה הנקייה.
 """
 from app.extensions import db
+from sqlalchemy.orm import selectinload
 from app.models import Site, Building, Floor, Area
 from app.services import audit_log_service as alog
 
@@ -21,7 +22,9 @@ def _require(value, field_name):
 # ---------- Sites ----------
 
 def list_sites():
-    return Site.query.order_by(Site.name).all()
+    return Site.query.options(
+        selectinload(Site.buildings).selectinload(Building.floors).selectinload(Floor.areas)
+    ).order_by(Site.name).all()
 
 
 def get_site_or_404(site_id):
