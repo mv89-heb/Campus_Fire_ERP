@@ -83,8 +83,15 @@ def api_documents_reanalyze():
 def api_documents_gemini_reanalyze():
     """Explicit one-time Gemini refresh for previously completed documents."""
     try:
-        include_archived = bool((request.get_json(silent=True) or {}).get('include_archived', False))
-        result = gemini_svc.reanalyze_all_completed(include_archived=include_archived)
+        body = request.get_json(silent=True) or {}
+        include_archived = bool(body.get('include_archived', False))
+        offset = max(0, int(body.get('offset', 0) or 0))
+        limit = min(1, max(1, int(body.get('limit', 1) or 1)))
+        result = gemini_svc.reanalyze_completed_batch(
+            offset=offset,
+            limit=limit,
+            include_archived=include_archived,
+        )
         return jsonify(_json_safe(result)), (200 if result.get('success') else 409)
     except Exception as exc:
         current_app.logger.exception('Gemini document reanalysis failed')
