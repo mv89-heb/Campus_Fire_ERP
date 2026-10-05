@@ -143,14 +143,16 @@ async function loadDashboard(forceRefresh = false) {
     const integrity = await integrityRes.json();
     const dup = Object.values(integrity.duplicates || {}).reduce((a, b) => a + Number(b || 0), 0);
     const orphan = Object.values(integrity.orphans || {}).reduce((a, b) => a + Number(b || 0), 0);
+    const review = Object.values(integrity.review || {}).reduce((a, b) => a + Number(b || 0), 0);
     const integrityBody = document.getElementById('dataIntegrityBody');
-    if (dup === 0 && orphan === 0) {
-      integrityBody.innerHTML = '<span class="pill valid">✓ הנתונים נקיים מבחינת כפילויות וקשרים בסיסיים</span>';
+    if (dup === 0 && orphan === 0 && review === 0) {
+      integrityBody.innerHTML = '<span class="pill valid">✓ הנתונים נקיים ומקושרים</span>';
     } else {
       const parts = [];
       if (dup) parts.push('כפילויות: ' + dup);
       if (orphan) parts.push('קשרים חסרים/יתומים: ' + orphan);
-      integrityBody.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;"><span class="pill warning">⚠ ' + esc(parts.join(' · ')) + '</span><button class="btn" onclick="repairDataIntegrity()">🧹 נקה כפילויות בטוחות</button></div>';
+      if (review) parts.push('דורש בדיקה: ' + review);
+      integrityBody.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;"><span class="pill warning">⚠ ' + esc(parts.join(' · ')) + '</span>' + (dup ? '<button class="btn" onclick="repairDataIntegrity()">🧹 נקה כפילויות בטוחות</button>' : '') + '</div>';
     }
 
     document.getElementById('kpiGrid').innerHTML = `
