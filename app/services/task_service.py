@@ -5,6 +5,7 @@ import json
 from datetime import date, datetime, timedelta
 
 from app.extensions import db
+from sqlalchemy.orm import selectinload
 from app.models import Task, Deficiency
 from app.services import audit_log_service as alog
 from app.services import integration_service as integration_svc
@@ -42,7 +43,7 @@ def _require(value, field_name):
 
 
 def list_tasks(q=None, status=None, priority=None, assignee=None, site_id=None):
-    query = Task.query
+    query = Task.query.options(selectinload(Task.deficiencies))
     if q:
         like = f"%{q}%"
         query = query.filter(db.or_(
