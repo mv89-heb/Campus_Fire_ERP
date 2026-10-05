@@ -112,24 +112,6 @@ def _install_security_guards(app):
         session['username'] = user.username
         session['role'] = user.role
 
-        # Lazily materialize already-completed Gemini data into the ERP on the
-        # first authenticated request after a deployment. This replaces the
-        # old startup-wide reconciliation without blocking application boot.
-        # It is intentionally process-local and idempotent; new Gemini
-        # documents are synchronized during their own persistence flow.
-        if not getattr(app, '_ai_entity_reconciled', False):
-            try:
-                from app.services import ai_entity_sync_service as entity_sync_svc
-                result = entity_sync_svc.reconcile_all_ai_documents(create_actions=True)
-                app._ai_entity_reconciled = True
-                app.logger.info(
-                    'AI entity reconciliation completed: %s',
-                    result,
-                )
-            except Exception:
-                db.session.rollback()
-                app.logger.exception('Lazy AI entity reconciliation failed')
-
         if request.method in WRITE_METHODS:
             if not _csrf_valid():
                 return jsonify({'error': 'CSRF token חסר או לא תקין'}), 403
