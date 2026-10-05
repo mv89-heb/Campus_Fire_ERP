@@ -5,6 +5,7 @@ from datetime import date, datetime
 import json
 
 from app.extensions import db
+from sqlalchemy.orm import joinedload, selectinload
 from app.models import Audit, Deficiency, Site, Building, Floor, Document
 from app.services import audit_log_service as alog
 from app.services import integration_service as integration_svc
@@ -34,7 +35,10 @@ def _parse_date(value):
 
 
 def list_audits(site_id=None, status=None, result=None):
-    query = Audit.query
+    query = Audit.query.options(
+        joinedload(Audit.site), joinedload(Audit.building), joinedload(Audit.floor),
+        selectinload(Audit.deficiencies)
+    )
     if site_id:
         query = query.filter(Audit.site_id == site_id)
     if status:
@@ -116,9 +120,9 @@ def compute_suggested_score(audit_id):
 
 
 def serialize_audit(audit, include_deficiencies=True):
-    site = db.session.get(Site, audit.site_id) if audit.site_id else None
-    building = db.session.get(Building, audit.building_id) if audit.building_id else None
-    floor = db.session.get(Floor, audit.floor_id) if audit.floor_id else None
+    site = audit.site if audit.site_id else None
+    building = audit.building if audit.building_id else None
+    floor = audit.floor if audit.floor_id else None
     data = {
         "id": audit.id, "audit_number": audit.audit_number, "site_id": audit.site_id,
         "site_name": site.name if site else None,
