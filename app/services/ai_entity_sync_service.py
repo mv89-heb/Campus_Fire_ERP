@@ -10,7 +10,7 @@ import json
 from datetime import date, datetime
 
 from app.extensions import db
-from app.models import Document, Site, Supplier, Audit
+from app.models import Document, Site, Supplier, Audit, Building, Floor, Area, Equipment
 from app.services import integration_service
 
 
@@ -95,6 +95,20 @@ def sync_document_entities(document: Document, create_missing: bool = True) -> d
     supplier_name = _clean(meta.get("supplier_name"))
     supplier_number = _clean(meta.get("supplier_number"))
     audit_number = _clean(meta.get("audit_number"))
+    supplier_contact_name = _clean(meta.get("supplier_contact_name"))
+    supplier_phone = _clean(meta.get("supplier_phone"))
+    supplier_phone_secondary = _clean(meta.get("supplier_phone_secondary"))
+    supplier_email = _clean(meta.get("supplier_email"))
+    supplier_address = _clean(meta.get("supplier_address"))
+    supplier_website = _clean(meta.get("supplier_website"))
+    supplier_service_type = _clean(meta.get("supplier_service_type"))
+    supplier_service_area = _clean(meta.get("supplier_service_area"))
+    supplier_contract_number = _clean(meta.get("supplier_contract_number"))
+    supplier_contract_expiry = _parse_date(meta.get("supplier_contract_expiry"))
+    supplier_insurance_expiry = _parse_date(meta.get("supplier_insurance_expiry"))
+    site_contact_name = _clean(meta.get("site_contact_name"))
+    site_contact_phone = _clean(meta.get("site_contact_phone"))
+    site_contact_email = _clean(meta.get("site_contact_email"))
     audit_date = _parse_date(meta.get("audit_date"))
     inspector_name = _clean(meta.get("inspector_name"))
     overall_status = _clean(meta.get("overall_status"))
@@ -112,6 +126,12 @@ def sync_document_entities(document: Document, create_missing: bool = True) -> d
             site.name = site_name
         if site_address and not site.address:
             site.address = site_address
+        if site_contact_name and not site.contact_name:
+            site.contact_name = site_contact_name
+        if site_contact_phone and not site.contact_phone:
+            site.contact_phone = site_contact_phone
+        if site_contact_email and not site.contact_email:
+            site.contact_email = site_contact_email
         document.site_id = site.id
         result["site_id"] = site.id
         changes.append("site")
@@ -129,6 +149,17 @@ def sync_document_entities(document: Document, create_missing: bool = True) -> d
             supplier.company_name = supplier_name
         if supplier_number and not supplier.supplier_number:
             supplier.supplier_number = supplier_number
+        for attr, value in {
+            "contact_name": supplier_contact_name, "phone": supplier_phone,
+            "phone_secondary": supplier_phone_secondary, "email": supplier_email,
+            "address": supplier_address, "website": supplier_website,
+            "service_type": supplier_service_type, "service_area": supplier_service_area,
+            "contract_number": supplier_contract_number,
+            "contract_expiry": supplier_contract_expiry,
+            "insurance_expiry": supplier_insurance_expiry,
+        }.items():
+            if value is not None and not getattr(supplier, attr):
+                setattr(supplier, attr, value)
         if site and not supplier.site_id:
             supplier.site_id = site.id
         if document.contact_name and not supplier.contact_name:
@@ -176,6 +207,64 @@ def sync_document_entities(document: Document, create_missing: bool = True) -> d
         result["audit_id"] = audit.id
         changes.append("audit")
 
+    if site:
+        for building_data in meta.get("buildings", []) or []:
+            if not isinstance(building_data, dict):
+                continue
+            bname = _clean(building_data.get("name"))
+            if not bname:
+                continue
+            building = Building.query.filter_by(site_id=site.id, name=bname).first()
+            if not building:
+                building = Building(site_id=site.id, name=bname, notes=_clean(building_data.get("notes")))
+                db.session.add(building)
+                db.session.flush()
+            for floor_data in building_data.get("floors", []) or []:
+                if not isinstance(floor_data, dict):
+                    continue
+                fname = _clean(floor_data.get("name"))
+                if not fname:
+                    continue
+                floor = Floor.query.filter_by(building_id=building.id, name=fname).first()
+                if not floor:
+                    floor = Floor(building_id=building.id, name=fname, notes=_clean(floor_data.get("notes")))
+                    db.session.add(floor)
+                    db.session.flush()
+                for area_name in floor_data.get("areas", []) or []:
+                    aname = _clean(area_name)
+                    if aname and not Area.query.filter_by(floor_id=floor.id, name=aname).first():
+                        db.session.add(Area(floor_id=floor.id, name=aname))
+        for equipment_data in meta.get("equipment", []) or []:
+            if not isinstance(equipment_data, dict):
+                continue
+            etype = _clean(equipment_data.get("equipment_type"))
+            if not etype:
+                continue
+            serial = _clean(equipment_data.get("serial_number"))
+            equipment = Equipment.query.filter_by(serial_number=serial).first() if serial else None
+            if not equipment:
+                equipment = Equipment.query.filter_by(
+                    supplier_id=document.supplier_id,
+                    equipment_type=etype,
+                    model=_clean(equipment_data.get("model"))
+                ).first()
+            if not equipment:
+                equipment = Equipment(equipment_type=etype, supplier_id=document.supplier_id)
+                db.session.add(equipment)
+                db.session.flush()
+            for attr, value in {
+                "serial_number": serial,
+                "manufacturer": _clean(equipment_data.get("manufacturer")),
+                "model": _clean(equipment_data.get("model")),
+                "install_date": _parse_date(equipment_data.get("install_date")),
+                "last_check_date": _parse_date(equipment_data.get("last_check_date")),
+                "next_check_date": _parse_date(equipment_data.get("next_check_date")),
+                "warranty_expiry": _parse_date(equipment_data.get("warranty_expiry")),
+                "status": _clean(equipment_data.get("status")),
+                "notes": _clean(equipment_data.get("notes")),
+            }.items():
+                if value is not None and not getattr(equipment, attr):
+                    setattr(equipment, attr, value)
     meta["erp_sync"] = {
         "site_id": document.site_id,
         "supplier_id": document.supplier_id,
