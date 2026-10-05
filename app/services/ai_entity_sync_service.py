@@ -12,6 +12,7 @@ from datetime import date, datetime
 from app.extensions import db
 from app.models import Document, Site, Supplier, Audit, Building, Floor, Area, Equipment
 from app.services import integration_service
+from app.services import data_integrity_service
 
 
 def _meta(document):
@@ -25,6 +26,10 @@ def _meta(document):
 def _clean(value):
     value = str(value or "").strip()
     return value or None
+
+
+def _norm_key(value):
+    return data_integrity_service.normalize(value)
 
 
 def _parse_date(value):
@@ -44,28 +49,22 @@ def _parse_date(value):
 def _find_site(name, address):
     name = _clean(name)
     address = _clean(address)
-    if name:
-        exact = Site.query.filter(db.func.lower(Site.name) == name.lower()).first()
-        if exact:
-            return exact
-    if address:
-        exact = Site.query.filter(db.func.lower(Site.address) == address.lower()).first()
-        if exact:
-            return exact
+    for site in Site.query.order_by(Site.id.asc()).all():
+        if name and _norm_key(site.name) == _norm_key(name):
+            return site
+        if address and _norm_key(site.address) == _norm_key(address):
+            return site
     return None
 
 
 def _find_supplier(name, number):
     name = _clean(name)
     number = _clean(number)
-    if number:
-        exact = Supplier.query.filter(db.func.lower(Supplier.supplier_number) == number.lower()).first()
-        if exact:
-            return exact
-    if name:
-        exact = Supplier.query.filter(db.func.lower(Supplier.company_name) == name.lower()).first()
-        if exact:
-            return exact
+    for supplier in Supplier.query.order_by(Supplier.id.asc()).all():
+        if number and _norm_key(supplier.supplier_number) == _norm_key(number):
+            return supplier
+        if name and _norm_key(supplier.company_name) == _norm_key(name):
+            return supplier
     return None
 
 
@@ -214,7 +213,8 @@ def sync_document_entities(document: Document, create_missing: bool = True) -> d
             bname = _clean(building_data.get("name"))
             if not bname:
                 continue
-            building = Building.query.filter_by(site_id=site.id, name=bname).first()
+            building = next((b for b in Building.query.filter_by(site_id=site.id).order_by(Building.id.asc()).all()
+                             if _norm_key(b.name) == _norm_key(bname)), None)
             if not building:
                 building = Building(site_id=site.id, name=bname, notes=_clean(building_data.get("notes")))
                 db.session.add(building)
@@ -225,14 +225,16 @@ def sync_document_entities(document: Document, create_missing: bool = True) -> d
                 fname = _clean(floor_data.get("name"))
                 if not fname:
                     continue
-                floor = Floor.query.filter_by(building_id=building.id, name=fname).first()
+                floor = next((f for f in Floor.query.filter_by(building_id=building.id).order_by(Floor.id.asc()).all()
+                              if _norm_key(f.name) == _norm_key(fname)), None)
                 if not floor:
                     floor = Floor(building_id=building.id, name=fname, notes=_clean(floor_data.get("notes")))
                     db.session.add(floor)
                     db.session.flush()
                 for area_name in floor_data.get("areas", []) or []:
                     aname = _clean(area_name)
-                    if aname and not Area.query.filter_by(floor_id=floor.id, name=aname).first():
+                    if aname and not next((a for a in Area.query.filter_by(floor_id=floor.id).order_by(Area.id.asc()).all()
+                                            if _norm_key(a.name) == _norm_key(aname)), None):
                         db.session.add(Area(floor_id=floor.id, name=aname))
         for equipment_data in meta.get("equipment", []) or []:
             if not isinstance(equipment_data, dict):
@@ -287,7 +289,7 @@ def reconcile_all_ai_documents(create_actions: bool = True) -> dict:
             .filter(Document.status.notin_(["deleted", "archived"]))
             .order_by(Document.id.asc())
             .all())
-    summary = {"documents": len(docs), "created": 0, "linked": 0, "actions_created": 0, "errors": []}
+    summary = {"documents": len(docs), "created": 0, "linked": 0, "actions_created": 0, "errors": [], "deduplication": None}
 
     for document in docs:
         try:
@@ -304,4 +306,8 @@ def reconcile_all_ai_documents(create_actions: bool = True) -> dict:
         except Exception as exc:
             db.session.rollback()
             summary["errors"].append({"document_id": document.id, "error": str(exc)[:500]})
+    try:
+        summary["deduplication"] = data_integrity_service.repair()
+    except Exception as exc:
+        summary["errors"].append({"stage": "deduplication", "error": str(exc)[:500]})
     return summary
