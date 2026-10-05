@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import threading
 
 from flask import Blueprint, jsonify, request, current_app, session, render_template_string
 from app.services import storage_health_service as svc
@@ -10,6 +11,45 @@ from app.services.auth_service import AuthServiceError
 from app.api.auth_routes import admin_required
 
 admin_storage_bp = Blueprint('admin_storage', __name__)
+
+_gemini_job_lock = threading.Lock()
+_gemini_job = {
+    'running': False, 'total': 0, 'processed': 0, 'updated': 0,
+    'failed': 0, 'offset': 0, 'started_at': None, 'finished_at': None,
+    'errors': [],
+}
+
+def _gemini_job_snapshot():
+    with _gemini_job_lock:
+        return dict(_gemini_job)
+
+def _run_gemini_reanalysis_background(app, include_archived=False):
+    with app.app_context():
+        try:
+            while True:
+                snapshot = _gemini_job_snapshot()
+                result = gemini_svc.reanalyze_completed_batch(
+                    offset=snapshot['offset'], limit=1,
+                    include_archived=include_archived,
+                )
+                with _gemini_job_lock:
+                    _gemini_job['total'] = result.get('total', 0)
+                    _gemini_job['processed'] += result.get('processed', 0)
+                    _gemini_job['updated'] += len(result.get('updated') or [])
+                    _gemini_job['failed'] += len(result.get('failed') or [])
+                    _gemini_job['offset'] = result.get('next_offset', _gemini_job['offset'])
+                    _gemini_job['errors'].extend(result.get('failed') or [])
+                if not result.get('has_more'):
+                    break
+        except Exception as exc:
+            app.logger.exception('Background Gemini reanalysis failed')
+            with _gemini_job_lock:
+                _gemini_job['errors'].append({'error': str(exc)[:2000]})
+        finally:
+            with _gemini_job_lock:
+                _gemini_job['running'] = False
+                _gemini_job['finished_at'] = datetime.utcnow().isoformat()
+
 
 
 def _json_safe(value):
@@ -81,22 +121,34 @@ def api_documents_reanalyze():
 @admin_storage_bp.route('/api/admin/documents/gemini-reanalyze', methods=['POST'])
 @admin_required
 def api_documents_gemini_reanalyze():
-    """Explicit one-time Gemini refresh for previously completed documents."""
     try:
         body = request.get_json(silent=True) or {}
         include_archived = bool(body.get('include_archived', False))
-        offset = max(0, int(body.get('offset', 0) or 0))
-        limit = min(1, max(1, int(body.get('limit', 1) or 1)))
-        result = gemini_svc.reanalyze_completed_batch(
-            offset=offset,
-            limit=limit,
-            include_archived=include_archived,
-        )
-        return jsonify(_json_safe(result)), (200 if result.get('success') else 409)
+        with _gemini_job_lock:
+            if _gemini_job['running']:
+                return jsonify({'success': True, 'started': False, 'running': True, 'job': dict(_gemini_job)}), 200
+            _gemini_job.update({
+                'running': True, 'total': 0, 'processed': 0, 'updated': 0,
+                'failed': 0, 'offset': 0, 'started_at': datetime.utcnow().isoformat(),
+                'finished_at': None, 'errors': [],
+            })
+        app = current_app._get_current_object()
+        threading.Thread(
+            target=_run_gemini_reanalysis_background,
+            args=(app, include_archived),
+            daemon=True,
+            name='gemini-erp-reanalysis',
+        ).start()
+        return jsonify({'success': True, 'started': True, 'running': True, 'job': _gemini_job_snapshot()}), 202
     except Exception as exc:
-        current_app.logger.exception('Gemini document reanalysis failed')
-        return jsonify({'success': False, 'error': 'ניתוח Gemini מחדש נכשל', 'details': str(exc)}), 500
+        current_app.logger.exception('Gemini document reanalysis failed to start')
+        return jsonify({'success': False, 'error': 'לא ניתן להפעיל את ניתוח Gemini ברקע', 'details': str(exc)}), 500
 
+
+@admin_storage_bp.route('/api/admin/documents/gemini-reanalyze/status', methods=['GET'])
+@admin_required
+def api_documents_gemini_reanalyze_status():
+    return jsonify({'success': True, 'job': _gemini_job_snapshot()})
 
 @admin_storage_bp.route('/api/admin/storage/cleanup-preview', methods=['POST'])
 @admin_required
