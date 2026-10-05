@@ -242,7 +242,7 @@ const Tasks = (() => {
     if (button) button.classList.add('active');
     document.getElementById('filterStatus').value = '';
     document.getElementById('filterPriority').value = '';
-    const today = new Date().toISOString().slice(0,10);
+    const today = todayISOIL();
     let list = _all;
     if (type === 'open') list = list.filter(t => ['open','in_progress'].includes(t.status));
     if (type === 'urgent') list = list.filter(t => ['urgent','high'].includes(t.priority) && t.status !== 'done' && t.status !== 'cancelled');
