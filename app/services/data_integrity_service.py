@@ -7,6 +7,7 @@ master-record duplicates. It never merges deficiencies automatically.
 from __future__ import annotations
 
 import re
+import json
 from collections import defaultdict
 
 from app.extensions import db
@@ -42,6 +43,13 @@ def _fill_empty(target, source, fields):
 
 
 def scan():
+    """Return safe duplicates plus relationships that truly need review.
+
+    Missing supplier/area is not automatically an error: some documents do not
+    have a supplier and Gemini may not have enough evidence to locate equipment
+    below site level. We therefore distinguish actionable missing links from
+    legitimate/unknown relationships.
+    """
     site_dupes = _groups(Site.query.order_by(Site.id.asc()).all(), lambda x: (
         "nameaddr:" + normalize(x.name) + "|" + normalize(x.address)
         if normalize(x.name) and normalize(x.address)
@@ -71,6 +79,7 @@ def scan():
             "serial:" + normalize(x.serial_number)
             + "|manufacturer:" + normalize(x.manufacturer)
             + "|model:" + normalize(x.model)
+            + "|supplier:" + str(x.supplier_id or "")
             if normalize(x.serial_number) else ""
         ),
     )
@@ -82,41 +91,87 @@ def scan():
         ),
     )
 
-    orphan = {
-        "documents_missing_site": Document.query.filter(
-            Document.ai_status == "completed",
-            Document.site_id.is_(None),
-            Document.status.notin_(["deleted", "archived"]),
-        ).count(),
-        "documents_missing_supplier": Document.query.filter(
-            Document.ai_status == "completed",
-            Document.supplier_id.is_(None),
-            Document.status.notin_(["deleted", "archived"]),
-        ).count(),
-        "documents_missing_audit": Document.query.filter(
-            Document.ai_status == "completed",
-            Document.audit_id.is_(None),
-            Document.status.notin_(["deleted", "archived"]),
-        ).count(),
-        "deficiencies_without_audit": Deficiency.query.filter(Deficiency.audit_id.is_(None)).count(),
-        "deficiencies_without_task": Deficiency.query.filter(
-            Deficiency.status != "resolved",
-            Deficiency.task_id.is_(None),
-        ).count(),
-        "equipment_without_area": Equipment.query.filter(Equipment.area_id.is_(None)).count(),
-    }
+    completed_docs = (Document.query
+        .filter(Document.ai_status == "completed")
+        .filter(Document.status.notin_(["deleted", "archived"]))
+        .order_by(Document.id.asc()).all())
 
+    missing_supplier_required = []
+    missing_supplier_unknown = []
+    missing_site = []
+    missing_audit = []
+
+    for document in completed_docs:
+        if document.site_id is None:
+            missing_site.append({"id": document.id, "file_name": document.file_name})
+        if document.audit_id is None:
+            missing_audit.append({"id": document.id, "file_name": document.file_name})
+        if document.supplier_id is not None:
+            continue
+        meta = {}
+        try:
+            meta = json.loads(document.ai_actions_json or "{}")
+        except (TypeError, ValueError):
+            meta = {}
+        supplier_name = normalize(meta.get("supplier_name")) if isinstance(meta, dict) else ""
+        supplier_number = normalize(meta.get("supplier_number")) if isinstance(meta, dict) else ""
+        if supplier_name or supplier_number:
+            missing_supplier_required.append({
+                "id": document.id,
+                "file_name": document.file_name,
+                "supplier_name": meta.get("supplier_name"),
+                "supplier_number": meta.get("supplier_number"),
+            })
+        else:
+            missing_supplier_unknown.append({
+                "id": document.id,
+                "file_name": document.file_name,
+                "category": document.category,
+                "document_type": document.ai_document_type,
+            })
+
+    deficiencies_without_audit = Deficiency.query.filter(Deficiency.audit_id.is_(None)).count()
+    deficiencies_without_task = Deficiency.query.filter(
+        Deficiency.status != "resolved",
+        Deficiency.task_id.is_(None),
+    ).count()
+    equipment_without_area = Equipment.query.filter(Equipment.area_id.is_(None)).count()
+
+    duplicates = {
+        "sites": sum(len(v) - 1 for v in site_dupes.values()),
+        "suppliers": sum(len(v) - 1 for v in supplier_dupes.values()),
+        "buildings": sum(len(v) - 1 for v in building_dupes.values()),
+        "floors": sum(len(v) - 1 for v in floor_dupes.values()),
+        "areas": sum(len(v) - 1 for v in area_dupes.values()),
+        "equipment_by_serial": sum(len(v) - 1 for v in equipment_dupes.values()),
+        "audits_by_number": sum(len(v) - 1 for v in audit_dupes.values()),
+    }
+    orphans = {
+        "documents_missing_site": len(missing_site),
+        "documents_missing_audit": len(missing_audit),
+        "deficiencies_without_audit": deficiencies_without_audit,
+        "deficiencies_without_task": deficiencies_without_task,
+    }
+    review = {
+        "documents_missing_required_supplier": len(missing_supplier_required),
+        "documents_supplier_unknown_or_not_applicable": len(missing_supplier_unknown),
+        "equipment_missing_location": equipment_without_area,
+    }
     return {
-        "duplicates": {
-            "sites": sum(len(v) - 1 for v in site_dupes.values()),
-            "suppliers": sum(len(v) - 1 for v in supplier_dupes.values()),
-            "buildings": sum(len(v) - 1 for v in building_dupes.values()),
-            "floors": sum(len(v) - 1 for v in floor_dupes.values()),
-            "areas": sum(len(v) - 1 for v in area_dupes.values()),
-            "equipment_by_serial": sum(len(v) - 1 for v in equipment_dupes.values()),
-            "audits_by_number": sum(len(v) - 1 for v in audit_dupes.values()),
+        "duplicates": duplicates,
+        "orphans": orphans,
+        "review": review,
+        "details": {
+            "documents_missing_required_supplier": missing_supplier_required,
+            "documents_supplier_unknown_or_not_applicable": missing_supplier_unknown,
+            "documents_missing_site": missing_site,
+            "documents_missing_audit": missing_audit,
         },
-        "orphans": orphan,
+        "summary": {
+            "duplicate_records": sum(duplicates.values()),
+            "relationship_errors": sum(orphans.values()),
+            "needs_review": sum(review.values()),
+        },
     }
 
 
