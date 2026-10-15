@@ -50,6 +50,16 @@ def api_fire_safety_tracking():
 
     source_marker = "ייבוא טבלת מעקב כבאות והצלה"
     tasks = Task.query.filter(Task.description.ilike(f"%{source_marker}%")).order_by(Task.id.asc()).all()
+    # Reuse the persisted Gemini analyses; do not generate new AI output here.
+    try:
+        from app.services.reports_service import get_ai_full_reports
+        ai_reports = get_ai_full_reports()
+    except Exception:
+        ai_reports = []
+
+    def norm(value):
+        return " ".join(str(value or "").casefold().split()).strip(" .,'\"׳״")
+
     grouped = {}
     for task in tasks:
         desc = task.description or ""
@@ -63,12 +73,28 @@ def api_fire_safety_tracking():
                 key, value = line.split(":", 1)
                 fields[key.strip()] = value.strip()
         if source_row not in grouped:
+            asset = fields.get("נכס רלוונטי", "")
+            case_number = fields.get("מספר תיק", "")
+            asset_key, case_key = norm(asset), norm(case_number)
+            matched_reports = []
+            for report in ai_reports:
+                site_key = norm(report.get("site"))
+                audit_key = norm(report.get("audit_number"))
+                # Prefer exact case/audit matches. Site matches must be exact or a meaningful full-name containment.
+                case_match = bool(case_key and audit_key and case_key == audit_key)
+                site_match = bool(asset_key and site_key and (
+                    asset_key == site_key or
+                    (len(asset_key) >= 8 and asset_key in site_key) or
+                    (len(site_key) >= 8 and site_key in asset_key)
+                ))
+                if case_match or site_match:
+                    matched_reports.append(report)
             grouped[source_row] = {
                 "id": task.id,
                 "source_row": source_row,
                 "title": task.title,
-                "asset": fields.get("נכס רלוונטי", ""),
-                "case_number": fields.get("מספר תיק", ""),
+                "asset": asset,
+                "case_number": case_number,
                 "forms": fields.get("מספר טופס להגשה", ""),
                 "phase": fields.get("שלב / שבוע", ""),
                 "notes": fields.get("הערות ודגשים", ""),
@@ -79,11 +105,30 @@ def api_fire_safety_tracking():
                 "due_date": str(task.due_date) if task.due_date else None,
                 "description": desc,
                 "duplicate_count": 0,
+                "ai_reports": [{
+                    "document_id": r.get("document_id"),
+                    "file_name": r.get("file_name"),
+                    "document_type": r.get("document_type"),
+                    "document_purpose": r.get("document_purpose"),
+                    "analyzed_at": r.get("analyzed_at"),
+                    "ai_model": r.get("ai_model"),
+                    "overall_status": r.get("overall_status"),
+                    "ai_confidence_percent": r.get("ai_confidence_percent"),
+                    "review_required": r.get("review_required"),
+                    "summary": r.get("summary"),
+                    "findings": r.get("findings") or [],
+                    "missing_items": r.get("missing_items") or [],
+                    "contradictions": r.get("contradictions") or [],
+                    "follow_up_questions": r.get("follow_up_questions") or [],
+                    "operational_actions": r.get("operational_actions") or [],
+                    "validity_status": r.get("validity_status"),
+                    "validity_evidence": r.get("validity_evidence"),
+                    "site": r.get("site"),
+                    "audit_number": r.get("audit_number"),
+                } for r in matched_reports],
             }
         else:
-            # Keep one visible row per source spreadsheet row; do not delete underlying records.
             grouped[source_row]["duplicate_count"] += 1
-            # If the primary row has no owner, retain the owner from a duplicate for visibility.
             if not grouped[source_row]["assignee"] and task.assignee:
                 grouped[source_row]["assignee"] = task.assignee
     return jsonify(sorted(grouped.values(), key=lambda item: (item["asset"], item["source_row"])))
