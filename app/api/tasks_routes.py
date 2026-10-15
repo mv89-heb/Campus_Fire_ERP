@@ -42,6 +42,53 @@ def api_list_tasks():
     return jsonify([svc.serialize_task(t) for t in tasks])
 
 
+@tasks_bp.route('/api/tasks/fire-safety-tracking', methods=['GET'])
+def api_fire_safety_tracking():
+    """Spreadsheet-style view of imported workbook rows, deduplicated by source row."""
+    import re
+    from app.models import Task
+
+    source_marker = "ייבוא טבלת מעקב כבאות והצלה"
+    tasks = Task.query.filter(Task.description.ilike(f"%{source_marker}%")).order_by(Task.id.asc()).all()
+    grouped = {}
+    for task in tasks:
+        desc = task.description or ""
+        row_match = re.search(r"שורה מקורית:\s*(\d+)", desc)
+        if not row_match:
+            continue
+        source_row = int(row_match.group(1))
+        fields = {}
+        for line in desc.splitlines():
+            if ":" in line:
+                key, value = line.split(":", 1)
+                fields[key.strip()] = value.strip()
+        if source_row not in grouped:
+            grouped[source_row] = {
+                "id": task.id,
+                "source_row": source_row,
+                "title": task.title,
+                "asset": fields.get("נכס רלוונטי", ""),
+                "case_number": fields.get("מספר תיק", ""),
+                "forms": fields.get("מספר טופס להגשה", ""),
+                "phase": fields.get("שלב / שבוע", ""),
+                "notes": fields.get("הערות ודגשים", ""),
+                "source": fields.get("ייבוא טבלת מעקב כבאות והצלה", ""),
+                "assignee": task.assignee or "",
+                "status": task.status,
+                "priority": task.priority,
+                "due_date": str(task.due_date) if task.due_date else None,
+                "description": desc,
+                "duplicate_count": 0,
+            }
+        else:
+            # Keep one visible row per source spreadsheet row; do not delete underlying records.
+            grouped[source_row]["duplicate_count"] += 1
+            # If the primary row has no owner, retain the owner from a duplicate for visibility.
+            if not grouped[source_row]["assignee"] and task.assignee:
+                grouped[source_row]["assignee"] = task.assignee
+    return jsonify(sorted(grouped.values(), key=lambda item: (item["asset"], item["source_row"])))
+
+
 @tasks_bp.route('/api/tasks/assignees', methods=['GET'])
 def api_list_assignees():
     return jsonify(svc.list_assignees())
