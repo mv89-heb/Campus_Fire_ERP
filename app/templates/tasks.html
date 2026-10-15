@@ -81,16 +81,13 @@
 {% block content %}
 <div class="page-title-row">
   <h1>✅ משימות</h1>
-  <div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="btn" onclick="Tasks.importFireSafetyTracking()">📥 ייבוא/רענון נתוני אקסל</button><button class="btn btn-primary" onclick="Tasks.openModal()">➕ משימה חדשה</button></div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="btn" onclick="Tasks.importFireSafetyTracking()">📥 ייבוא/רענון נתוני אקסל</button></div>
 </div>
 
 <div class="card" id="trackingCard">
   <div class="card-title">
     <span>📊 מעקב כבאות והצלה — תצוגת גיליון</span>
-    <div class="view-switch">
-      <button type="button" class="btn btn-sm active" id="trackingViewBtn" onclick="Tasks.showView('tracking')">מעקב לפי האקסל</button>
-      <button type="button" class="btn btn-sm" id="generalViewBtn" onclick="Tasks.showView('general')">משימות נוספות</button>
-    </div>
+    <span style="font-size:.8rem;color:var(--text-muted);">כל המעקב מרוכז כאן</span>
   </div>
   <div class="tracking-controls">
     <input id="trackingSearch" type="search" placeholder="חיפוש במשימה, נכס, תיק, טופס או אחראי..." oninput="Tasks.renderTracking()">
@@ -103,7 +100,7 @@
   <div id="trackingTableHost"><div class="skeleton"></div></div>
 </div>
 
-<div class="card" id="generalTaskCard" style="display:none;">
+<div class="card" id="generalTaskCard" style="display:none !important;">
   <div class="card-title"><span>📋 משימות נוספות</span></div>
   <div class="filters-row task-filters">
     <div class="quick-filters" aria-label="מסננים מהירים">
@@ -204,24 +201,55 @@ const Tasks = (() => {
 
   async function refresh() {
     try {
-      const [res, trackingRes] = await Promise.all([fetch('/api/tasks'), fetch('/api/tasks/fire-safety-tracking')]);
-      if (!res.ok || !trackingRes.ok) throw new Error('שגיאה בטעינת המשימות');
-      _all = await res.json();
+      const trackingRes = await fetch('/api/tasks/fire-safety-tracking');
+      if (!trackingRes.ok) throw new Error('שגיאה בטעינת מעקב הכבאות');
       _tracking = await trackingRes.json();
-      render(_all);
       renderTracking();
     } catch (e) {
-      document.getElementById('taskList').innerHTML = `<div class="error-state">⚠️ שגיאה בטעינת משימות<button class="retry-btn" onclick="Tasks.init()">🔄 נסה שוב</button></div>`;
-      showToast('שגיאה בחיבור לשרת', 'error');
+      document.getElementById('trackingTableHost').innerHTML = `<div class="error-state">⚠️ שגיאה בטעינת מעקב הכבאות<button class="retry-btn" onclick="Tasks.init()">🔄 נסה שוב</button></div>`;
+      showToast('שגיאה בטעינת נתוני המעקב', 'error');
     }
   }
 
-  function showView(view) {
-    const tracking = view === 'tracking';
-    document.getElementById('trackingCard').style.display = tracking ? '' : 'none';
-    document.getElementById('generalTaskCard').style.display = tracking ? 'none' : '';
-    document.getElementById('trackingViewBtn').classList.toggle('active', tracking);
-    document.getElementById('generalViewBtn').classList.toggle('active', !tracking);
+  function showView(view) { document.getElementById('trackingCard').style.display = ''; }
+
+  function aiValue(value) {
+    if (value === null || value === undefined || value === '') return '';
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return esc(String(value));
+    if (Array.isArray(value)) return value.map(v => '<li>' + aiValue(v) + '</li>').join('');
+    const preferred = ['title','name','description','details','severity','status','responsible','due_date','task_title','task_status','evidence','recommendation','action','text','question','item'];
+    const keys = preferred.filter(k => value[k] !== undefined && value[k] !== null && value[k] !== '');
+    const rest = Object.keys(value).filter(k => !keys.includes(k) && value[k] !== null && value[k] !== '');
+    return [...keys, ...rest].map(k => '<div><strong>' + esc(k.replaceAll('_',' ')) + ':</strong> ' + aiValue(value[k]) + '</div>').join('');
+  }
+
+  function renderAIReports(reports) {
+    if (!reports || !reports.length) return '<div class="tracking-detail"><strong>ניתוח AI:</strong> לא נמצא דוח Gemini שניתן לקשר בוודאות לשורה זו. הדוחות נשמרים במסך דוחות Gemini.</div>';
+    return reports.map((r, index) => {
+      const status = r.overall_status ? '<span class="badge normal">' + esc(r.overall_status) + '</span>' : '';
+      const confidence = r.ai_confidence_percent !== null && r.ai_confidence_percent !== undefined ? '<span class="badge normal">ביטחון AI: ' + esc(r.ai_confidence_percent) + '%</span>' : '';
+      const section = (title, items) => {
+        if (!items || !items.length) return '';
+        return '<div style="margin-top:10px;"><strong>' + title + '</strong><ul style="padding-right:22px;margin:5px 0;">' + items.map(item => '<li style="margin:4px 0;">' + aiValue(item) + '</li>').join('') + '</ul></div>';
+      };
+      return '<div class="tracking-detail" style="margin-top:10px;"><h4 style="margin:0 0 8px;">🧠 ניתוח Gemini ' + (index + 1) + ': ' + esc(r.file_name || 'מסמך ללא שם') + '</h4>' +
+        '<div class="task-meta" style="margin-bottom:8px;">' + status + confidence + (r.review_required ? '<span class="badge urgent">נדרשת בדיקה</span>' : '') + '</div>' +
+        (r.document_type ? '<div><strong>סוג מסמך:</strong> ' + esc(r.document_type) + '</div>' : '') +
+        (r.document_purpose ? '<div><strong>מטרת המסמך:</strong> ' + esc(r.document_purpose) + '</div>' : '') +
+        (r.site ? '<div><strong>אתר בדוח:</strong> ' + esc(r.site) + '</div>' : '') +
+        (r.audit_number ? '<div><strong>מספר ביקורת:</strong> ' + esc(r.audit_number) + '</div>' : '') +
+        (r.analyzed_at ? '<div><strong>תאריך ניתוח:</strong> ' + esc(r.analyzed_at) + '</div>' : '') +
+        (r.ai_model ? '<div><strong>מודל:</strong> ' + esc(r.ai_model) + '</div>' : '') +
+        (r.summary ? '<div style="margin-top:8px;"><strong>סיכום AI:</strong><div style="white-space:pre-wrap;margin-top:4px;">' + esc(r.summary) + '</div></div>' : '') +
+        section('ממצאים ודרגת חומרה', r.findings) +
+        section('חוסרים', r.missing_items) +
+        section('סתירות שזוהו', r.contradictions) +
+        section('שאלות להמשך בירור', r.follow_up_questions) +
+        section('פעולות תפעוליות / תיקונים', r.operational_actions) +
+        (r.validity_status ? '<div style="margin-top:8px;"><strong>תוקף:</strong> ' + esc(r.validity_status) + '</div>' : '') +
+        (r.validity_evidence ? '<div><strong>ראיות לתוקף:</strong> ' + esc(r.validity_evidence) + '</div>' : '') +
+        '</div>';
+    }).join('');
   }
 
   function renderTracking() {
@@ -253,7 +281,7 @@ const Tasks = (() => {
         <td><strong>${esc(t.title)}</strong>${t.duplicate_count ? '<div style="color:var(--warning);font-size:.75rem;">זוהו ' + t.duplicate_count + ' עותקים נוספים</div>' : ''}</td>
         <td>${esc(t.asset)}</td><td>${esc(t.case_number)}</td><td>${esc(t.forms)}</td><td>${esc(t.assignee)}</td><td>${esc(t.phase)}</td>
         <td><select class="status-select" aria-label="סטטוס משימה" onchange="Tasks.updateTrackingStatus(${t.id},this.value)"><option value="open" ${t.status==='open'?'selected':''}>פתוחה</option><option value="in_progress" ${t.status==='in_progress'?'selected':''}>בביצוע</option><option value="done" ${t.status==='done'?'selected':''}>הושלמה</option><option value="cancelled" ${t.status==='cancelled'?'selected':''}>בוטלה</option></select>${t.due_date ? '<div style="font-size:.75rem;margin-top:4px;">יעד: '+esc(t.due_date)+'</div>':''}</td>
-        <td><details><summary style="cursor:pointer;color:var(--accent);">הרחב פירוט</summary><div class="tracking-detail"><strong>הערות ודגשים:</strong> ${esc(t.notes || 'אין הערות')}\n<strong>אחראי:</strong> ${esc(t.assignee || 'לא הוגדר')}\n<strong>מקור:</strong> שורה ${t.source_row} בקובץ האקסל\n\n<strong>תיאור מלא:</strong>\n${esc(t.description || '')}</div><button class="btn btn-sm" style="margin-top:6px;" onclick="Tasks.openModal(${t.id})">✏️ עריכת פרטים</button></details></td>
+        <td><details><summary style="cursor:pointer;color:var(--accent);">הרחב פירוט</summary><div class="tracking-detail"><strong>הערות ודגשים:</strong> ${esc(t.notes || 'אין הערות')}\n<strong>אחראי:</strong> ${esc(t.assignee || 'לא הוגדר')}\n<strong>מקור:</strong> שורה ${t.source_row} בקובץ האקסל\n\n<strong>תיאור מלא:</strong>\n${esc(t.description || '')}</div><h4 style="margin-top:12px;">🧠 פירוט ניתוח AI</h4>${renderAIReports(t.ai_reports)}<button class="btn btn-sm" style="margin-top:6px;" onclick="Tasks.openModal(${t.id})">✏️ עריכת פרטים</button></details></td>
       </tr>`).join('') + '</tbody></table></div>';
   }
 
@@ -264,11 +292,8 @@ const Tasks = (() => {
       if (!res.ok) throw new Error(data.error || 'עדכון הסטטוס נכשל');
       const row = _tracking.find(t => t.id === id);
       if (row) row.status = status;
-      const general = _all.find(t => t.id === id);
-      if (general) general.status = status;
       showToast('הסטטוס עודכן');
       renderTracking();
-      render(_all);
     } catch (e) { showToast(e.message || 'שגיאה בעדכון הסטטוס', 'error'); await refresh(); }
   }
 
