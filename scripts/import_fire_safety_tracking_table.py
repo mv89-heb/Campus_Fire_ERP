@@ -64,7 +64,7 @@ def import_rows(dry_run=False):
                     LOG.info("SKIP row=%s task_id=%s (already imported)", source_row, existing.id)
                     skipped += 1
                     continue
-                description = "\\n".join([
+                description = "\n".join([
                     f"שלב / שבוע: {phase}",
                     f"נכס רלוונטי: {asset}",
                     f"מספר תיק: {case_no}",
