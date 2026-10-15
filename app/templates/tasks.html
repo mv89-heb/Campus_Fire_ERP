@@ -273,6 +273,7 @@ const Tasks = (() => {
   }
 
   function render(list) {
+    list = list.filter(t => !((t.description || '').includes('ייבוא טבלת מעקב כבאות והצלה')));
     const el = document.getElementById('taskList');
     if (!list.length) { el.innerHTML = `<div class="empty-state">אין משימות</div>`; return; }
     el.innerHTML = list.map(t => {
