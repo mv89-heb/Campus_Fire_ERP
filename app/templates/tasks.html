@@ -68,7 +68,7 @@
 {% block content %}
 <div class="page-title-row">
   <h1>✅ משימות</h1>
-  <button class="btn btn-primary" onclick="Tasks.openModal()">➕ משימה חדשה</button>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="btn" onclick="Tasks.importFireSafetyTracking()">📥 ייבוא משימות כבאות מהאקסל</button><button class="btn btn-primary" onclick="Tasks.openModal()">➕ משימה חדשה</button></div>
 </div>
 
 <div class="card">
@@ -281,6 +281,19 @@ const Tasks = (() => {
     },
     refresh,
     applyFilters,
+    importFireSafetyTracking: async () => {
+      if (!confirm('ייבא את 25 המשימות מקובץ מעקב כבאות והצלה? משימות שיובאו בעבר ידולגו ולא ייווצרו כפילויות.')) return;
+      try {
+        const response = await fetch('/api/tasks/import-fire-safety-tracking', { method: 'POST', credentials: 'same-origin' });
+        const payload = await response.json();
+        if (!response.ok || !payload.success) throw new Error(payload.error || 'הייבוא נכשל');
+        const result = payload.result || {};
+        showToast(`ייבוא הסתיים: ${result.imported || 0} נוספו, ${result.skipped_existing || 0} כבר קיימות`);
+        await refresh();
+      } catch (error) {
+        showToast(error.message || 'שגיאה בייבוא המשימות', 'error');
+      }
+    },
 
     toggleSelect: (id, checked) => {
       if (checked) _selected.add(id); else _selected.delete(id);

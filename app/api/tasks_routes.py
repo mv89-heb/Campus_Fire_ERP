@@ -22,6 +22,14 @@ def tasks_page():
     return render_template('tasks.html', active_nav='tasks')
 
 
+@tasks_bp.route('/api/tasks/import-fire-safety-tracking', methods=['POST'])
+def api_import_fire_safety_tracking():
+    # Uses the same existing Task model/table; importer is idempotent and never deletes data.
+    from scripts.import_fire_safety_tracking_table import import_rows
+    result = import_rows(dry_run=False)
+    return jsonify({"success": True, "result": result})
+
+
 @tasks_bp.route('/api/tasks', methods=['GET'])
 def api_list_tasks():
     tasks = svc.list_tasks(
