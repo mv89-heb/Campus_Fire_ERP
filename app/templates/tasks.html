@@ -61,6 +61,19 @@
 .modal-actions .btn { flex: 1; }
 .btn, .filter-select, table button { min-height: 38px; }
 .skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 37%, rgba(255,255,255,0.04) 63%); background-size: 400px 100%; animation: shimmer 1.4s ease infinite; border-radius: 6px; height: 70px; margin-bottom: 10px; }
+.tracking-table-wrap { width:100%; overflow-x:auto; direction:rtl; }
+.tracking-table { width:100%; min-width:1050px; border-collapse:collapse; direction:rtl; }
+.tracking-table th,.tracking-table td { padding:10px 9px; border-bottom:1px solid var(--border); text-align:right; vertical-align:top; white-space:normal; }
+.tracking-table th { position:sticky; top:0; background:var(--bg-hover); color:var(--text-muted); font-size:.78rem; z-index:1; }
+.tracking-table td { font-size:.85rem; }
+.tracking-table .status-select { min-width:105px; background:var(--bg); color:var(--text); border:1px solid var(--border-mid); border-radius:6px; padding:6px; }
+.tracking-detail { background:var(--bg-hover); padding:12px; border-radius:8px; margin-top:6px; white-space:pre-wrap; line-height:1.65; }
+.tracking-controls { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+.tracking-controls input,.tracking-controls select { background:var(--bg); color:var(--text); border:1px solid var(--border-mid); border-radius:6px; padding:8px 10px; }
+.tracking-controls input { flex:1; min-width:180px; }
+.tracking-summary { display:flex; gap:12px; flex-wrap:wrap; color:var(--text-muted); font-size:.82rem; margin-bottom:10px; }
+.view-switch { display:flex; gap:6px; flex-wrap:wrap; }
+.view-switch .active { border-color:var(--accent); color:var(--accent); }
 .error-state { text-align: center; color: var(--critical); padding: 20px; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .retry-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border-mid); background: var(--bg-hover); color: var(--text); cursor: pointer; font-size: 0.8rem; }
 {% endblock %}
@@ -68,11 +81,30 @@
 {% block content %}
 <div class="page-title-row">
   <h1>✅ משימות</h1>
-  <div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="btn" onclick="Tasks.importFireSafetyTracking()">📥 ייבוא משימות כבאות מהאקסל</button><button class="btn btn-primary" onclick="Tasks.openModal()">➕ משימה חדשה</button></div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="btn" onclick="Tasks.importFireSafetyTracking()">📥 ייבוא/רענון נתוני אקסל</button><button class="btn btn-primary" onclick="Tasks.openModal()">➕ משימה חדשה</button></div>
 </div>
 
-<div class="card">
-  <div class="card-title"><span>📋 רשימת משימות</span></div>
+<div class="card" id="trackingCard">
+  <div class="card-title">
+    <span>📊 מעקב כבאות והצלה — תצוגת גיליון</span>
+    <div class="view-switch">
+      <button type="button" class="btn btn-sm active" id="trackingViewBtn" onclick="Tasks.showView('tracking')">מעקב לפי האקסל</button>
+      <button type="button" class="btn btn-sm" id="generalViewBtn" onclick="Tasks.showView('general')">משימות נוספות</button>
+    </div>
+  </div>
+  <div class="tracking-controls">
+    <input id="trackingSearch" type="search" placeholder="חיפוש במשימה, נכס, תיק, טופס או אחראי..." oninput="Tasks.renderTracking()">
+    <select id="trackingStatusFilter" onchange="Tasks.renderTracking()">
+      <option value="">כל הסטטוסים</option><option value="open">פתוחה</option><option value="in_progress">בביצוע</option><option value="done">הושלמה</option><option value="cancelled">בוטלה</option>
+    </select>
+    <select id="trackingAssetFilter" onchange="Tasks.renderTracking()"><option value="">כל הנכסים</option></select>
+  </div>
+  <div class="tracking-summary" id="trackingSummary">טוען נתוני מעקב…</div>
+  <div id="trackingTableHost"><div class="skeleton"></div></div>
+</div>
+
+<div class="card" id="generalTaskCard" style="display:none;">
+  <div class="card-title"><span>📋 משימות נוספות</span></div>
   <div class="filters-row task-filters">
     <div class="quick-filters" aria-label="מסננים מהירים">
       <button type="button" class="quick-filter active" onclick="Tasks.quickFilter('all', this)">הכול</button>
@@ -102,6 +134,7 @@
     <button class="btn btn-sm" onclick="Tasks.clearSelection()">בטל בחירה</button>
   </div>
   <div id="taskList" class="task-list"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+</div>
 </div>
 
 <div class="modal-overlay" id="taskModal">
@@ -155,6 +188,7 @@
 <script>
 const Tasks = (() => {
   let _all = [];
+  let _tracking = [];
   let _checklistDraft = [];
   let _selected = new Set();
 
@@ -170,13 +204,72 @@ const Tasks = (() => {
 
   async function refresh() {
     try {
-      const res = await fetch('/api/tasks');
+      const [res, trackingRes] = await Promise.all([fetch('/api/tasks'), fetch('/api/tasks/fire-safety-tracking')]);
+      if (!res.ok || !trackingRes.ok) throw new Error('שגיאה בטעינת המשימות');
       _all = await res.json();
+      _tracking = await trackingRes.json();
       render(_all);
+      renderTracking();
     } catch (e) {
       document.getElementById('taskList').innerHTML = `<div class="error-state">⚠️ שגיאה בטעינת משימות<button class="retry-btn" onclick="Tasks.init()">🔄 נסה שוב</button></div>`;
       showToast('שגיאה בחיבור לשרת', 'error');
     }
+  }
+
+  function showView(view) {
+    const tracking = view === 'tracking';
+    document.getElementById('trackingCard').style.display = tracking ? '' : 'none';
+    document.getElementById('generalTaskCard').style.display = tracking ? 'none' : '';
+    document.getElementById('trackingViewBtn').classList.toggle('active', tracking);
+    document.getElementById('generalViewBtn').classList.toggle('active', !tracking);
+  }
+
+  function renderTracking() {
+    const host = document.getElementById('trackingTableHost');
+    if (!host) return;
+    const search = (document.getElementById('trackingSearch')?.value || '').trim().toLocaleLowerCase('he');
+    const status = document.getElementById('trackingStatusFilter')?.value || '';
+    const asset = document.getElementById('trackingAssetFilter')?.value || '';
+    const assets = [...new Set(_tracking.map(t => t.asset).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'he'));
+    const assetSelect = document.getElementById('trackingAssetFilter');
+    if (assetSelect && assetSelect.dataset.ready !== '1') {
+      assetSelect.innerHTML = '<option value="">כל הנכסים</option>' + assets.map(a => '<option value="' + esc(a) + '">' + esc(a) + '</option>').join('');
+      assetSelect.dataset.ready = '1';
+    }
+    const list = _tracking.filter(t => {
+      const haystack = [t.title,t.asset,t.case_number,t.forms,t.assignee,t.phase,t.notes].join(' ').toLocaleLowerCase('he');
+      return (!search || haystack.includes(search)) && (!status || t.status === status) && (!asset || t.asset === asset);
+    });
+    const done = _tracking.filter(t => t.status === 'done').length;
+    const duplicates = _tracking.reduce((sum,t) => sum + (t.duplicate_count || 0), 0);
+    document.getElementById('trackingSummary').textContent = `${list.length} שורות מוצגות מתוך ${_tracking.length} | הושלמו: ${done} | פתוחות/בטיפול: ${_tracking.filter(t => !['done','cancelled'].includes(t.status)).length}${duplicates ? ' | שורות כפולות שזוהו והוסתרו: ' + duplicates : ''}`;
+    if (!list.length) {
+      host.innerHTML = '<div class="empty-state">אין שורות מעקב התואמות למסננים. אם טרם ייבאת את הקובץ, לחץ על "ייבוא/רענון נתוני אקסל".</div>';
+      return;
+    }
+    const statusLabels = {open:'פתוחה',in_progress:'בביצוע',done:'הושלמה',cancelled:'בוטלה'};
+    host.innerHTML = '<div class="tracking-table-wrap"><table class="tracking-table"><thead><tr><th>משימה</th><th>נכס / מבנה</th><th>מספר תיק</th><th>טופס / אישור</th><th>אחראי</th><th>שלב</th><th>סטטוס</th><th>פירוט</th></tr></thead><tbody>' +
+      list.map(t => `<tr>
+        <td><strong>${esc(t.title)}</strong>${t.duplicate_count ? '<div style="color:var(--warning);font-size:.75rem;">זוהו ' + t.duplicate_count + ' עותקים נוספים</div>' : ''}</td>
+        <td>${esc(t.asset)}</td><td>${esc(t.case_number)}</td><td>${esc(t.forms)}</td><td>${esc(t.assignee)}</td><td>${esc(t.phase)}</td>
+        <td><select class="status-select" aria-label="סטטוס משימה" onchange="Tasks.updateTrackingStatus(${t.id},this.value)"><option value="open" ${t.status==='open'?'selected':''}>פתוחה</option><option value="in_progress" ${t.status==='in_progress'?'selected':''}>בביצוע</option><option value="done" ${t.status==='done'?'selected':''}>הושלמה</option><option value="cancelled" ${t.status==='cancelled'?'selected':''}>בוטלה</option></select>${t.due_date ? '<div style="font-size:.75rem;margin-top:4px;">יעד: '+esc(t.due_date)+'</div>':''}</td>
+        <td><details><summary style="cursor:pointer;color:var(--accent);">הרחב פירוט</summary><div class="tracking-detail"><strong>הערות ודגשים:</strong> ${esc(t.notes || 'אין הערות')}\n<strong>אחראי:</strong> ${esc(t.assignee || 'לא הוגדר')}\n<strong>מקור:</strong> שורה ${t.source_row} בקובץ האקסל\n\n<strong>תיאור מלא:</strong>\n${esc(t.description || '')}</div><button class="btn btn-sm" style="margin-top:6px;" onclick="Tasks.openModal(${t.id})">✏️ עריכת פרטים</button></details></td>
+      </tr>`).join('') + '</tbody></table></div>';
+  }
+
+  async function updateTrackingStatus(id, status) {
+    try {
+      const res = await fetch('/api/tasks/' + id, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status})});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'עדכון הסטטוס נכשל');
+      const row = _tracking.find(t => t.id === id);
+      if (row) row.status = status;
+      const general = _all.find(t => t.id === id);
+      if (general) general.status = status;
+      showToast('הסטטוס עודכן');
+      renderTracking();
+      render(_all);
+    } catch (e) { showToast(e.message || 'שגיאה בעדכון הסטטוס', 'error'); await refresh(); }
   }
 
   function render(list) {
@@ -281,8 +374,11 @@ const Tasks = (() => {
     },
     refresh,
     applyFilters,
+    showView,
+    renderTracking,
+    updateTrackingStatus,
     importFireSafetyTracking: async () => {
-      if (!confirm('ייבא את 25 המשימות מקובץ מעקב כבאות והצלה? משימות שיובאו בעבר ידולגו ולא ייווצרו כפילויות.')) return;
+      if (!confirm('ייבא את שורות קובץ מעקב כבאות והצלה שחסרות במערכת? משימות שיובאו בעבר ידולגו.')) return;
       try {
         const response = await fetch('/api/tasks/import-fire-safety-tracking', { method: 'POST', credentials: 'same-origin' });
         const payload = await response.json();
@@ -290,6 +386,7 @@ const Tasks = (() => {
         const result = payload.result || {};
         showToast(`ייבוא הסתיים: ${result.imported || 0} נוספו, ${result.skipped_existing || 0} כבר קיימות`);
         await refresh();
+        showView('tracking');
       } catch (error) {
         showToast(error.message || 'שגיאה בייבוא המשימות', 'error');
       }
