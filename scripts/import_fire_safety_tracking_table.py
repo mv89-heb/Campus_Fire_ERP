@@ -54,37 +54,39 @@ def import_rows(dry_run=False):
     app = create_app()
     imported = skipped = 0
     with app.app_context():
+        # App startup can leave a read transaction open during seed checks.
+        db.session.rollback()
         try:
-            # A single transaction makes the import all-or-nothing.
-            with db.session.begin():
-                for source_row, phase, title, asset, case_no, forms, owner, notes in ROWS:
-                    marker = f"ייבוא טבלת מעקב כבאות והצלה | מקור: {SOURCE} | שורה מקורית: {source_row}"
-                    existing = Task.query.filter(Task.description.contains(marker)).first()
-                    if existing:
-                        LOG.info("SKIP row=%s task_id=%s (already imported)", source_row, existing.id)
-                        skipped += 1
-                        continue
-                    description = "\n".join([
-                        f"שלב / שבוע: {phase}",
-                        f"נכס רלוונטי: {asset}",
-                        f"מספר תיק: {case_no}",
-                        f"מספר טופס להגשה: {forms}",
-                        f"הערות ודגשים: {notes}",
-                        marker,
-                    ])
-                    task = Task(
-                        title=title,
-                        description=description,
-                        assignee=owner,
-                        priority="urgent" if "קריטי!" in notes else "normal",
-                        status="open",
-                        due_date=None,  # The spreadsheet has no due dates.
-                    )
-                    db.session.add(task)
-                    imported += 1
-                    LOG.info("%s row=%s title=%s", "DRY-RUN" if dry_run else "IMPORT", source_row, title)
-                if dry_run:
-                    db.session.rollback()
+            for source_row, phase, title, asset, case_no, forms, owner, notes in ROWS:
+                marker = f"ייבוא טבלת מעקב כבאות והצלה | מקור: {SOURCE} | שורה מקורית: {source_row}"
+                existing = Task.query.filter(Task.description.contains(marker)).first()
+                if existing:
+                    LOG.info("SKIP row=%s task_id=%s (already imported)", source_row, existing.id)
+                    skipped += 1
+                    continue
+                description = "\\n".join([
+                    f"שלב / שבוע: {phase}",
+                    f"נכס רלוונטי: {asset}",
+                    f"מספר תיק: {case_no}",
+                    f"מספר טופס להגשה: {forms}",
+                    f"הערות ודגשים: {notes}",
+                    marker,
+                ])
+                task = Task(
+                    title=title,
+                    description=description,
+                    assignee=owner,
+                    priority="urgent" if "קריטי!" in notes else "normal",
+                    status="open",
+                    due_date=None,  # The spreadsheet has no due dates.
+                )
+                db.session.add(task)
+                imported += 1
+                LOG.info("%s row=%s title=%s", "DRY-RUN" if dry_run else "IMPORT", source_row, title)
+            if dry_run:
+                db.session.rollback()
+            else:
+                db.session.commit()
         except Exception:
             db.session.rollback()
             LOG.exception("Import failed; transaction rolled back")
@@ -92,7 +94,6 @@ def import_rows(dry_run=False):
     LOG.info("RESULT source_rows=%s imported=%s skipped_existing=%s errors=0 dry_run=%s",
              len(ROWS), imported, skipped, dry_run)
     return {"source_rows": len(ROWS), "imported": imported, "skipped_existing": skipped, "errors": 0, "dry_run": dry_run}
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
