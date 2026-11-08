@@ -95,6 +95,14 @@ def calculate_document_status(
             "reason": "תאריך ההנפקה מאוחר מהתאריך הנוכחי.",
         }
 
+    if issue_date.year < 1900 or (expiry_date and expiry_date.year < 1900):
+        return {
+            "status": "needs_manual_review",
+            "verification": "implausible_date",
+            "is_multi_year": False,
+            "reason": "זוהה תאריך מוקדם באופן חריג (לפני 1900); ייתכן שגיאת OCR ויש לאמת מול המסמך.",
+        }
+
     if expiry_date and expiry_date < issue_date:
         return {
             "status": "date_conflict",
