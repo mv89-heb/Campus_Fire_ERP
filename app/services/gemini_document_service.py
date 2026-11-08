@@ -22,6 +22,10 @@ SCHEMA = {
     "properties": {
         "document_type": {"type": "STRING"},
         "document_purpose": {"type": "STRING"},
+        "is_audit_summary": {"type": "BOOLEAN"},
+        "document_issue_date": {"type": "STRING", "nullable": True},
+        "document_expiry_date": {"type": "STRING", "nullable": True},
+        "date_extraction_confidence": {"type": "NUMBER", "nullable": True},
         "audit_number": {"type": "STRING", "nullable": True},
         "site_name": {"type": "STRING", "nullable": True},
         "site_address": {"type": "STRING", "nullable": True},
@@ -78,7 +82,7 @@ SCHEMA = {
         "follow_up_questions": {"type": "ARRAY", "items": {"type": "STRING"}},
         "confidence": {"type": "NUMBER"}
     },
-    "required": ["document_type", "document_purpose", "summary", "overall_status", "key_findings", "missing_items", "contradictions", "follow_up_questions", "confidence"]
+    "required": ["document_type", "document_purpose", "is_audit_summary", "date_extraction_confidence", "summary", "overall_status", "key_findings", "missing_items", "contradictions", "follow_up_questions", "confidence"]
 }
 
 SYSTEM_PROMPT = """אתה מנתח מסמכי בטיחות אש עבור ERP.
@@ -90,7 +94,7 @@ SYSTEM_PROMPT = """אתה מנתח מסמכי בטיחות אש עבור ERP.
 אם מידע אינו מופיע במסמך, החזר null או רשימה ריקה; לעולם אל תנחש.
 לכל ממצא: הסבר מה נמצא, למה זה חשוב, מה צריך לעשות בפועל, מי בדרך כלל מטפל
 אם אפשר להסיק זאת, ומה הראיה הדרושה לסגירה. הפרד עובדה מהמלצה וסמן אי-ודאות.
-אל תציג המלצה משפטית כעובדה. כתוב בעברית ברורה ומעשית."""
+אם המסמך הוא סיכום/דוח ביקורת או בדיקת בטיחות מסכמת, סמן is_audit_summary=true וחלץ את audit_date בפורמט ISO YYYY-MM-DD כפי שמופיע במסמך; אחרת false. חלץ document_issue_date ו-document_expiry_date רק כאשר תווית התאריך ברורה, בפורמט ISO YYYY-MM-DD; אל תבלבל תאריך חתימה, תאריך העלאה או תאריך בדיקה הבאה עם תאריך הנפקה/תפוגה. החזר date_extraction_confidence בין 0 ל-1 רק עבור ודאות זיהוי התאריכים. אל תציג המלצה משפטית כעובדה. כתוב בעברית ברורה ומעשית."""
 
 def is_configured():
     return bool(current_app.config.get("GEMINI_API_KEY"))
@@ -201,6 +205,59 @@ def persist(document, result):
     document.ai_model = result.get("model")
     document.ai_analyzed_at = datetime.utcnow()
     document.ai_document_type = result.get("document_type")
+    date_fields = (
+        ("document_issue_date", "gemini_issue_date", "issue_date", "analysis_issue_date"),
+        ("document_expiry_date", "gemini_expiry_date", "expiry_date", "analysis_expiry_date"),
+    )
+    extracted_any_date = False
+    for source_key, evidence_field, effective_field, analysis_field in date_fields:
+        raw_value = result.get(source_key)
+        if not raw_value:
+            continue
+        try:
+            extracted_date = date.fromisoformat(str(raw_value)[:10])
+        except (TypeError, ValueError):
+            document.analysis_review_required = True
+            continue
+        setattr(document, evidence_field, extracted_date)
+        extracted_any_date = True
+        if not document.date_reviewed_at:
+            existing_date = getattr(document, effective_field)
+            if existing_date and existing_date != extracted_date:
+                document.date_extraction_conflict = True
+                document.analysis_review_required = True
+            elif not existing_date:
+                setattr(document, effective_field, extracted_date)
+                if not getattr(document, analysis_field):
+                    setattr(document, analysis_field, extracted_date)
+    if not document.date_reviewed_at:
+        try:
+            if result.get("date_extraction_confidence") is not None:
+                document.date_extraction_confidence = float(result["date_extraction_confidence"])
+                if not 0 <= document.date_extraction_confidence <= 1:
+                    raise ValueError("date confidence out of range")
+        except (TypeError, ValueError):
+            document.date_extraction_confidence = None
+            document.analysis_review_required = True
+    if extracted_any_date and document.date_extraction_confidence is None:
+        # Dates without a model-provided extraction confidence are not auto-approved.
+        document.date_extraction_confidence = 0.0
+        document.analysis_review_required = True
+    if extracted_any_date and not document.date_reviewed_at:
+        document.date_extraction_source = (
+            "conflicting_sources" if document.date_extraction_conflict else "gemini_pdf"
+        )
+    purpose_text = " ".join(str(result.get(key) or "") for key in ("document_type", "document_purpose", "summary")).lower()
+    document.is_audit_summary = bool(
+        document.is_audit_summary or result.get("is_audit_summary") is True or
+        any(term in purpose_text for term in ("סיכום ביקורת", "דוח ביקורת", "דו\"ח ביקורת", "audit report", "inspection report"))
+    )
+    audit_date_value = result.get("audit_date")
+    if audit_date_value:
+        try:
+            document.audit_year = date.fromisoformat(str(audit_date_value)[:10]).year
+        except (TypeError, ValueError):
+            document.analysis_review_required = True
     document.ai_summary = result.get("summary")
     document.ai_findings_json = json.dumps(result.get("key_findings", []), ensure_ascii=False)
     document.ai_actions_json = json.dumps({
@@ -238,6 +295,8 @@ def persist(document, result):
     except (TypeError, ValueError):
         document.ai_confidence = None
     document.ai_error = None
+    from app.services.document_date_policy_service import apply_document_policy
+    apply_document_policy(document)
 
     # Materialize every extracted business entity into the ERP first.
     # This is what makes Gemini data visible in Suppliers/Sites/Audits and

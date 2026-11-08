@@ -6,8 +6,12 @@ from app.services import document_link_service as link_svc
 from app.services.dms_service import DMSService
 from app.services import storage
 from app.services.document_analysis_service import validity_status
+from app.services.document_date_policy_service import (
+    apply_document_policy, calculate_document_status, reconcile_audit_summary, STATUS_LABELS, today_israel, document_dates,
+)
+from app.services.audit_log_service import log as audit_log
 from app.utils.security import validate_and_save_pdf
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 import io
 import platform
 import os
@@ -207,18 +211,38 @@ def dashboard():
                 total_reqs += 1
                 docs = Document.query.filter_by(req_id=req.id, status='active').order_by(Document.uploaded_at.desc()).all()
                 latest = docs[0] if docs else None
-                if not latest or not latest.expiry_date:
-                    label = 'needs_review' if latest else 'missing'
+                policy_result = None
+                calculated_status = None
+                if not latest:
+                    label = 'missing'
                 else:
-                    days_left = (latest.expiry_date - date.today()).days
-                    if days_left <= 0:
-                        label = 'expired'
-                    elif days_left <= 14:
-                        label = 'critical'
-                    elif days_left <= 30:
-                        label = 'warning'
-                    else:
+                    policy_result = calculate_document_status(
+                        *document_dates(latest),
+                        policy_year=current_app.config.get('DOCUMENT_POLICY_YEAR', 2026),
+                        today=today_israel(),
+                        grace_period_days=current_app.config.get('DOCUMENT_GRACE_PERIOD_DAYS', 0),
+                        date_extraction_conflict=bool(latest.date_extraction_conflict),
+                        date_extraction_confidence=latest.date_extraction_confidence,
+                        minimum_date_confidence=current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80),
+                    )
+                    calculated_status = policy_result['status']
+                    override_active = bool(
+                        latest.manual_status_override and latest.override_expires_at
+                        and latest.override_expires_at > datetime.utcnow()
+                    )
+                    if override_active:
+                        calculated_status = latest.manual_status_override
+                    days_left = (document_dates(latest)[1] - today_israel()).days if document_dates(latest)[1] else None
+                    if calculated_status == 'active':
                         label = 'valid'
+                    elif calculated_status == 'expiring_soon':
+                        label = 'critical' if days_left is not None and days_left <= 14 else 'warning'
+                    elif calculated_status == 'expired':
+                        label = 'expired'
+                    else:
+                        # Old approvals, future dates, unknown dates and grace-period
+                        # records must never be counted as compliant.
+                        label = 'needs_review'
                 entry = {
                     'req_id': req.id, 'zone_id': zone.id, 'zone_name': zone.zone_name,
                     'file_number': zone.file_number, 'system_name': req.system_name,
@@ -228,7 +252,11 @@ def dashboard():
                     'file_access_url': f'/api/documents/{latest.id}/file' if latest and latest.file_path else None,
                     'issue_date': str(latest.issue_date) if latest and latest.issue_date else None,
                     'expiry_date': str(latest.expiry_date) if latest and latest.expiry_date else None,
-                    'status': label, 'doc_count': len(docs), 'doc_names': [d.file_name for d in docs],
+                    'status': label, 'calculated_status': calculated_status,
+                    'calculated_status_label': STATUS_LABELS.get(calculated_status, calculated_status),
+                    'status_reason': policy_result.get('reason') if policy_result else None,
+                    'document_year': latest.document_year if latest else None,
+                    'doc_count': len(docs), 'doc_names': [d.file_name for d in docs],
                     'analysis_tags': latest.tags if latest else None,
                 }
                 requirements_processed.append(entry)
@@ -264,6 +292,7 @@ def upload_bulk():
     processed = 0
     skipped_duplicates = 0
     errors = []
+    date_warnings = []
     files = request.files.getlist('file')
     max_pdf_bytes = current_app.config['MAX_PDF_BYTES']
     for f in files:
@@ -274,6 +303,14 @@ def upload_bulk():
             result = DMSService.ingest_document(safe_path, f.filename)
             if result is not None:
                 processed += 1
+                if result.calculated_status in {'future_issue_date', 'date_conflict', 'needs_manual_review', 'old_approval', 'expired', 'grace_period'}:
+                    date_warnings.append({
+                        'file': result.file_name,
+                        'status': result.calculated_status,
+                        'status_label': STATUS_LABELS.get(result.calculated_status, result.calculated_status),
+                        'message': 'המסמך נשמר, אך אינו נספר כאישור תקף עד להשלמת בדיקה/תיקון.',
+                        'blocked_from_compliance': True,
+                    })
             else:
                 skipped_duplicates += 1
         except Exception as e:
@@ -281,17 +318,30 @@ def upload_bulk():
             errors.append({'file': f.filename, 'reason': str(e)})
     success = processed > 0 or (skipped_duplicates > 0 and not errors)
     return jsonify({'success': success, 'processed': processed, 'skipped_duplicates': skipped_duplicates,
-                    'errors': errors, 'total_files': len(files)})
+                    'errors': errors, 'date_warnings': date_warnings, 'total_files': len(files)})
 
 
 @main_bp.route('/document-intelligence')
 def document_intelligence_page():
     if not session.get('user_id'):
         return redirect('/login')
-    return render_template('document_intelligence.html', active_nav='document_intelligence')
+    return render_template('document_intelligence.html', active_nav='document_intelligence', user_role=session.get('role'))
 
 
-def _ai_document_payload(doc):
+def _ai_document_payload(doc, include_reconciliation=False):
+    date_result = calculate_document_status(
+        *document_dates(doc),
+        policy_year=current_app.config.get('DOCUMENT_POLICY_YEAR', 2026),
+        grace_period_days=current_app.config.get('DOCUMENT_GRACE_PERIOD_DAYS', 0),
+        date_extraction_conflict=bool(doc.date_extraction_conflict),
+        date_extraction_confidence=doc.date_extraction_confidence,
+        minimum_date_confidence=current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80),
+    )
+    calculated_status = date_result['status']
+    override_active = bool(
+        doc.manual_status_override and doc.override_expires_at
+        and doc.override_expires_at > datetime.utcnow()
+    )
     return {
         'document_id': doc.id,
         'file_name': doc.file_name,
@@ -306,6 +356,25 @@ def _ai_document_payload(doc):
         'confidence': doc.ai_confidence,
         'error': doc.ai_error,
         'review_required': doc.analysis_review_required,
+        'issue_date': doc.issue_date.isoformat() if doc.issue_date else None,
+        'expiry_date': doc.expiry_date.isoformat() if doc.expiry_date else None,
+        'document_year': doc.document_year or (doc.issue_date.year if doc.issue_date else None),
+        'calculated_status': calculated_status,
+        'calculated_status_label': STATUS_LABELS.get(calculated_status, calculated_status),
+        'date_verification_status': doc.date_verification_status,
+        'date_reviewed_at': doc.date_reviewed_at.isoformat() if doc.date_reviewed_at else None,
+        'date_extraction_source': doc.date_extraction_source,
+        'date_extraction_confidence': doc.date_extraction_confidence,
+        'date_extraction_conflict': bool(doc.date_extraction_conflict),
+        'gemini_issue_date': doc.gemini_issue_date.isoformat() if doc.gemini_issue_date else None,
+        'gemini_expiry_date': doc.gemini_expiry_date.isoformat() if doc.gemini_expiry_date else None,
+        'is_multi_year': bool(doc.is_multi_year),
+        'is_audit_summary': bool(doc.is_audit_summary),
+        'audit_year': doc.audit_year,
+        'effective_status': doc.manual_status_override if override_active else calculated_status,
+        'manual_status_override': doc.manual_status_override if override_active else None,
+        'override_reason': doc.override_reason if override_active else None,
+        'reconciliation': reconcile_audit_summary(doc) if include_reconciliation and doc.is_audit_summary else None,
         'relationships': {'site_id': doc.site_id, 'audit_id': doc.audit_id, 'supplier_id': doc.supplier_id},
         'relationship_review_required': doc.ai_status == 'completed' and not (doc.site_id or doc.audit_id or doc.supplier_id),
     }
@@ -316,7 +385,157 @@ def document_intelligence_detail(doc_id):
     doc = db.session.get(Document, doc_id)
     if not doc:
         return jsonify({'error': 'המסמך לא נמצא'}), 404
-    return jsonify(_ai_document_payload(doc))
+    return jsonify(_ai_document_payload(doc, include_reconciliation=True))
+
+
+def _parse_document_date(value, field_name):
+    if value in (None, ""):
+        return None
+    try:
+        return date.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        raise ValueError(f"תאריך {field_name} חייב להיות בפורמט YYYY-MM-DD")
+
+
+@main_bp.route('/api/documents/<int:doc_id>/date-review', methods=['POST'])
+def document_date_review(doc_id):
+    """Manager-level correction of dates after manual inspection of the source PDF."""
+    document = db.session.get(Document, doc_id)
+    if not document or document.status in {'deleted', 'archived'}:
+        return jsonify({'error': 'המסמך לא נמצא או אינו פעיל'}), 404
+    data = request.get_json(silent=True) or {}
+    if 'issue_date' not in data and 'expiry_date' not in data:
+        return jsonify({'error': 'יש למסור לפחות תאריך אחד לתיקון'}), 400
+    try:
+        issue_date = _parse_document_date(data.get('issue_date'), 'הנפקה') if 'issue_date' in data else document.issue_date
+        expiry_date = _parse_document_date(data.get('expiry_date'), 'תפוגה') if 'expiry_date' in data else document.expiry_date
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    today = today_israel()
+    if 'issue_date' in data and issue_date is None:
+        return jsonify({'error': 'תאריך הנפקה נדרש; אם אינו מופיע במסמך יש להעביר לבדיקה ידנית'}), 400
+    if issue_date and issue_date > today:
+        return jsonify({'error': 'תאריך ההנפקה אינו יכול להיות בעתיד', 'code': 'FUTURE_ISSUE_DATE'}), 422
+    if issue_date and expiry_date and expiry_date < issue_date:
+        return jsonify({'error': 'תאריך התפוגה אינו יכול להיות מוקדם מתאריך ההנפקה', 'code': 'EXPIRY_BEFORE_ISSUE'}), 422
+
+    old_values = {
+        'issue_date': document.issue_date.isoformat() if document.issue_date else None,
+        'expiry_date': document.expiry_date.isoformat() if document.expiry_date else None,
+    }
+    document.issue_date = issue_date
+    document.expiry_date = expiry_date
+    document.date_reviewed_at = datetime.utcnow()
+    document.date_extraction_source = 'manual'
+    document.date_extraction_confidence = 1.0
+    document.date_extraction_conflict = False
+    document.analysis_review_required = False
+    # A corrected source date invalidates a previous exception; recalculate from evidence.
+    document.manual_status_override = None
+    document.override_reason = None
+    document.override_by = None
+    document.override_at = None
+    document.override_expires_at = None
+    result = apply_document_policy(document)
+    audit_log(
+        'update', 'document_date', document.id, document.file_name,
+        old_values,
+        {'issue_date': issue_date.isoformat() if issue_date else None,
+         'expiry_date': expiry_date.isoformat() if expiry_date else None,
+         'calculated_status': result['status']},
+    )
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'document_id': document.id,
+        'calculated_status': result['status'],
+        'status_label': STATUS_LABELS.get(result['status'], result['status']),
+        'date_verification_status': result['verification'],
+        'reason': result['reason'],
+    })
+
+
+@main_bp.route('/api/admin/documents/recalculate-date-policy', methods=['POST'])
+def recalculate_document_date_policy():
+    """Admin-only full recalculation after an approved policy-year change."""
+    documents = Document.query.filter(Document.status.notin_(['deleted', 'archived'])).all()
+    counts = {}
+    for document in documents:
+        result = apply_document_policy(document)
+        counts[result['status']] = counts.get(result['status'], 0) + 1
+    audit_log(
+        'update', 'document_date_policy', None, 'Recalculation of document date policy',
+        None,
+        {'policy_year': current_app.config.get('DOCUMENT_POLICY_YEAR', 2026),
+         'documents_processed': len(documents), 'status_counts': counts},
+    )
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'policy_year': current_app.config.get('DOCUMENT_POLICY_YEAR', 2026),
+        'documents_processed': len(documents),
+        'status_counts': counts,
+    })
+
+
+@main_bp.route('/api/documents/<int:doc_id>/date-override', methods=['POST'])
+def document_date_override(doc_id):
+    """Admin-only, reasoned exception. Calculated status remains unchanged."""
+    document = db.session.get(Document, doc_id)
+    if not document or document.status in {'deleted', 'archived'}:
+        return jsonify({'error': 'המסמך לא נמצא או אינו פעיל'}), 404
+    data = request.get_json(silent=True) or {}
+    allowed = {'active', 'old_approval', 'expired', 'grace_period', 'needs_manual_review'}
+    override_status = str(data.get('status') or '').strip()
+    reason = str(data.get('reason') or '').strip()
+    if override_status not in allowed:
+        return jsonify({'error': 'סטטוס החריג אינו מותר'}), 400
+    if len(reason) < 10:
+        return jsonify({'error': 'נדרשת סיבת חריג מפורטת (לפחות 10 תווים)'}), 400
+
+    expiry_value = data.get('expires_at')
+    try:
+        if expiry_value:
+            parsed_expiry = datetime.fromisoformat(str(expiry_value).replace('Z', '+00:00'))
+            override_expires_at = (
+                parsed_expiry.astimezone(timezone.utc).replace(tzinfo=None)
+                if parsed_expiry.tzinfo else parsed_expiry
+            )
+        else:
+            override_expires_at = datetime.utcnow() + timedelta(days=90)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'תאריך פקיעת החריג אינו תקין'}), 400
+    if override_expires_at <= datetime.utcnow():
+        return jsonify({'error': 'תוקף החריג חייב להיות בעתיד'}), 400
+    calculated = apply_document_policy(document)
+    if (calculated['status'] in {'future_issue_date', 'date_conflict'} or document.date_extraction_conflict or (document.date_extraction_confidence is not None and document.date_extraction_confidence < current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80))) and override_status == 'active':
+        return jsonify({'error': 'יש לתקן ולאמת את התאריכים לפני אישור המסמך', 'code': 'DATE_CORRECTION_REQUIRED'}), 409
+
+    old_values = {
+        'manual_status_override': document.manual_status_override,
+        'override_reason': document.override_reason,
+        'override_expires_at': document.override_expires_at.isoformat() if document.override_expires_at else None,
+    }
+    document.manual_status_override = override_status
+    document.override_reason = reason
+    document.override_by = session.get('user_id')
+    document.override_at = datetime.utcnow()
+    document.override_expires_at = override_expires_at
+    audit_log(
+        'update', 'document_status_override', document.id, document.file_name,
+        old_values,
+        {'manual_status_override': override_status, 'reason': reason,
+         'override_expires_at': override_expires_at.isoformat()},
+    )
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'document_id': document.id,
+        'calculated_status': document.calculated_status,
+        'effective_status': override_status,
+        'override_expires_at': override_expires_at.isoformat(),
+    })
 
 
 @main_bp.route('/api/document-intelligence/documents')

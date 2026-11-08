@@ -77,6 +77,10 @@ class Config:
 
     MAX_PDF_BYTES = int(os.environ.get('MAX_PDF_BYTES', str(100 * 1024 * 1024)))
 
+    DOCUMENT_POLICY_YEAR = int(os.environ.get('DOCUMENT_POLICY_YEAR', '2026'))
+    DOCUMENT_GRACE_PERIOD_DAYS = max(0, int(os.environ.get('DOCUMENT_GRACE_PERIOD_DAYS', '0')))
+    DOCUMENT_DATE_CONFIDENCE_MIN = float(os.environ.get('DOCUMENT_DATE_CONFIDENCE_MIN', '0.80'))
+
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
     GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.8-flash')
     GEMINI_THINKING_LEVEL = os.environ.get('GEMINI_THINKING_LEVEL', 'medium')

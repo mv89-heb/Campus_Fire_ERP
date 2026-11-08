@@ -45,7 +45,7 @@ _EXPLICIT_EXPIRY_PATTERNS = (
 )
 _INSPECTION_LABELS = (
     "תאריך בדיקה", "מועד בדיקה", "תאריך ביצוע", "מועד ביצוע", "תאריך תחזוקה", "מועד תחזוקה",
-    "תאריך ביקורת", "מועד ביקורת", "נבדק בתאריך", "נבדקה בתאריך", "נבדק ביום", "נבדקה ביום",
+    "תאריך ביקורת", "תאריך הביקורת", "מועד ביקורת", "מועד הביקורת", "נבדק בתאריך", "נבדקה בתאריך", "נבדק ביום", "נבדקה ביום",
     "בוצע בתאריך", "בוצעה בתאריך", "בוצע ביום", "בוצעה ביום", "תאריך אישור", "מועד אישור",
     "תאריך הנפקה", "מועד הנפקה", "הונפק בתאריך", "הונפק ביום", "תאריך מילוי", "מועד מילוי", "בדיקה אחרונה",
 )
@@ -264,6 +264,12 @@ def analyze_pdf_bytes(data: bytes, filename=""):
     inspection_date = inspection_evidence["date"] if inspection_evidence else None
 
     validity = resolve_validity(zone_code=zone_code, form_number=form, text=text, inspection_date=inspection_date, explicit_expiry=explicit_expiry)
+    normalized_text = " ".join((text or "").split()).lower()
+    is_audit_summary = any(
+        term in normalized_text
+        for term in ("סיכום ביקורת", "דוח ביקורת", 'דו"ח ביקורת', "audit report", "inspection report")
+    )
+    audit_date = inspection_date if is_audit_summary else None
     effective_expiry = validity.get("expiry_date")
     validity_source = validity.get("source") or "unknown"
     validity_status_value = validity_status(effective_expiry)
@@ -305,6 +311,8 @@ def analyze_pdf_bytes(data: bytes, filename=""):
         "zone_code": zone_code,
         "zone_evidence": zone_evidence,
         "inspection_date": inspection_date.isoformat() if inspection_date else None,
+        "is_audit_summary": is_audit_summary,
+        "audit_date": audit_date.isoformat() if audit_date else None,
         "inspection_evidence": inspection_json,
         "explicit_expiry_date": explicit_expiry.isoformat() if explicit_expiry else None,
         "calculated_expiry_date": effective_expiry.isoformat() if effective_expiry and validity_source != "explicit_document_expiry" else None,
@@ -331,6 +339,9 @@ def analyze_pdf_bytes(data: bytes, filename=""):
         "zone_evidence": zone_evidence,
         "inspection_date": inspection_date,
         "issue_date": inspection_date,
+        "is_audit_summary": is_audit_summary,
+        "audit_date": audit_date,
+        "audit_year": audit_date.year if audit_date else None,
         "inspection_evidence": inspection_evidence,
         "explicit_expiry_date": explicit_expiry,
         "calculated_expiry_date": effective_expiry if effective_expiry and validity_source != "explicit_document_expiry" else None,
