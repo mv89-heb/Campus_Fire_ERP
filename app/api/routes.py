@@ -295,7 +295,18 @@ def document_intelligence_page():
     return render_template('document_intelligence.html', active_nav='document_intelligence')
 
 
-def _ai_document_payload(doc):
+def _ai_document_payload(doc, include_reconciliation=False):
+    date_result = calculate_document_status(
+        doc.issue_date or doc.analysis_issue_date,
+        doc.expiry_date or doc.analysis_expiry_date,
+        policy_year=current_app.config.get('DOCUMENT_POLICY_YEAR', 2026),
+        grace_period_days=current_app.config.get('DOCUMENT_GRACE_PERIOD_DAYS', 0),
+    )
+    calculated_status = doc.calculated_status or date_result['status']
+    override_active = bool(
+        doc.manual_status_override and doc.override_expires_at
+        and doc.override_expires_at > datetime.utcnow()
+    )
     return {
         'document_id': doc.id,
         'file_name': doc.file_name,
@@ -313,18 +324,16 @@ def _ai_document_payload(doc):
         'issue_date': doc.issue_date.isoformat() if doc.issue_date else None,
         'expiry_date': doc.expiry_date.isoformat() if doc.expiry_date else None,
         'document_year': doc.document_year or (doc.issue_date.year if doc.issue_date else None),
-        'calculated_status': doc.calculated_status,
-        'calculated_status_label': STATUS_LABELS.get(doc.calculated_status, doc.calculated_status),
+        'calculated_status': calculated_status,
+        'calculated_status_label': STATUS_LABELS.get(calculated_status, calculated_status),
         'date_verification_status': doc.date_verification_status,
         'is_multi_year': bool(doc.is_multi_year),
         'is_audit_summary': bool(doc.is_audit_summary),
         'audit_year': doc.audit_year,
-        'effective_status': (
-            doc.manual_status_override
-            if doc.manual_status_override and doc.override_expires_at and doc.override_expires_at > datetime.utcnow()
-            else doc.calculated_status
-        ),
-        'reconciliation': reconcile_audit_summary(doc) if doc.is_audit_summary else None,
+        'effective_status': doc.manual_status_override if override_active else calculated_status,
+        'manual_status_override': doc.manual_status_override if override_active else None,
+        'override_reason': doc.override_reason if override_active else None,
+        'reconciliation': reconcile_audit_summary(doc) if include_reconciliation and doc.is_audit_summary else None,
         'relationships': {'site_id': doc.site_id, 'audit_id': doc.audit_id, 'supplier_id': doc.supplier_id},
         'relationship_review_required': doc.ai_status == 'completed' and not (doc.site_id or doc.audit_id or doc.supplier_id),
     }
@@ -363,6 +372,8 @@ def document_date_review(doc_id):
         return jsonify({'error': str(exc)}), 400
 
     today = today_israel()
+    if 'issue_date' in data and issue_date is None:
+        return jsonify({'error': 'תאריך הנפקה נדרש; אם אינו מופיע במסמך יש להעביר לבדיקה ידנית'}), 400
     if issue_date and issue_date > today:
         return jsonify({'error': 'תאריך ההנפקה אינו יכול להיות בעתיד', 'code': 'FUTURE_ISSUE_DATE'}), 422
     if issue_date and expiry_date and expiry_date < issue_date:
