@@ -22,6 +22,7 @@ def upgrade():
         ("audit_year", sa.SmallInteger(), True),
         ("calculated_status", sa.String(length=32), True),
         ("date_verification_status", sa.String(length=32), True),
+        ("date_reviewed_at", sa.DateTime(), True),
         ("status_policy_year", sa.SmallInteger(), True),
         ("status_calculated_at", sa.DateTime(), True),
         ("manual_status_override", sa.String(length=32), True),
