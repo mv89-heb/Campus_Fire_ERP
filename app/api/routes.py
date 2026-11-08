@@ -425,6 +425,8 @@ def document_date_override(doc_id):
         return jsonify({'error': 'תאריך פקיעת החריג אינו תקין'}), 400
     if override_expires_at <= datetime.utcnow():
         return jsonify({'error': 'תוקף החריג חייב להיות בעתיד'}), 400
+    if document.calculated_status in {'future_issue_date', 'date_conflict'} and override_status == 'active':
+        return jsonify({'error': 'יש לתקן ולאמת את התאריכים לפני אישור המסמך', 'code': 'DATE_CORRECTION_REQUIRED'}), 409
 
     old_values = {
         'manual_status_override': document.manual_status_override,
