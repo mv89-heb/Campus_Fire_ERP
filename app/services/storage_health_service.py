@@ -36,8 +36,24 @@ def scan(upload_folder: str) -> dict:
     all_docs = Document.query.all()
     relevant_docs = [d for d in all_docs if d.status != 'deleted' and d.file_path]
 
-    bucket_files = storage.list_supabase_files() if storage.is_configured() else []
     bucket = storage.get_bucket_name() if storage.is_configured() else None
+    try:
+        bucket_files = storage.list_supabase_files(strict=True) if storage.is_configured() else []
+    except storage.StorageError as exc:
+        logger.error('Storage integrity scan incomplete: %s', exc)
+        return {
+            'scanned_at': datetime.utcnow().isoformat(),
+            'scan_complete': False,
+            'scan_error': 'לא ניתן להשלים את סריקת Supabase Storage. לא ניתן להסיק שמסמכים חסרים או שקבצים יתומים.',
+            'total_documents': len(relevant_docs),
+            'healthy': None,
+            'missing': None,
+            'orphaned': None,
+            'hash_errors': None,
+            'missing_items': [],
+            'orphaned_items': [],
+            'hash_error_items': [],
+        }
 
     missing_items = []
     hash_error_items = []
@@ -129,6 +145,7 @@ def scan(upload_folder: str) -> dict:
 
     return {
         'scanned_at': datetime.utcnow().isoformat(),
+        'scan_complete': True,
         'total_documents': len(relevant_docs),
         'healthy': healthy_count,
         'missing': len(missing_items),
@@ -143,6 +160,8 @@ def scan(upload_folder: str) -> dict:
 def cleanup_preview(upload_folder: str) -> list:
     """Preview only; nothing is deleted."""
     result = scan(upload_folder)
+    if not result.get('scan_complete', True):
+        raise storage.StorageError(result.get('scan_error') or 'סריקת האחסון לא הושלמה; הניקוי נחסם')
     return result['orphaned_items']
 
 
