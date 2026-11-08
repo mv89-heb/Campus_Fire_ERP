@@ -68,7 +68,7 @@ def classify_document(filename=None, document_type=None, document_purpose=None, 
     qualify as audit summaries. Payment/administrative documents are separately
     marked as exempt from certificate-expiry policy.
     """
-    filename_text = _normalize(filename)
+    filename_text = _normalize(str(filename or "").replace("\\", "/").rsplit("/", 1)[-1])
     type_text = _normalize(document_type)
     purpose_text = _normalize(document_purpose)
     body = _normalize(body_text)
