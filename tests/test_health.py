@@ -10,6 +10,7 @@ class ProductionHealthConfig:
     ENV = 'production'
     IS_PRODUCTION = True
     SECRET_KEY = 'health-test-secret'
+    SECRET_KEY_FROM_ENV = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {}
