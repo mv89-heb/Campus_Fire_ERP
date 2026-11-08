@@ -16,8 +16,12 @@ _AUDIT_REPORT_MARKERS = (
     "סיכום ביקורת",
     "דוח ליקויים",
     'דו"ח ליקויים',
+    "דוח ביקורת",
+    'דו"ח ביקורת',
     "audit summary",
     "inspection summary",
+    "audit report",
+    "inspection report",
     "audit findings report",
     "inspection findings report",
 )
