@@ -225,7 +225,6 @@ def dashboard():
                         date_extraction_confidence=latest.date_extraction_confidence,
                         minimum_date_confidence=current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80),
                         is_audit_summary=bool(latest.is_audit_summary),
-        is_audit_summary=bool(doc.is_audit_summary),
                     )
                     calculated_status = policy_result['status']
                     override_active = bool(
@@ -338,6 +337,7 @@ def _ai_document_payload(doc, include_reconciliation=False):
         date_extraction_conflict=bool(doc.date_extraction_conflict),
         date_extraction_confidence=doc.date_extraction_confidence,
         minimum_date_confidence=current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80),
+        is_audit_summary=bool(doc.is_audit_summary),
     )
     calculated_status = date_result['status']
     override_active = bool(
