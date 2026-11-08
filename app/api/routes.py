@@ -225,6 +225,7 @@ def dashboard():
                         date_extraction_confidence=latest.date_extraction_confidence,
                         minimum_date_confidence=current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80),
                         is_audit_summary=bool(latest.is_audit_summary),
+                        date_policy_exempt=bool(latest.date_policy_exempt),
                     )
                     calculated_status = policy_result['status']
                     override_active = bool(
@@ -338,6 +339,7 @@ def _ai_document_payload(doc, include_reconciliation=False):
         date_extraction_confidence=doc.date_extraction_confidence,
         minimum_date_confidence=current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80),
         is_audit_summary=bool(doc.is_audit_summary),
+        date_policy_exempt=bool(doc.date_policy_exempt),
     )
     calculated_status = date_result['status']
     override_active = bool(
@@ -360,7 +362,7 @@ def _ai_document_payload(doc, include_reconciliation=False):
         'review_required': doc.analysis_review_required,
         'issue_date': doc.issue_date.isoformat() if doc.issue_date else None,
         'expiry_date': doc.expiry_date.isoformat() if doc.expiry_date else None,
-        'document_year': doc.document_year if doc.document_year is not None else (doc.issue_date.year if doc.issue_date and not doc.is_audit_summary else None),
+        'document_year': doc.document_year if doc.document_year is not None else (doc.issue_date.year if doc.issue_date and not doc.is_audit_summary and not doc.date_policy_exempt else None),
         'calculated_status': calculated_status,
         'calculated_status_label': STATUS_LABELS.get(calculated_status, calculated_status),
         'date_verification_status': doc.date_verification_status,
@@ -373,6 +375,7 @@ def _ai_document_payload(doc, include_reconciliation=False):
         'gemini_expiry_date': doc.gemini_expiry_date.isoformat() if doc.gemini_expiry_date else None,
         'is_multi_year': bool(doc.is_multi_year),
         'is_audit_summary': bool(doc.is_audit_summary),
+        'date_policy_exempt': bool(doc.date_policy_exempt),
         'audit_year': doc.audit_year,
         'effective_status': doc.manual_status_override if override_active else calculated_status,
         'manual_status_override': doc.manual_status_override if override_active else None,
@@ -406,6 +409,8 @@ def document_date_review(doc_id):
     document = db.session.get(Document, doc_id)
     if not document or document.status in {'deleted', 'archived'}:
         return jsonify({'error': 'המסמך לא נמצא או אינו פעיל'}), 404
+    if document.is_audit_summary or document.date_policy_exempt:
+        return jsonify({'error': 'המסמך אינו אישור בעל תוקף ולכן אין לתקן בו תאריכי תוקף', 'code': 'DATE_POLICY_NOT_APPLICABLE'}), 409
     data = request.get_json(silent=True) or {}
     if 'issue_date' not in data and 'expiry_date' not in data:
         return jsonify({'error': 'יש למסור לפחות תאריך אחד לתיקון'}), 400
@@ -488,8 +493,8 @@ def recalculate_document_date_policy():
 def document_date_override(doc_id):
     """Admin-only, reasoned exception. Calculated status remains unchanged."""
     document = db.session.get(Document, doc_id)
-    if document and document.is_audit_summary:
-        return jsonify({'error': 'סיכום ביקורת אינו אישור בעל תוקף ולכן לא ניתן להחיל עליו חריג תוקף', 'code': 'AUDIT_SUMMARY_NOT_CERTIFICATE'}), 409
+    if document and (document.is_audit_summary or document.date_policy_exempt):
+        return jsonify({'error': 'המסמך אינו אישור בעל תוקף ולכן לא ניתן להחיל עליו חריג תוקף', 'code': 'DATE_POLICY_NOT_APPLICABLE'}), 409
     if not document or document.status in {'deleted', 'archived'}:
         return jsonify({'error': 'המסמך לא נמצא או אינו פעיל'}), 404
     data = request.get_json(silent=True) or {}
