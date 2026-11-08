@@ -155,9 +155,18 @@ const AI=(()=>{
     if(s.contradictions?.length)h+='<div class="finding high"><b>סתירות</b><ul>'+s.contradictions.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';
     if(d.ai_status==='not_requested'||d.ai_status==='failed'||d.processing_stale)
       h+='<button class="btn btn-primary" onclick="AI.analyze('+d.document_id+')">🤖 '+(d.processing_stale?'נסה שוב עם Gemini':'נתח עם Gemini')+'</button>';
+    if(d.ai_status==='completed' && ['admin','super_admin'].includes(USER_ROLE) &&
+       !d.is_audit_summary && !d.date_policy_exempt &&
+       ['needs_manual_review','date_conflict','future_issue_date','old_approval'].includes(d.calculated_status))
+      h+='<button class="btn" onclick="AI.reanalyze('+d.document_id+')">🔄 נתח מחדש ב-Gemini</button>';
     if(d.ai_status==='completed')
       h+='<button class="btn btn-primary" onclick="AI.actions('+d.document_id+')">✅ צור ליקויים ומשימות</button>';
     document.getElementById('detail').innerHTML=h;
+  }
+
+  async function reanalyze(id){
+    if(!confirm('הפעולה תשלח את המסמך שוב ל-Gemini ועלולה לצרוך מכסת API או ליצור עלות. להמשיך?'))return false;
+    return analyze(id);
   }
 
   async function analyze(id, silent=false){
@@ -260,7 +269,7 @@ const AI=(()=>{
     await open(id);
   }
 
-  return {load,open,analyze,analyzeAll,actions,saveRelationships,saveDates,applyOverride};
+  return {load,open,analyze,reanalyze,analyzeAll,actions,saveRelationships,saveDates,applyOverride};
 })();
 document.addEventListener('DOMContentLoaded',async()=>{await AI.load();const id=new URLSearchParams(window.location.search).get('document');if(id)await AI.open(Number(id));});
 </script>
