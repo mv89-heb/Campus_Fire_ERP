@@ -247,7 +247,7 @@ def persist(document, result):
         document.date_extraction_source = (
             "conflicting_sources" if document.date_extraction_conflict else "gemini_pdf"
         )
-    purpose_text = " ".join(str(result.get(key) or "") for key in ("document_type", "document_purpose", "summary")).lower()
+    purpose_text = " ".join([document.file_name or ""] + [str(result.get(key) or "") for key in ("document_type", "document_purpose", "summary")]).lower()
     document.is_audit_summary = bool(
         document.is_audit_summary or result.get("is_audit_summary") is True or
         any(term in purpose_text for term in ("סיכום ביקורת", "דוח ביקורת", "דו\"ח ביקורת", "audit report", "inspection report"))
