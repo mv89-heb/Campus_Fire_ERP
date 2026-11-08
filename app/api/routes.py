@@ -737,6 +737,8 @@ def system_health():
         'db_backend': None,
         'db_host': None,
         'schema_revision': None,
+        'schema_revision_required': bool(current_app.config.get('IS_PRODUCTION')),
+        'schema_revision_ready': not bool(current_app.config.get('IS_PRODUCTION')),
     }
 
     try:
@@ -747,8 +749,10 @@ def system_health():
             result['schema_revision'] = db.session.execute(
                 text('SELECT version_num FROM alembic_version')
             ).scalar()
+            result['schema_revision_ready'] = bool(result['schema_revision']) or not result['schema_revision_required']
         except Exception:
             current_app.logger.exception('Health check Alembic revision probe failed')
+            result['schema_revision_ready'] = not result['schema_revision_required']
         zone_count = Zone.query.count()
         result['db_connected'] = True
         result['zones_seeded'] = zone_count > 0
@@ -790,6 +794,7 @@ def system_health():
     )
     ready = (
         result['db_connected'] and
+        result['schema_revision_ready'] and
         result['zones_seeded'] and
         result['upload_folder_writable'] and
         storage_ready
