@@ -20,8 +20,8 @@ class DocumentAnalysisTests(unittest.TestCase):
             add_interval(date(2025, 8, 17), ValidityRule('annual', 'שנה', years=1)),
             date(2026, 8, 17),
         )
-        # The expiry date itself is the final valid day.
-        self.assertEqual(validity_status(date(2026, 8, 17), date(2026, 8, 17)), 'valid')
+        # The expiry date itself is still in force, but is flagged as critical.
+        self.assertEqual(validity_status(date(2026, 8, 17), date(2026, 8, 17)), 'critical')
         self.assertEqual(validity_status(date(2026, 8, 16), date(2026, 8, 17)), 'expired')
 
     def test_february_29_has_safe_next_year(self):
