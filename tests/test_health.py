@@ -2,6 +2,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from sqlalchemy import text
+
 from app import create_app
 from app.extensions import db
 
@@ -38,6 +40,14 @@ class SystemHealthTests(unittest.TestCase):
         ProductionHealthConfig.UPLOAD_FOLDER = self.temp_dir.name
         self.app = create_app(ProductionHealthConfig)
         self.app.config.update(TESTING=True)
+        with self.app.app_context():
+            db.session.execute(text(
+                "CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)"
+            ))
+            db.session.execute(text(
+                "INSERT INTO alembic_version (version_num) VALUES ('0013_document_classification')"
+            ))
+            db.session.commit()
         self.client = self.app.test_client()
 
     def tearDown(self):
@@ -63,6 +73,22 @@ class SystemHealthTests(unittest.TestCase):
         self.assertTrue(payload['supabase_configured'])
         self.assertTrue(payload['storage_connected'])
         self.assertTrue(payload['gemini_configured'])
+
+    def test_production_is_not_ready_when_alembic_revision_is_missing(self):
+        with self.app.app_context():
+            db.session.execute(text("DROP TABLE alembic_version"))
+            db.session.commit()
+
+        with patch('app.api.routes.storage.is_configured', return_value=True), patch(
+            'app.api.routes.storage.check_connection', return_value=(True, None)
+        ):
+            response = self.client.get('/api/system/health')
+
+        self.assertEqual(response.status_code, 503)
+        payload = response.get_json()
+        self.assertEqual(payload['status'], 'degraded')
+        self.assertTrue(payload['schema_revision_required'])
+        self.assertFalse(payload['schema_revision_ready'])
 
     def test_production_is_not_ready_when_supabase_is_not_configured(self):
         with patch('app.api.routes.storage.is_configured', return_value=False):
