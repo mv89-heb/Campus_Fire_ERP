@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, current_app, render_template, send_file, redirect, session
 from app.extensions import db
-from app.models import Zone, SystemRequirement, Document
+from app.models import Zone, SystemRequirement, Document, User
 from app.services import gemini_document_service as ai_svc
 from app.services import document_link_service as link_svc
 from app.services.dms_service import DMSService
@@ -35,8 +35,18 @@ def _document_token_valid(token, doc_id):
 
 
 def _document_access_allowed(doc_id):
-    if session.get('user_id'):
-        return True
+    user_id = session.get('user_id')
+    if user_id:
+        try:
+            user = db.session.get(User, user_id)
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception('Could not validate session user for document %s', doc_id)
+            user = None
+        if user and user.active:
+            return True
+        session.clear()
+
     token = request.args.get('access_token') or request.headers.get('X-Document-Access-Token') or request.cookies.get(f'doc_access_{int(doc_id)}')
     return _document_token_valid(token, doc_id)
 
@@ -147,7 +157,7 @@ def serve_upload(filename):
             return _pdf_response(data, _safe_pdf_filename(doc, doc.id), download=False)
         except ValueError as exc:
             return jsonify({'error': str(exc)}), 502
-    return jsonify({'error': f'File not found. Looking in: {full_path}'}), 404
+    return jsonify({'error': 'File not found'}), 404
 
 
 @main_bp.route('/api/documents/<int:doc_id>/file', methods=['GET'])
@@ -169,15 +179,13 @@ def document_file(doc_id):
             fallback = _supabase_signed_redirect(resolved_path, doc_id)
             if fallback:
                 return fallback
-        return jsonify({'error': 'המסמך נמצא ב-Supabase אך לא ניתן להוריד אותו', 'document_id': doc_id,
-                        'resolved_path': resolved_path, 'details': error}), 502
+        return jsonify({'error': 'המסמך נמצא באחסון אך לא ניתן להוריד אותו', 'document_id': doc_id}), 502
     base_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     full_path = os.path.abspath(os.path.join(base_dir, os.path.basename(doc.file_path)))
     if os.path.commonpath([full_path, base_dir]) != base_dir:
         return jsonify({'error': 'Invalid file path'}), 400
     if not os.path.isfile(full_path):
-        return jsonify({'error': 'File not found', 'document_id': doc_id, 'db_file_path': doc.file_path,
-                        'looking_in': full_path, 'supabase_resolved': False}), 404
+        return jsonify({'error': 'File not found', 'document_id': doc_id}), 404
     try:
         with open(full_path, 'rb') as local_file:
             data = local_file.read()
@@ -357,7 +365,7 @@ def document_intelligence_context(doc_id):
     if not doc:
         return jsonify({'error': 'המסמך לא נמצא'}), 404
     try:
-        links = link_svc.resolve_document(doc, persist=True)
+        links = link_svc.resolve_document(doc, persist=False)
         return jsonify({
             'document_id': doc.id,
             'file_name': doc.file_name,
