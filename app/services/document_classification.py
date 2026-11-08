@@ -76,6 +76,7 @@ def classify_document(filename=None, document_type=None, document_purpose=None, 
     type_text = _normalize(document_type)
     purpose_text = _normalize(document_purpose)
     body = _normalize(body_text)
+    body_header = body[:1500]
     metadata_text = " ".join(part for part in (type_text, purpose_text) if part)
 
     if _contains_any(filename_text, _AUDIT_FILENAME_MARKERS):
@@ -85,7 +86,7 @@ def classify_document(filename=None, document_type=None, document_purpose=None, 
             "reason": "explicit_audit_summary_filename",
         }
 
-    if _contains_any(metadata_text, _ADMINISTRATIVE_MARKERS) or _contains_any(filename_text, _ADMINISTRATIVE_MARKERS) or _contains_any(body, _ADMINISTRATIVE_MARKERS):
+    if _contains_any(metadata_text, _ADMINISTRATIVE_MARKERS) or _contains_any(filename_text, _ADMINISTRATIVE_MARKERS) or (not type_text and _contains_any(body_header, _ADMINISTRATIVE_MARKERS)):
         return {
             "is_audit_summary": False,
             "date_policy_exempt": True,
