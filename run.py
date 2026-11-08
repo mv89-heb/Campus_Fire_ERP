@@ -10,9 +10,20 @@ app = create_app()
 # than relying on FLASK_ENV being set correctly, because production database
 # schema must always match the SQLAlchemy models shipped with the release.
 try:
-    from flask_migrate import upgrade
+    # Invoke the registered Flask-Migrate CLI command through Flask's runner.
+    # This follows the exact same code path exercised by `flask db upgrade`
+    # in CI, and surfaces Alembic output in Render startup logs.
     with app.app_context():
-        upgrade()
+        migration_result = app.test_cli_runner().invoke(args=['db', 'upgrade'])
+    if migration_result.exit_code != 0:
+        raise RuntimeError(
+            'Alembic startup migration failed: '
+            + (migration_result.output or 'no diagnostic output')
+        )
+    app.logger.info(
+        'Alembic startup migration completed: %s',
+        (migration_result.output or 'database already at migration head').strip(),
+    )
 except Exception:
     app.logger.exception('Database migration failed during startup')
     raise
