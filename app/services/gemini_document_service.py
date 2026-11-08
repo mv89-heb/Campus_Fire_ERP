@@ -82,7 +82,7 @@ SCHEMA = {
         "follow_up_questions": {"type": "ARRAY", "items": {"type": "STRING"}},
         "confidence": {"type": "NUMBER"}
     },
-    "required": ["document_type", "document_purpose", "is_audit_summary", "summary", "overall_status", "key_findings", "missing_items", "contradictions", "follow_up_questions", "confidence"]
+    "required": ["document_type", "document_purpose", "is_audit_summary", "date_extraction_confidence", "summary", "overall_status", "key_findings", "missing_items", "contradictions", "follow_up_questions", "confidence"]
 }
 
 SYSTEM_PROMPT = """אתה מנתח מסמכי בטיחות אש עבור ERP.
@@ -237,6 +237,10 @@ def persist(document, result):
                 raise ValueError("date confidence out of range")
     except (TypeError, ValueError):
         document.date_extraction_confidence = None
+        document.analysis_review_required = True
+    if extracted_any_date and document.date_extraction_confidence is None:
+        # Dates without a model-provided extraction confidence are not auto-approved.
+        document.date_extraction_confidence = 0.0
         document.analysis_review_required = True
     if extracted_any_date and not document.date_reviewed_at:
         document.date_extraction_source = (
