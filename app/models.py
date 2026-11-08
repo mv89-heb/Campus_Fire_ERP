@@ -59,6 +59,21 @@ class Document(db.Model):
     previous_expiry_date = db.Column(db.Date, nullable=True)
     previous_issue_date = db.Column(db.Date, nullable=True)
 
+    # Deterministic date-policy results are separate from source/OCR dates.
+    document_year = db.Column(db.SmallInteger, nullable=True)
+    is_multi_year = db.Column(db.Boolean, default=False, nullable=False)
+    is_audit_summary = db.Column(db.Boolean, default=False, nullable=False)
+    audit_year = db.Column(db.SmallInteger, nullable=True)
+    calculated_status = db.Column(db.String(32), nullable=True, index=True)
+    date_verification_status = db.Column(db.String(32), nullable=True)
+    status_policy_year = db.Column(db.SmallInteger, nullable=True)
+    status_calculated_at = db.Column(db.DateTime, nullable=True)
+    manual_status_override = db.Column(db.String(32), nullable=True)
+    override_reason = db.Column(db.Text, nullable=True)
+    override_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    override_at = db.Column(db.DateTime, nullable=True)
+    override_expires_at = db.Column(db.DateTime, nullable=True)
+
     ai_status = db.Column(db.String(20), default='not_requested', nullable=False)
     ai_processing_started_at = db.Column(db.DateTime, nullable=True)
     ai_model = db.Column(db.String(80), nullable=True)
