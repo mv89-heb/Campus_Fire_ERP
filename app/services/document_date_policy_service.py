@@ -294,6 +294,9 @@ def reconcile_audit_summary(summary_document):
                     doc.expiry_date or doc.analysis_expiry_date,
                     policy_year=policy_year,
                     grace_period_days=grace_days,
+                    date_extraction_conflict=bool(doc.date_extraction_conflict),
+                    date_extraction_confidence=doc.date_extraction_confidence,
+                    minimum_date_confidence=current_app.config.get("DOCUMENT_DATE_CONFIDENCE_MIN", 0.80) if has_app_context() else 0.80,
                 )
                 candidates.append({
                     "document_id": doc.id,
@@ -339,6 +342,9 @@ def reconcile_audit_summary(summary_document):
                         doc.expiry_date or doc.analysis_expiry_date,
                         policy_year=policy_year,
                         grace_period_days=grace_days,
+                        date_extraction_conflict=bool(doc.date_extraction_conflict),
+                        date_extraction_confidence=doc.date_extraction_confidence,
+                        minimum_date_confidence=current_app.config.get("DOCUMENT_DATE_CONFIDENCE_MIN", 0.80) if has_app_context() else 0.80,
                     )
                     candidates.append({
                         "document_id": doc.id,
