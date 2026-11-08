@@ -87,7 +87,7 @@ def classify_document(filename=None, document_type=None, document_purpose=None, 
     if _contains_any(metadata_text, _AUDIT_REPORT_MARKERS):
         # A maintenance certificate can mention an inspection report without
         # itself being the authority's consolidated audit/finding summary.
-        if _contains_any(type_text, _CERTIFICATE_MARKERS) or _contains_any(purpose_text, _CERTIFICATE_MARKERS):
+        if _contains_any(type_text, _CERTIFICATE_MARKERS):
             return {
                 "is_audit_summary": False,
                 "date_policy_exempt": False,
@@ -100,7 +100,7 @@ def classify_document(filename=None, document_type=None, document_purpose=None, 
         }
 
     if _contains_any(body, _AUDIT_REPORT_MARKERS) or ("ליקויים" in body and "ביקורת" in body):
-        if not _contains_any(body, _CERTIFICATE_MARKERS):
+        if not _contains_any(type_text, _CERTIFICATE_MARKERS):
             return {
                 "is_audit_summary": True,
                 "date_policy_exempt": False,
