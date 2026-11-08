@@ -6,7 +6,7 @@ from calendar import monthrange
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-revision = "0012_document_date_ocr_edge_cases"
+revision = "0012_date_ocr_edges"
 down_revision = "0011_document_date_policy"
 branch_labels = None
 depends_on = None
