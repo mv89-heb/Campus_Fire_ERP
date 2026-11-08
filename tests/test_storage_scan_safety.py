@@ -35,10 +35,8 @@ class StorageScanConfig:
 class _FakeBucket:
     def __init__(self, pages):
         self.pages = pages
-        self.calls = 0
 
     def list(self, path='', options=None):
-        self.calls += 1
         value = self.pages.pop(0)
         if isinstance(value, Exception):
             raise value
@@ -59,58 +57,63 @@ class _FakeClient:
 
 
 class StorageInventorySafetyTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        StorageScanConfig.UPLOAD_FOLDER = self.temp_dir.name
+        self.app = create_app(StorageScanConfig)
+
+    def tearDown(self):
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+        self.temp_dir.cleanup()
+
+    @staticmethod
+    def _first_page():
+        return [{'name': f'{i}.pdf', 'metadata': {'size': 1}} for i in range(100)]
+
     def test_strict_inventory_raises_instead_of_returning_partial_page(self):
-        first_page = [
-            {'name': f'{i}.pdf', 'metadata': {'size': 1}}
-            for i in range(100)
-        ]
-        bucket = _FakeBucket([first_page, RuntimeError('provider timeout')])
-        with patch('app.services.storage.is_configured', return_value=True), patch(
+        bucket = _FakeBucket([self._first_page(), RuntimeError('provider timeout')])
+        with self.app.app_context(), patch(
+            'app.services.storage.is_configured', return_value=True
+        ), patch(
             'app.services.storage._get_client', return_value=_FakeClient(bucket)
         ):
             with self.assertRaises(storage.StorageError):
                 storage.list_supabase_files(strict=True)
 
     def test_best_effort_inventory_keeps_legacy_behavior(self):
-        first_page = [
-            {'name': f'{i}.pdf', 'metadata': {'size': 1}}
-            for i in range(100)
-        ]
-        bucket = _FakeBucket([first_page, RuntimeError('provider timeout')])
-        with patch('app.services.storage.is_configured', return_value=True), patch(
+        bucket = _FakeBucket([self._first_page(), RuntimeError('provider timeout')])
+        with self.app.app_context(), patch(
+            'app.services.storage.is_configured', return_value=True
+        ), patch(
             'app.services.storage._get_client', return_value=_FakeClient(bucket)
         ):
             result = storage.list_supabase_files()
         self.assertEqual(len(result), 100)
 
     def test_failed_storage_scan_is_marked_incomplete_and_has_no_orphan_candidates(self):
-        with tempfile.TemporaryDirectory() as folder:
-            StorageScanConfig.UPLOAD_FOLDER = folder
-            app = create_app(StorageScanConfig)
-            with app.app_context():
-                db.create_all()
-                db.session.add(Document(
-                    file_name='existing.pdf',
-                    file_path='documents/existing.pdf',
-                    file_hash='a' * 64,
-                    status='active',
-                ))
-                db.session.commit()
-                with patch.object(health.storage, 'is_configured', return_value=True), patch.object(
-                    health.storage, 'get_bucket_name', return_value='documents'
-                ), patch.object(
-                    health.storage, 'list_supabase_files',
-                    side_effect=storage.StorageError('provider timeout'),
-                ):
-                    result = health.scan(folder)
-                    self.assertFalse(result['scan_complete'])
-                    self.assertIsNone(result['orphaned'])
-                    self.assertIsNone(result['missing'])
-                    self.assertEqual(result['orphaned_items'], [])
-                    with self.assertRaises(storage.StorageError):
-                        health.cleanup_preview(folder)
-                db.session.remove()
-                db.drop_all()
+        with self.app.app_context():
+            db.session.add(Document(
+                file_name='existing.pdf',
+                file_path='documents/existing.pdf',
+                file_hash='a' * 64,
+                status='active',
+            ))
+            db.session.commit()
+            with patch.object(health.storage, 'is_configured', return_value=True), patch.object(
+                health.storage, 'get_bucket_name', return_value='documents'
+            ), patch.object(
+                health.storage, 'list_supabase_files',
+                side_effect=storage.StorageError('provider timeout'),
+            ):
+                result = health.scan(self.temp_dir.name)
+                self.assertFalse(result['scan_complete'])
+                self.assertIsNone(result['orphaned'])
+                self.assertIsNone(result['missing'])
+                self.assertEqual(result['orphaned_items'], [])
+                with self.assertRaises(storage.StorageError):
+                    health.cleanup_preview(self.temp_dir.name)
 
 
 if __name__ == '__main__':
