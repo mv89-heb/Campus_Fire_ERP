@@ -302,16 +302,24 @@ def build_local_basename_index(upload_folder: str) -> dict:
     return index
 
 
-def list_supabase_files() -> list:
-    """Return files from the whole bucket, including nested folders."""
+def list_supabase_files(strict: bool = False) -> list:
+    """Return a complete bucket inventory, including nested folders.
+
+    By default, preserve the historical best-effort behavior for non-destructive
+    callers. Integrity scans must pass strict=True so a provider/pagination
+    failure cannot be mistaken for a complete (but partial) inventory.
+    """
     if not is_configured():
+        if strict:
+            raise StorageError('Supabase אינו מוגדר; לא ניתן להשלים סריקת אחסון')
         return []
+
     results = []
     bucket = _bucket_name()
-    client = _get_client()
     visited = set()
     queue = ['']
     try:
+        client = _get_client()
         while queue:
             prefix = queue.pop(0)
             if prefix in visited:
@@ -323,8 +331,8 @@ def list_supabase_files() -> list:
                     path=prefix,
                     options={'limit': limit, 'offset': offset, 'sortBy': {'column': 'name', 'order': 'asc'}},
                 )
-                if not page:
-                    break
+                if page is None:
+                    raise StorageError(f'Supabase החזיר תשובת רשימה ריקה/לא תקינה עבור {prefix or "/"}')
                 for item in page:
                     name = item.get('name') if isinstance(item, dict) else getattr(item, 'name', None)
                     if not name:
@@ -339,10 +347,13 @@ def list_supabase_files() -> list:
                 if len(page) < limit:
                     break
                 offset += limit
-    except Exception as e:
-        logger.error(f'list_supabase_files failed: {e}')
+    except Exception as exc:
+        logger.error('list_supabase_files failed for bucket %s: %s', bucket, exc)
+        if strict:
+            if isinstance(exc, StorageError):
+                raise
+            raise StorageError(f'סריקת Supabase Storage נקטעה: {exc}') from exc
     return results
-
 
 def find_supabase_legacy_path(file_path: str, inventory: list | None = None) -> str | None:
     """Resolve old local DB paths to an actual Supabase object path."""
