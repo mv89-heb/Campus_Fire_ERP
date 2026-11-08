@@ -224,6 +224,8 @@ def dashboard():
                         date_extraction_conflict=bool(latest.date_extraction_conflict),
                         date_extraction_confidence=latest.date_extraction_confidence,
                         minimum_date_confidence=current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80),
+                        is_audit_summary=bool(latest.is_audit_summary),
+        is_audit_summary=bool(doc.is_audit_summary),
                     )
                     calculated_status = policy_result['status']
                     override_active = bool(
