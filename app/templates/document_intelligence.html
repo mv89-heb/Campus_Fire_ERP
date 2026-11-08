@@ -114,10 +114,12 @@ const AI=(()=>{
       '<div class="muted" style="margin:6px 0">סטטוס מחושב: <b>'+esc(d.calculated_status_label||d.calculated_status||'ממתין לחישוב')+'</b>'+
       (d.is_multi_year?' · אישור רב-שנתי':'')+'</div><p class="muted">'+esc(d.date_status_reason||'')+'</p>'+
       (d.effective_status&&d.effective_status!==d.calculated_status?' · חריג ידני פעיל: '+esc(d.effective_status):'')+'</div>'+
-      '<div class="relationship-grid">'+
-      '<label>תאריך הנפקה<input id="docIssueDate" type="date" value="'+esc(d.issue_date||'')+'"></label>'+
-      '<label>תאריך תפוגה<input id="docExpiryDate" type="date" value="'+esc(d.expiry_date||'')+'"></label>'+
-      '</div><button class="btn btn-primary" style="margin-top:10px" onclick="AI.saveDates('+d.document_id+')">💾 שמור ואמת תאריכים</button>'+
+      (d.is_audit_summary
+        ?'<p class="muted">זהו סיכום ביקורת ולא אישור בעל תוקף. שנת הביקורת: '+esc(d.audit_year||'לא זוהתה')+'.</p>'
+        :'<div class="relationship-grid">'+
+          '<label>תאריך הנפקה<input id="docIssueDate" type="date" value="'+esc(d.issue_date||'')+'"></label>'+
+          '<label>תאריך תפוגה<input id="docExpiryDate" type="date" value="'+esc(d.expiry_date||'')+'"></label>'+
+          '</div><button class="btn btn-primary" style="margin-top:10px" onclick="AI.saveDates('+d.document_id+')">💾 שמור ואמת תאריכים</button>')+
       (d.date_extraction_conflict?'<div class="finding high">נמצאה סתירה בין תאריכי החילוץ. תאריך Gemini: '+esc(d.gemini_issue_date||'לא זוהה')+' עד '+esc(d.gemini_expiry_date||'לא זוהה')+'. יש לבדוק מול ה-PDF ולאשר ידנית.</div>':'')+
       (d.date_extraction_confidence!=null?'<p class="muted">ביטחון חילוץ תאריכים: '+Math.round(d.date_extraction_confidence*100)+'% · מקור: '+esc(d.date_extraction_source||'לא ידוע')+'</p>':'')+
       (d.override_reason?'<p class="muted">סיבת חריג: '+esc(d.override_reason)+'</p>':'')+'</div>';
