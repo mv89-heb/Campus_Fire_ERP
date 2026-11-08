@@ -11,6 +11,7 @@ from datetime import date
 import io
 import platform
 import os
+import tempfile
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 main_bp = Blueprint('main', __name__)
@@ -473,35 +474,70 @@ def document_intelligence_overview():
 
 @main_bp.route('/api/system/health')
 def system_health():
-    result = {'db_connected': False, 'zones_seeded': False, 'upload_folder_writable': False}
+    """Public, side-effect-light readiness probe for Render and GitHub Actions."""
+    storage_required = bool(current_app.config.get(
+        'REQUIRE_SUPABASE_STORAGE',
+        current_app.config.get('IS_PRODUCTION', False),
+    ))
+    result = {
+        'status': 'degraded',
+        'db_connected': False,
+        'zones_seeded': False,
+        'upload_folder_writable': False,
+        'supabase_required': storage_required,
+        'supabase_configured': False,
+        'storage_connected': False,
+        'gemini_configured': bool(current_app.config.get('GEMINI_API_KEY')),
+    }
+
     try:
         zone_count = Zone.query.count()
         result['db_connected'] = True
         result['zones_seeded'] = zone_count > 0
         result['zone_count'] = zone_count
-    except Exception as e:
-        result['db_error'] = str(e)
-    try:
-        test_path = os.path.join(current_app.config['UPLOAD_FOLDER'], '.write_test')
-        with open(test_path, 'w') as f:
-            f.write('ok')
-        os.remove(test_path)
-        result['upload_folder_writable'] = True
-    except Exception as e:
-        result['upload_folder_error'] = str(e)
-    result['database_url_source'] = 'DATABASE_URL (custom, e.g. Neon)' if os.environ.get('DATABASE_URL') else 'SQLite מקומי (ברירת מחדל - DATABASE_URL לא הוגדר)'
-    result['supabase_configured'] = storage.is_configured()
-    if result['supabase_configured']:
-        connected, storage_error = storage.check_connection()
-        result['storage_connected'] = connected
-        if storage_error:
-            result['storage_error'] = storage_error
-    else:
-        result['storage_connected'] = False
-        result['storage_note'] = 'Supabase לא מוגדר - מסמכים חדשים יישמרו מקומית'
-    status_code = 200 if result['db_connected'] and result['upload_folder_writable'] else 503
-    return jsonify(result), status_code
+    except Exception:
+        current_app.logger.exception('Health check database probe failed')
 
+    try:
+        with tempfile.NamedTemporaryFile(
+            prefix='.healthcheck-',
+            dir=current_app.config['UPLOAD_FOLDER'],
+            delete=True,
+        ) as probe_file:
+            probe_file.write(b'ok')
+            probe_file.flush()
+        result['upload_folder_writable'] = True
+    except Exception:
+        current_app.logger.exception('Health check upload-folder probe failed')
+
+    try:
+        result['supabase_configured'] = storage.is_configured()
+        if result['supabase_configured']:
+            connected, storage_error = storage.check_connection()
+            result['storage_connected'] = bool(connected)
+            if not connected:
+                current_app.logger.warning(
+                    'Health check Supabase Storage probe failed: %s',
+                    storage_error or 'unknown storage error',
+                )
+        elif not storage_required:
+            result['storage_note'] = 'Supabase is not configured; local storage fallback is enabled'
+    except Exception:
+        current_app.logger.exception('Health check Supabase Storage probe failed')
+        result['storage_connected'] = False
+
+    storage_ready = (
+        not storage_required or
+        (result['supabase_configured'] and result['storage_connected'])
+    )
+    ready = (
+        result['db_connected'] and
+        result['zones_seeded'] and
+        result['upload_folder_writable'] and
+        storage_ready
+    )
+    result['status'] = 'ok' if ready else 'degraded'
+    return jsonify(result), (200 if ready else 503)
 
 @main_bp.route('/api/outlook', methods=['POST'])
 def outlook():
