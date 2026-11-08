@@ -230,6 +230,7 @@ def dashboard():
                     calculated_status = policy_result['status']
                     override_active = bool(
                         latest.manual_status_override and latest.override_expires_at
+                        and not latest.is_audit_summary and not latest.date_policy_exempt
                         and latest.override_expires_at > datetime.utcnow()
                     )
                     if override_active:
@@ -344,6 +345,7 @@ def _ai_document_payload(doc, include_reconciliation=False):
     calculated_status = date_result['status']
     override_active = bool(
         doc.manual_status_override and doc.override_expires_at
+        and not doc.is_audit_summary and not doc.date_policy_exempt
         and doc.override_expires_at > datetime.utcnow()
     )
     return {
