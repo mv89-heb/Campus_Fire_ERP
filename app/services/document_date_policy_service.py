@@ -209,7 +209,7 @@ def apply_document_policy(document, *, policy_year=None, today=None, grace_perio
         ),
         is_audit_summary=bool(getattr(document, "is_audit_summary", False)),
     )
-    document.document_year = issue_date.year if issue_date else None
+    document.document_year = issue_date.year if issue_date and not getattr(document, 'is_audit_summary', False) else None
     document.is_multi_year = bool(result["is_multi_year"])
     document.calculated_status = result["status"]
     document.date_verification_status = result["verification"]
