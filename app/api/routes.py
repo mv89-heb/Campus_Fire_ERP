@@ -7,7 +7,7 @@ from app.services.dms_service import DMSService
 from app.services import storage
 from app.services.document_analysis_service import validity_status
 from app.services.document_date_policy_service import (
-    apply_document_policy, calculate_document_status, reconcile_audit_summary, STATUS_LABELS, today_israel,
+    apply_document_policy, calculate_document_status, reconcile_audit_summary, STATUS_LABELS, today_israel, document_dates,
 )
 from app.services.audit_log_service import log as audit_log
 from app.utils.security import validate_and_save_pdf
@@ -297,8 +297,7 @@ def document_intelligence_page():
 
 def _ai_document_payload(doc, include_reconciliation=False):
     date_result = calculate_document_status(
-        doc.issue_date or doc.analysis_issue_date,
-        doc.expiry_date or doc.analysis_expiry_date,
+        *document_dates(doc),
         policy_year=current_app.config.get('DOCUMENT_POLICY_YEAR', 2026),
         grace_period_days=current_app.config.get('DOCUMENT_GRACE_PERIOD_DAYS', 0),
     )
@@ -385,6 +384,7 @@ def document_date_review(doc_id):
     }
     document.issue_date = issue_date
     document.expiry_date = expiry_date
+    document.date_reviewed_at = datetime.utcnow()
     document.analysis_review_required = False
     # A corrected source date invalidates a previous exception; recalculate from evidence.
     document.manual_status_override = None
