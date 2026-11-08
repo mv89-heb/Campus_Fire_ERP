@@ -79,6 +79,15 @@ class DocumentDatePolicyTests(unittest.TestCase):
         self.assertEqual(result["status"], "needs_manual_review")
         self.assertEqual(result["verification"], "low_date_confidence")
 
+    def test_ocr_year_1212_is_implausible_and_requires_manual_review(self):
+        result = calculate_document_status(
+            date(1212, 2, 28), date(1217, 2, 28),
+            policy_year=2026, today=date(2026, 11, 8),
+        )
+        self.assertEqual(result["status"], "needs_manual_review")
+        self.assertEqual(result["verification"], "implausible_date")
+        self.assertFalse(result["is_multi_year"])
+
     def test_conflicting_local_and_gemini_dates_require_manual_review(self):
         result = calculate_document_status(
             date(2026, 1, 1), date(2027, 1, 1),
@@ -170,6 +179,17 @@ class AuditSummaryReconciliationTests(unittest.TestCase):
         self.assertTrue(result["is_audit_summary"])
         self.assertEqual(result["audit_year"], 2026)
         self.assertEqual(result["audit_date"], date(2026, 11, 1))
+
+
+    def test_audit_summary_is_detected_from_file_name_without_text_layer(self):
+        from unittest.mock import patch
+        from app.services.document_analysis_service import analyze_pdf_bytes
+        with patch(
+            "app.services.document_analysis_service._extract_text",
+            return_value=("", 0),
+        ):
+            result = analyze_pdf_bytes(b"fake-pdf", "סיכום ביקורת תקופתית.pdf")
+        self.assertTrue(result["is_audit_summary"])
 
 
     def test_unlinked_audit_summary_requires_manual_site_link(self):
