@@ -134,7 +134,7 @@ const AI=(()=>{
           '</div>').join('')+
         '</div>';
     }
-    if(!d.is_audit_summary&&['admin','super_admin'].includes(USER_ROLE)){
+    if(!d.is_audit_summary&&!d.date_policy_exempt&&['admin','super_admin'].includes(USER_ROLE)){
       h+='<div class="card"><b>🛡️ אישור חריג מנהלי</b><p class="muted">החריג אינו משנה את הסטטוס המחושב, נרשם ביומן ופג אוטומטית לאחר 90 יום.</p>'+
         '<select id="docOverrideStatus"><option value="active">אישור תקף בחריג</option><option value="old_approval">אישור ישן</option><option value="expired">פג תוקף</option><option value="grace_period">תקופת חסד</option><option value="needs_manual_review">דורש בדיקה</option></select>'+
         '<textarea id="docOverrideReason" rows="2" placeholder="סיבה מפורטת לאישור החריג (לפחות 10 תווים)"></textarea>'+
