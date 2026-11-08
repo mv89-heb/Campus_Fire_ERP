@@ -33,6 +33,15 @@ class DocumentDatePolicyTests(unittest.TestCase):
         self.assertFalse(result["is_audit_summary"])
         self.assertFalse(result["date_policy_exempt"])
 
+    def test_maintenance_report_with_generic_audit_wording_is_not_a_summary(self):
+        result = classify_document(
+            filename="טופס 4.pdf",
+            document_type='טופס 4 ודו"ח ביקורת תחזוקה למערכת גילוי אש',
+            document_purpose="דיווח שנתי על ביצוע תחזוקה שוטפת למערכת גילוי אש",
+        )
+        self.assertFalse(result["is_audit_summary"])
+        self.assertFalse(result["date_policy_exempt"])
+
     def test_fee_receipt_is_exempt_but_not_an_audit_summary(self):
         result = classify_document(
             filename="KAB2650733.pdf",
@@ -234,6 +243,28 @@ class AuditSummaryReconciliationTests(unittest.TestCase):
         self.assertEqual(result["audit_year"], 2026)
         self.assertEqual(result["audit_date"], date(2026, 11, 1))
 
+
+    def test_maintenance_form_text_does_not_become_audit_summary(self):
+        from unittest.mock import patch
+        from app.services.document_analysis_service import analyze_pdf_bytes
+        with patch(
+            "app.services.document_analysis_service._extract_text",
+            return_value=('טופס 2 - אישור תקינות. דו"ח ביקורת שנתית ותחזוקת מטפים לפי ת"י 129 חלק 1', 1),
+        ):
+            result = analyze_pdf_bytes(b"fake-pdf", "טופס 2.pdf")
+        self.assertFalse(result["is_audit_summary"])
+        self.assertFalse(result["date_policy_exempt"])
+
+    def test_fee_receipt_text_is_exempt_from_certificate_expiry(self):
+        from unittest.mock import patch
+        from app.services.document_analysis_service import analyze_pdf_bytes
+        with patch(
+            "app.services.document_analysis_service._extract_text",
+            return_value=("שובר אגרת בטיחות אש. תשלום בגין ביקורת ציוד במקרקעין.", 1),
+        ):
+            result = analyze_pdf_bytes(b"fake-pdf", "KAB2650733.pdf")
+        self.assertFalse(result["is_audit_summary"])
+        self.assertTrue(result["date_policy_exempt"])
 
     def test_audit_summary_is_detected_from_file_name_without_text_layer(self):
         from unittest.mock import patch
