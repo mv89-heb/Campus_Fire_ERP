@@ -11,6 +11,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from app.extensions import db
+from flask import current_app, has_app_context
 from app.models import Audit, Document
 
 DEFAULT_POLICY_YEAR = 2026
@@ -163,6 +164,8 @@ def apply_document_policy(document, *, policy_year=None, today=None, grace_perio
     document.date_verification_status = result["verification"]
     document.status_policy_year = int(policy_year)
     document.status_calculated_at = datetime.utcnow()
+    if result['status'] in {'needs_manual_review', 'future_issue_date', 'date_conflict'}:
+        document.analysis_review_required = True
     return result
 
 
@@ -212,7 +215,13 @@ def reconcile_audit_summary(summary_document):
     site_id = summary_document.site_id or (audit.site_id if audit else None)
     query = Document.query.filter(Document.status.notin_(["deleted", "archived"]), Document.id != summary_document.id)
     if site_id:
-        query = query.filter(Document.site_id == site_id)
+        from sqlalchemy import or_
+        scope = [Document.site_id == site_id]
+        if summary_document.audit_id:
+            scope.append(Document.audit_id == summary_document.audit_id)
+        if summary_document.zone_id:
+            scope.append(Document.zone_id == summary_document.zone_id)
+        query = query.filter(or_(*scope))
     elif summary_document.audit_id:
         query = query.filter(Document.audit_id == summary_document.audit_id)
     else:
@@ -245,7 +254,14 @@ def reconcile_audit_summary(summary_document):
                 doc.tags or "", doc.notes or "",
             ]))
             if any(_normalise(term) in haystack for term in terms):
-                policy = apply_document_policy(doc)
+                policy_year = current_app.config.get("DOCUMENT_POLICY_YEAR", DEFAULT_POLICY_YEAR) if has_app_context() else DEFAULT_POLICY_YEAR
+                grace_days = current_app.config.get("DOCUMENT_GRACE_PERIOD_DAYS", DEFAULT_GRACE_DAYS) if has_app_context() else DEFAULT_GRACE_DAYS
+                policy = calculate_document_status(
+                    doc.issue_date or doc.analysis_issue_date,
+                    doc.expiry_date or doc.analysis_expiry_date,
+                    policy_year=policy_year,
+                    grace_period_days=grace_days,
+                )
                 candidates.append({
                     "document_id": doc.id,
                     "file_name": doc.file_name,
