@@ -153,8 +153,11 @@ def api_documents_gemini_reanalyze_status():
 @admin_storage_bp.route('/api/admin/storage/cleanup-preview', methods=['POST'])
 @admin_required
 def api_cleanup_preview():
-    orphans = svc.cleanup_preview(current_app.config['UPLOAD_FOLDER'])
-    return jsonify({'orphaned_items': orphans, 'count': len(orphans)})
+    try:
+        orphans = svc.cleanup_preview(current_app.config['UPLOAD_FOLDER'])
+        return jsonify({'scan_complete': True, 'orphaned_items': orphans, 'count': len(orphans)})
+    except storage.StorageError as exc:
+        return jsonify({'scan_complete': False, 'orphaned_items': [], 'count': None, 'error': str(exc)}), 503
 
 
 @admin_storage_bp.route('/api/admin/storage/cleanup-confirm', methods=['POST'])
@@ -174,14 +177,14 @@ def api_storage_inventory():
     if not storage.is_configured():
         return jsonify({'configured': False, 'bucket': storage.get_bucket_name(), 'error': 'Supabase אינו מוגדר: חסרים SUPABASE_URL / SUPABASE_SERVICE_KEY', 'objects': []}), 503
     try:
-        objects = storage.list_supabase_files()
+        objects = storage.list_supabase_files(strict=True)
         query = (request.args.get('q') or '').strip().lower()
         if query:
             objects = [item for item in objects if query in str(item.get('filename', '')).lower() or query in str(item.get('basename', '')).lower()]
         return jsonify({'configured': True, 'bucket': storage.get_bucket_name(), 'object_count': len(objects), 'query': query or None, 'objects': objects})
     except Exception as exc:
         current_app.logger.exception('Supabase inventory check failed')
-        return jsonify({'configured': True, 'bucket': storage.get_bucket_name(), 'object_count': 0, 'objects': [], 'error': f'לא ניתן לקרוא את Supabase Storage: {exc}'}), 502
+        return jsonify({'configured': True, 'scan_complete': False, 'bucket': storage.get_bucket_name(), 'object_count': None, 'objects': [], 'error': f'לא ניתן להשלים סריקת Supabase Storage: {exc}'}), 502
 
 
 @admin_storage_bp.route('/admin/storage/recovery', methods=['GET'])
