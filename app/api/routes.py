@@ -334,13 +334,13 @@ def document_intelligence_analyze(doc_id):
         return jsonify({'error': 'המסמך לא נמצא'}), 404
     if doc.status in {'deleted', 'archived'}:
         return jsonify({'error': 'לא ניתן לנתח מסמך שנמחק או הועבר לארכיון'}), 409
-    if doc.ai_status == 'processing':
-        return jsonify({'error': 'המסמך כבר נמצא בתהליך ניתוח. נסה שוב לאחר סיום.'}), 409
-
     try:
         result = ai_svc.analyze_and_persist(doc.id)
         doc = db.session.get(Document, doc.id)
         return jsonify(_ai_document_payload(doc) | {'result': result}), 200
+    except ai_svc.DocumentAnalysisInProgress as exc:
+        db.session.rollback()
+        return jsonify({'error': str(exc), 'ai_status': 'processing'}), 409
     except Exception:
         current_app.logger.exception('Web Gemini analysis failed for document %s', doc_id)
         doc = db.session.get(Document, doc_id)
