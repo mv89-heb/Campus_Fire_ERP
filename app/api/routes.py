@@ -275,7 +275,7 @@ def dashboard():
                                 'form_code': d.requirement.required_form if d.requirement else '-',
                                 'issue_date': str(d.issue_date) if d.issue_date else '',
                                 'expiry_date': str(d.expiry_date) if d.expiry_date else '',
-                                'validity_status': ('missing' if not d.file_path else validity_status(d.expiry_date)),
+                                'validity_status': ('not_applicable' if d.is_audit_summary or d.date_policy_exempt else ('missing' if not d.file_path else validity_status(d.expiry_date))),
                                 'ai_status': d.ai_status,
                                 'ai_summary': d.ai_summary,
                                 'file_path': d.file_path,
