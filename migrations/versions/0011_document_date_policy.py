@@ -28,7 +28,17 @@ def upgrade():
     )
     for name, column_type, nullable in columns:
         if name not in existing:
-            op.add_column("documents", sa.Column(name, column_type, nullable=nullable))
+            if name in {"is_multi_year", "is_audit_summary"}:
+                op.add_column("documents", sa.Column(
+                    name, column_type, nullable=False, server_default=sa.false()
+                ))
+                op.alter_column("documents", name, server_default=None)
+            elif name == "override_by":
+                op.add_column("documents", sa.Column(
+                    name, column_type, sa.ForeignKey("users.id"), nullable=nullable
+                ))
+            else:
+                op.add_column("documents", sa.Column(name, column_type, nullable=nullable))
     indexes = {index["name"] for index in sa.inspect(bind).get_indexes("documents")}
     if "ix_documents_calculated_status" not in indexes:
         op.create_index("ix_documents_calculated_status", "documents", ["calculated_status"])
