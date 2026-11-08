@@ -97,6 +97,7 @@ class DMSService:
             analysis_confidence=analysis.get('confidence'),
             analysis_review_required=analysis.get('status') == 'needs_review',
             is_audit_summary=bool(analysis.get('is_audit_summary')),
+            date_extraction_source='local_pdf_text' if (analysis.get('issue_date') or analysis.get('expiry_date')) else None,
             audit_year=analysis.get('audit_year'),
             ai_status='not_requested',
         )
