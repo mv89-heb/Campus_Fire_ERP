@@ -292,6 +292,7 @@ def upload_bulk():
     processed = 0
     skipped_duplicates = 0
     errors = []
+    date_warnings = []
     files = request.files.getlist('file')
     max_pdf_bytes = current_app.config['MAX_PDF_BYTES']
     for f in files:
@@ -302,6 +303,13 @@ def upload_bulk():
             result = DMSService.ingest_document(safe_path, f.filename)
             if result is not None:
                 processed += 1
+                if result.calculated_status in {'future_issue_date', 'date_conflict', 'needs_manual_review', 'old_approval', 'expired', 'grace_period'}:
+                    date_warnings.append({
+                        'file': result.file_name,
+                        'status': result.calculated_status,
+                        'status_label': STATUS_LABELS.get(result.calculated_status, result.calculated_status),
+                        'message': 'המסמך נשמר, אך אינו נספר כאישור תקף עד להשלמת בדיקה/תיקון.',
+                    })
             else:
                 skipped_duplicates += 1
         except Exception as e:
@@ -309,7 +317,7 @@ def upload_bulk():
             errors.append({'file': f.filename, 'reason': str(e)})
     success = processed > 0 or (skipped_duplicates > 0 and not errors)
     return jsonify({'success': success, 'processed': processed, 'skipped_duplicates': skipped_duplicates,
-                    'errors': errors, 'total_files': len(files)})
+                    'errors': errors, 'date_warnings': date_warnings, 'total_files': len(files)})
 
 
 @main_bp.route('/document-intelligence')
