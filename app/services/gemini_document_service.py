@@ -22,6 +22,7 @@ SCHEMA = {
     "properties": {
         "document_type": {"type": "STRING"},
         "document_purpose": {"type": "STRING"},
+        "is_audit_summary": {"type": "BOOLEAN"},
         "audit_number": {"type": "STRING", "nullable": True},
         "site_name": {"type": "STRING", "nullable": True},
         "site_address": {"type": "STRING", "nullable": True},
@@ -78,7 +79,7 @@ SCHEMA = {
         "follow_up_questions": {"type": "ARRAY", "items": {"type": "STRING"}},
         "confidence": {"type": "NUMBER"}
     },
-    "required": ["document_type", "document_purpose", "summary", "overall_status", "key_findings", "missing_items", "contradictions", "follow_up_questions", "confidence"]
+    "required": ["document_type", "document_purpose", "is_audit_summary", "summary", "overall_status", "key_findings", "missing_items", "contradictions", "follow_up_questions", "confidence"]
 }
 
 SYSTEM_PROMPT = """אתה מנתח מסמכי בטיחות אש עבור ERP.
@@ -90,7 +91,7 @@ SYSTEM_PROMPT = """אתה מנתח מסמכי בטיחות אש עבור ERP.
 אם מידע אינו מופיע במסמך, החזר null או רשימה ריקה; לעולם אל תנחש.
 לכל ממצא: הסבר מה נמצא, למה זה חשוב, מה צריך לעשות בפועל, מי בדרך כלל מטפל
 אם אפשר להסיק זאת, ומה הראיה הדרושה לסגירה. הפרד עובדה מהמלצה וסמן אי-ודאות.
-אל תציג המלצה משפטית כעובדה. כתוב בעברית ברורה ומעשית."""
+אם המסמך הוא סיכום/דוח ביקורת או בדיקת בטיחות מסכמת, סמן is_audit_summary=true וחלץ את audit_date כפי שמופיע במסמך; אחרת false. אל תציג המלצה משפטית כעובדה. כתוב בעברית ברורה ומעשית."""
 
 def is_configured():
     return bool(current_app.config.get("GEMINI_API_KEY"))
@@ -203,7 +204,7 @@ def persist(document, result):
     document.ai_document_type = result.get("document_type")
     purpose_text = " ".join(str(result.get(key) or "") for key in ("document_type", "document_purpose", "summary")).lower()
     document.is_audit_summary = bool(
-        document.is_audit_summary or
+        document.is_audit_summary or result.get("is_audit_summary") is True or
         any(term in purpose_text for term in ("סיכום ביקורת", "דוח ביקורת", "דו\"ח ביקורת", "audit report", "inspection report"))
     )
     audit_date_value = result.get("audit_date")
