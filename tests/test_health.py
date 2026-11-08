@@ -55,6 +55,8 @@ class SystemHealthTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertEqual(payload['status'], 'ok')
+        self.assertTrue(payload['production_mode'])
+        self.assertTrue(payload['secret_key_from_environment'])
         self.assertTrue(payload['db_connected'])
         self.assertTrue(payload['zones_seeded'])
         self.assertTrue(payload['upload_folder_writable'])
