@@ -48,7 +48,7 @@ _CERTIFICATE_MARKERS = (
 
 def _normalize(value):
     value = str(value or "").lower().replace("׳", "'").replace("״", '"')
-    value = re.sub(r"[^\\w\\u0590-\\u05ff]+", " ", value)
+    value = re.sub(r"[^\w\u0590-\u05ff]+", " ", value)
     return " ".join(value.split())
 
 
