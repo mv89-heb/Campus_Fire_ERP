@@ -67,6 +67,7 @@ class Config:
     SUPABASE_URL = os.environ.get('SUPABASE_URL')
     SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY')
     SUPABASE_BUCKET = os.environ.get('SUPABASE_BUCKET', 'documents')
+    REQUIRE_SUPABASE_STORAGE = _env_bool('REQUIRE_SUPABASE_STORAGE', IS_PRODUCTION)
 
     MAX_PDF_BYTES = int(os.environ.get('MAX_PDF_BYTES', str(100 * 1024 * 1024)))
 
