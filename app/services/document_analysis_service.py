@@ -264,7 +264,7 @@ def analyze_pdf_bytes(data: bytes, filename=""):
     inspection_date = inspection_evidence["date"] if inspection_evidence else None
 
     validity = resolve_validity(zone_code=zone_code, form_number=form, text=text, inspection_date=inspection_date, explicit_expiry=explicit_expiry)
-    normalized_text = " ".join((text or "").split()).lower()
+    normalized_text = " ".join(((text or "") + " " + (file_name or "")).split()).lower()
     is_audit_summary = any(
         term in normalized_text
         for term in ("סיכום ביקורת", "דוח ביקורת", 'דו"ח ביקורת', "audit report", "inspection report")
