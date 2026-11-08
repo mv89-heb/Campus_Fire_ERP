@@ -35,6 +35,11 @@ ZONE_INFO = {
 }
 
 _EXPLICIT_EXPIRY_PATTERNS = (
+    re.compile(
+        r"(?:תוקף|בתוקף|תקף)\s+(?:האישור|הרישיון|המסמך|התעודה|ההיתר|הביטוח|החוזה)\s*(?:עד|ליום|בתאריך)\s*[:\-]?\s*"
+        + _DATE_RE.pattern,
+        re.I,
+    ),
     re.compile(r"(?:תוקף|בתוקף|תקף)\s*(?:עד|ליום|בתאריך)?\s*[:\-]?\s*" + _DATE_RE.pattern, re.I),
     re.compile(r"(?:valid\s+(?:until|through)|expires?|expiry|expiration)\s*[:\-]?\s*" + _DATE_RE.pattern, re.I),
 )
