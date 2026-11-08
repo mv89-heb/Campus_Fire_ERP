@@ -95,7 +95,7 @@ class DMSService:
             requirement_source=analysis.get('requirement_source'),
             requirement_note=analysis.get('requirement_note'),
             analysis_confidence=analysis.get('confidence'),
-            analysis_review_required=analysis.get('status') == 'needs_review' and not analysis.get('is_audit_summary'),
+            analysis_review_required=analysis.get('status') == 'needs_review' and not analysis.get('is_audit_summary') and not analysis.get('date_policy_exempt'),
             is_audit_summary=bool(analysis.get('is_audit_summary')),
             date_policy_exempt=bool(analysis.get('date_policy_exempt')),
             date_extraction_source='local_pdf_text' if (analysis.get('issue_date') or analysis.get('expiry_date')) else None,
