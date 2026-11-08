@@ -60,6 +60,7 @@ class Document(db.Model):
     previous_issue_date = db.Column(db.Date, nullable=True)
 
     ai_status = db.Column(db.String(20), default='not_requested', nullable=False)
+    ai_processing_started_at = db.Column(db.DateTime, nullable=True)
     ai_model = db.Column(db.String(80), nullable=True)
     ai_analyzed_at = db.Column(db.DateTime, nullable=True)
     ai_document_type = db.Column(db.String(120), nullable=True)
