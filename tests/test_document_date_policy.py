@@ -79,6 +79,14 @@ class DocumentDatePolicyTests(unittest.TestCase):
         self.assertEqual(result["status"], "needs_manual_review")
         self.assertEqual(result["verification"], "low_date_confidence")
 
+    def test_expired_multiyear_document_keeps_multiyear_classification(self):
+        result = calculate_document_status(
+            date(2018, 1, 1), date(2021, 1, 1),
+            policy_year=2026, today=date(2026, 11, 8),
+        )
+        self.assertEqual(result["status"], "expired")
+        self.assertTrue(result["is_multi_year"])
+
     def test_ocr_year_1212_is_implausible_and_requires_manual_review(self):
         result = calculate_document_status(
             date(1212, 2, 28), date(1217, 2, 28),
