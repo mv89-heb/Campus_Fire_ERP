@@ -143,6 +143,16 @@ def calculate_document_status(
     }
 
 
+def document_dates(document):
+    """Return effective dates; an explicit manual review may intentionally clear OCR values."""
+    if getattr(document, "date_reviewed_at", None):
+        return document.issue_date, document.expiry_date
+    return (
+        document.issue_date or document.analysis_issue_date,
+        document.expiry_date or document.analysis_expiry_date,
+    )
+
+
 def apply_document_policy(document, *, policy_year=None, today=None, grace_period_days=None):
     """Persist derived fields while preserving extracted and manually entered dates."""
     from flask import current_app, has_app_context
@@ -152,8 +162,7 @@ def apply_document_policy(document, *, policy_year=None, today=None, grace_perio
     if grace_period_days is None:
         grace_period_days = current_app.config.get("DOCUMENT_GRACE_PERIOD_DAYS", DEFAULT_GRACE_DAYS) if has_app_context() else DEFAULT_GRACE_DAYS
 
-    issue_date = document.issue_date or document.analysis_issue_date
-    expiry_date = document.expiry_date or document.analysis_expiry_date
+    issue_date, expiry_date = document_dates(document)
     result = calculate_document_status(
         issue_date, expiry_date, policy_year=policy_year,
         today=today, grace_period_days=grace_period_days,
