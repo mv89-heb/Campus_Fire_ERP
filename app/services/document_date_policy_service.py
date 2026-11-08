@@ -288,6 +288,38 @@ def reconcile_audit_summary(summary_document):
             "reason": reason,
         })
 
+    for contradiction in actions.get("contradictions", []) or []:
+        contradiction_text = str(contradiction or "").strip()
+        terms = _matching_terms(contradiction_text)
+        candidates = []
+        if terms:
+            for doc in documents:
+                haystack = _normalise(" ".join([
+                    doc.category or "", doc.ai_document_type or "", doc.file_name or "",
+                    doc.tags or "", doc.notes or "",
+                ]))
+                if any(_normalise(term) in haystack for term in terms):
+                    policy_year = current_app.config.get("DOCUMENT_POLICY_YEAR", DEFAULT_POLICY_YEAR) if has_app_context() else DEFAULT_POLICY_YEAR
+                    grace_days = current_app.config.get("DOCUMENT_GRACE_PERIOD_DAYS", DEFAULT_GRACE_DAYS) if has_app_context() else DEFAULT_GRACE_DAYS
+                    policy = calculate_document_status(
+                        doc.issue_date or doc.analysis_issue_date,
+                        doc.expiry_date or doc.analysis_expiry_date,
+                        policy_year=policy_year,
+                        grace_period_days=grace_days,
+                    )
+                    candidates.append({
+                        "document_id": doc.id,
+                        "file_name": doc.file_name,
+                        "calculated_status": policy["status"],
+                        "status_label": STATUS_LABELS.get(policy["status"], policy["status"]),
+                    })
+        items.append({
+            "finding": contradiction_text,
+            "status": "conflict",
+            "matched_documents": candidates,
+            "reason": "Gemini זיהה סתירה בסיכום הביקורת; נדרשת בדיקת מנהל גם אם נמצא מסמך תומך.",
+        })
+
     counts = {}
     for item in items:
         counts[item["status"]] = counts.get(item["status"], 0) + 1
