@@ -496,16 +496,20 @@ def document_date_override(doc_id):
 
     expiry_value = data.get('expires_at')
     try:
-        override_expires_at = (
-            datetime.fromisoformat(str(expiry_value).replace('Z', '+00:00')).astimezone(timezone.utc).replace(tzinfo=None)
-            if expiry_value else datetime.utcnow() + timedelta(days=90)
-        )
+        if expiry_value:
+            parsed_expiry = datetime.fromisoformat(str(expiry_value).replace('Z', '+00:00'))
+            override_expires_at = (
+                parsed_expiry.astimezone(timezone.utc).replace(tzinfo=None)
+                if parsed_expiry.tzinfo else parsed_expiry
+            )
+        else:
+            override_expires_at = datetime.utcnow() + timedelta(days=90)
     except (TypeError, ValueError):
         return jsonify({'error': 'תאריך פקיעת החריג אינו תקין'}), 400
     if override_expires_at <= datetime.utcnow():
         return jsonify({'error': 'תוקף החריג חייב להיות בעתיד'}), 400
     calculated = apply_document_policy(document)
-    if calculated['status'] in {'future_issue_date', 'date_conflict'} and override_status == 'active':
+    if (calculated['status'] in {'future_issue_date', 'date_conflict'} or document.date_extraction_conflict or (document.date_extraction_confidence is not None and document.date_extraction_confidence < current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80))) and override_status == 'active':
         return jsonify({'error': 'יש לתקן ולאמת את התאריכים לפני אישור המסמך', 'code': 'DATE_CORRECTION_REQUIRED'}), 409
 
     old_values = {
