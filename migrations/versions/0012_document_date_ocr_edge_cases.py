@@ -105,7 +105,7 @@ def upgrade():
             audit_year = _parse_date(linked_audit_date).year
 
         values = {
-            "document_year": issue.year if issue else None,
+            "document_year": issue.year if issue and not is_audit_summary else None,
             "is_multi_year": multi_year,
             "is_audit_summary": is_audit_summary,
             "audit_year": audit_year,
