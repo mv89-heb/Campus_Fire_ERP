@@ -725,9 +725,21 @@ def system_health():
         'supabase_configured': False,
         'storage_connected': False,
         'gemini_configured': bool(current_app.config.get('GEMINI_API_KEY')),
+        'db_backend': None,
+        'db_host': None,
+        'schema_revision': None,
     }
 
     try:
+        result['db_backend'] = db.engine.url.get_backend_name()
+        result['db_host'] = db.engine.url.host
+        try:
+            from sqlalchemy import text
+            result['schema_revision'] = db.session.execute(
+                text('SELECT version_num FROM alembic_version')
+            ).scalar()
+        except Exception:
+            current_app.logger.exception('Health check Alembic revision probe failed')
         zone_count = Zone.query.count()
         result['db_connected'] = True
         result['zones_seeded'] = zone_count > 0
