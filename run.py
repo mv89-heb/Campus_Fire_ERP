@@ -22,9 +22,19 @@ try:
         # migration failed before creating/updating that table, querying it
         # first would mask the original Alembic error with a secondary error.
         if migration_result.exit_code != 0:
+            details = (migration_result.output or '').strip()
+            if migration_result.exception is not None:
+                exception = migration_result.exception
+                exception_detail = f'{type(exception).__name__}: {exception}'
+                details = f'{details}\n{exception_detail}'.strip()
+                if migration_result.exc_info:
+                    app.logger.error(
+                        'Alembic CLI traceback during startup migration',
+                        exc_info=migration_result.exc_info,
+                    )
             raise RuntimeError(
                 'Alembic startup migration failed: '
-                + (migration_result.output or 'no diagnostic output')
+                + (details or 'no diagnostic output or exception details')
             )
 
         database_backend = db.engine.url.get_backend_name()
