@@ -221,6 +221,9 @@ def dashboard():
                         policy_year=current_app.config.get('DOCUMENT_POLICY_YEAR', 2026),
                         today=today_israel(),
                         grace_period_days=current_app.config.get('DOCUMENT_GRACE_PERIOD_DAYS', 0),
+                        date_extraction_conflict=bool(latest.date_extraction_conflict),
+                        date_extraction_confidence=latest.date_extraction_confidence,
+                        minimum_date_confidence=current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80),
                     )
                     calculated_status = policy_result['status']
                     override_active = bool(
@@ -321,6 +324,9 @@ def _ai_document_payload(doc, include_reconciliation=False):
         *document_dates(doc),
         policy_year=current_app.config.get('DOCUMENT_POLICY_YEAR', 2026),
         grace_period_days=current_app.config.get('DOCUMENT_GRACE_PERIOD_DAYS', 0),
+        date_extraction_conflict=bool(doc.date_extraction_conflict),
+        date_extraction_confidence=doc.date_extraction_confidence,
+        minimum_date_confidence=current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80),
     )
     calculated_status = date_result['status']
     override_active = bool(
@@ -406,6 +412,9 @@ def document_date_review(doc_id):
     document.issue_date = issue_date
     document.expiry_date = expiry_date
     document.date_reviewed_at = datetime.utcnow()
+    document.date_extraction_source = 'manual'
+    document.date_extraction_confidence = 1.0
+    document.date_extraction_conflict = False
     document.analysis_review_required = False
     # A corrected source date invalidates a previous exception; recalculate from evidence.
     document.manual_status_override = None
