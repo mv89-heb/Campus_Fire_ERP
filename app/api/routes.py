@@ -11,7 +11,7 @@ from app.services.document_date_policy_service import (
 )
 from app.services.audit_log_service import log as audit_log
 from app.utils.security import validate_and_save_pdf
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import io
 import platform
 import os
@@ -309,6 +309,7 @@ def upload_bulk():
                         'status': result.calculated_status,
                         'status_label': STATUS_LABELS.get(result.calculated_status, result.calculated_status),
                         'message': 'המסמך נשמר, אך אינו נספר כאישור תקף עד להשלמת בדיקה/תיקון.',
+                        'blocked_from_compliance': True,
                     })
             else:
                 skipped_duplicates += 1
@@ -391,7 +392,7 @@ def _parse_document_date(value, field_name):
     if value in (None, ""):
         return None
     try:
-        return date.fromisoformat(str(value)[:10])
+        return date.fromisoformat(str(value))
     except (TypeError, ValueError):
         raise ValueError(f"תאריך {field_name} חייב להיות בפורמט YYYY-MM-DD")
 
@@ -496,7 +497,7 @@ def document_date_override(doc_id):
     expiry_value = data.get('expires_at')
     try:
         override_expires_at = (
-            datetime.fromisoformat(str(expiry_value).replace('Z', '+00:00')).replace(tzinfo=None)
+            datetime.fromisoformat(str(expiry_value).replace('Z', '+00:00')).astimezone(timezone.utc).replace(tzinfo=None)
             if expiry_value else datetime.utcnow() + timedelta(days=90)
         )
     except (TypeError, ValueError):
