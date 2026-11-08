@@ -211,18 +211,35 @@ def dashboard():
                 total_reqs += 1
                 docs = Document.query.filter_by(req_id=req.id, status='active').order_by(Document.uploaded_at.desc()).all()
                 latest = docs[0] if docs else None
-                if not latest or not latest.expiry_date:
-                    label = 'needs_review' if latest else 'missing'
+                policy_result = None
+                calculated_status = None
+                if not latest:
+                    label = 'missing'
                 else:
-                    days_left = (latest.expiry_date - date.today()).days
-                    if days_left <= 0:
-                        label = 'expired'
-                    elif days_left <= 14:
-                        label = 'critical'
-                    elif days_left <= 30:
-                        label = 'warning'
-                    else:
+                    policy_result = calculate_document_status(
+                        *document_dates(latest),
+                        policy_year=current_app.config.get('DOCUMENT_POLICY_YEAR', 2026),
+                        today=today_israel(),
+                        grace_period_days=current_app.config.get('DOCUMENT_GRACE_PERIOD_DAYS', 0),
+                    )
+                    calculated_status = latest.calculated_status or policy_result['status']
+                    override_active = bool(
+                        latest.manual_status_override and latest.override_expires_at
+                        and latest.override_expires_at > datetime.utcnow()
+                    )
+                    if override_active:
+                        calculated_status = latest.manual_status_override
+                    days_left = (document_dates(latest)[1] - today_israel()).days if document_dates(latest)[1] else None
+                    if calculated_status == 'active':
                         label = 'valid'
+                    elif calculated_status == 'expiring_soon':
+                        label = 'critical' if days_left is not None and days_left <= 14 else 'warning'
+                    elif calculated_status == 'expired':
+                        label = 'expired'
+                    else:
+                        # Old approvals, future dates, unknown dates and grace-period
+                        # records must never be counted as compliant.
+                        label = 'needs_review'
                 entry = {
                     'req_id': req.id, 'zone_id': zone.id, 'zone_name': zone.zone_name,
                     'file_number': zone.file_number, 'system_name': req.system_name,
@@ -232,7 +249,11 @@ def dashboard():
                     'file_access_url': f'/api/documents/{latest.id}/file' if latest and latest.file_path else None,
                     'issue_date': str(latest.issue_date) if latest and latest.issue_date else None,
                     'expiry_date': str(latest.expiry_date) if latest and latest.expiry_date else None,
-                    'status': label, 'doc_count': len(docs), 'doc_names': [d.file_name for d in docs],
+                    'status': label, 'calculated_status': calculated_status,
+                    'calculated_status_label': STATUS_LABELS.get(calculated_status, calculated_status),
+                    'status_reason': policy_result.get('reason') if policy_result else None,
+                    'document_year': latest.document_year if latest else None,
+                    'doc_count': len(docs), 'doc_names': [d.file_name for d in docs],
                     'analysis_tags': latest.tags if latest else None,
                 }
                 requirements_processed.append(entry)
