@@ -120,8 +120,8 @@ const AI=(()=>{
     const s=d.supplemental||{};
     if(s.missing_items?.length)h+='<div class="finding medium"><b>חוסרים</b><ul>'+s.missing_items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';
     if(s.contradictions?.length)h+='<div class="finding high"><b>סתירות</b><ul>'+s.contradictions.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';
-    if(d.ai_status==='not_requested'||d.ai_status==='failed')
-      h+='<button class="btn btn-primary" onclick="AI.analyze('+d.document_id+')">🤖 נתח עם Gemini</button>';
+    if(d.ai_status==='not_requested'||d.ai_status==='failed'||d.processing_stale)
+      h+='<button class="btn btn-primary" onclick="AI.analyze('+d.document_id+')">🤖 '+(d.processing_stale?'נסה שוב עם Gemini':'נתח עם Gemini')+'</button>';
     if(d.ai_status==='completed')
       h+='<button class="btn btn-primary" onclick="AI.actions('+d.document_id+')">✅ צור ליקויים ומשימות</button>';
     document.getElementById('detail').innerHTML=h;
@@ -163,7 +163,7 @@ const AI=(()=>{
       const r=await fetch('/api/document-intelligence/documents');
       const d=await r.json();
       if(!r.ok)throw new Error(d.error||'לא ניתן לטעון מסמכים');
-      const pending=(d.documents||[]).filter(x=>x.ai_status!=='completed');
+      const pending=(d.documents||[]).filter(x=>x.ai_status==='not_requested'||x.ai_status==='failed'||x.processing_stale);
       if(!pending.length){
         text.textContent='כל המסמכים כבר נותחו.';
         bar.style.width='100%';
