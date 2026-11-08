@@ -257,6 +257,8 @@ def reconcile_audit_summary(summary_document):
         query = query.filter(or_(*scope))
     elif summary_document.audit_id:
         query = query.filter(Document.audit_id == summary_document.audit_id)
+    elif summary_document.zone_id:
+        query = query.filter(Document.zone_id == summary_document.zone_id)
     else:
         return {
             "is_audit_summary": True,
@@ -332,7 +334,6 @@ def reconcile_audit_summary(summary_document):
             for doc in documents:
                 haystack = _normalise(" ".join([
                     doc.category or "", doc.ai_document_type or "", doc.file_name or "",
-                    doc.tags or "", doc.notes or "",
                 ]))
                 if any(_normalise(term) in haystack for term in terms):
                     policy_year = current_app.config.get("DOCUMENT_POLICY_YEAR", DEFAULT_POLICY_YEAR) if has_app_context() else DEFAULT_POLICY_YEAR
