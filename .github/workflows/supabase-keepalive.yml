@@ -27,6 +27,8 @@ jobs:
               health = json.load(health_file)
 
           required_checks = (
+              "production_mode",
+              "secret_key_from_environment",
               "db_connected",
               "zones_seeded",
               "upload_folder_writable",
