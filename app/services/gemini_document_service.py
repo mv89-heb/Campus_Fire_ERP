@@ -238,7 +238,7 @@ def persist(document, result):
     except (TypeError, ValueError):
         document.date_extraction_confidence = None
         document.analysis_review_required = True
-    if extracted_any_date:
+    if extracted_any_date and not document.date_reviewed_at:
         document.date_extraction_source = (
             "conflicting_sources" if document.date_extraction_conflict else "gemini_pdf"
         )
