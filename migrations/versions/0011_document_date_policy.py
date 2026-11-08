@@ -1,6 +1,10 @@
 """Add deterministic document-date policy and audit-summary metadata."""
 from alembic import op
 import sqlalchemy as sa
+import json
+from calendar import monthrange
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 revision = "0011_document_date_policy"
 down_revision = "0010_gemini_processing_lease"
@@ -46,6 +50,88 @@ def upgrade():
         op.create_index("ix_documents_document_year", "documents", ["document_year"])
     if "ix_documents_audit_summary" not in indexes:
         op.create_index("ix_documents_audit_summary", "documents", ["is_audit_summary", "audit_year"])
+
+    # Backfill derived metadata for existing records without changing source dates/files.
+    documents = sa.Table("documents", sa.MetaData(), autoload_with=bind)
+    audits = sa.Table("audits", sa.MetaData(), autoload_with=bind)
+    today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+    audit_dates = {}
+    for row in bind.execute(sa.select(audits.c.id, audits.c.audit_date)):
+        audit_dates[row.id] = row.audit_date
+
+    rows = bind.execute(sa.select(
+        documents.c.id, documents.c.issue_date, documents.c.expiry_date,
+        documents.c.analysis_issue_date, documents.c.analysis_expiry_date,
+        documents.c.ai_document_type, documents.c.ai_summary,
+        documents.c.ai_actions_json, documents.c.audit_id,
+    )).mappings()
+    for row in rows:
+        issue = row["issue_date"] or row["analysis_issue_date"]
+        expiry = row["expiry_date"] or row["analysis_expiry_date"]
+        if isinstance(issue, str):
+            issue = date.fromisoformat(issue[:10])
+        if isinstance(expiry, str):
+            expiry = date.fromisoformat(expiry[:10])
+        multi_year = False
+        verification = "missing_issue_date"
+        if not issue:
+            status = "needs_manual_review"
+        elif issue > today:
+            status, verification = "future_issue_date", "future_issue_date"
+        elif expiry and expiry < issue:
+            status, verification = "date_conflict", "date_conflict"
+        elif expiry and today > expiry:
+            status, verification = "expired", "verified"
+        elif not expiry:
+            status = "old_approval" if issue.year != 2026 else "needs_manual_review"
+            verification = "missing_expiry_date"
+        else:
+            target_year = issue.year + 1
+            anniversary = issue.replace(
+                year=target_year,
+                day=min(issue.day, monthrange(target_year, issue.month)[1]),
+            )
+            multi_year = expiry > anniversary
+            verification = "verified"
+            if multi_year:
+                status = "expiring_soon" if (expiry - today).days <= 30 else "active"
+            elif issue.year != 2026:
+                status = "old_approval"
+            else:
+                status = "expiring_soon" if (expiry - today).days <= 30 else "active"
+
+        metadata = {}
+        try:
+            metadata = json.loads(row["ai_actions_json"] or "{}")
+        except (TypeError, ValueError):
+            metadata = {}
+        text = " ".join(str(value or "") for value in (
+            row["ai_document_type"], row["ai_summary"], row["ai_actions_json"]
+        )).lower()
+        is_audit_summary = any(term in text for term in (
+            "סיכום ביקורת", "דוח ביקורת", 'דו"ח ביקורת', "audit report", "inspection report"
+        ))
+        audit_year = None
+        audit_date = metadata.get("audit_date") if isinstance(metadata, dict) else None
+        if audit_date:
+            try:
+                audit_year = date.fromisoformat(str(audit_date)[:10]).year
+            except (TypeError, ValueError):
+                pass
+        linked_audit_date = audit_dates.get(row["audit_id"])
+        if not audit_year and linked_audit_date:
+            audit_year = linked_audit_date.year if hasattr(linked_audit_date, "year") else date.fromisoformat(str(linked_audit_date)[:10]).year
+
+        bind.execute(documents.update().where(documents.c.id == row["id"]).values(
+            document_year=issue.year if issue else None,
+            is_multi_year=multi_year,
+            is_audit_summary=is_audit_summary,
+            audit_year=audit_year,
+            calculated_status=status,
+            date_verification_status=verification,
+            status_policy_year=2026,
+            status_calculated_at=datetime.utcnow(),
+        ))
 
 
 def downgrade():
