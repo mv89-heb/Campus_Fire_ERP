@@ -230,14 +230,15 @@ def persist(document, result):
                 setattr(document, effective_field, extracted_date)
                 if not getattr(document, analysis_field):
                     setattr(document, analysis_field, extracted_date)
-    try:
-        if result.get("date_extraction_confidence") is not None:
-            document.date_extraction_confidence = float(result["date_extraction_confidence"])
-            if not 0 <= document.date_extraction_confidence <= 1:
-                raise ValueError("date confidence out of range")
-    except (TypeError, ValueError):
-        document.date_extraction_confidence = None
-        document.analysis_review_required = True
+    if not document.date_reviewed_at:
+        try:
+            if result.get("date_extraction_confidence") is not None:
+                document.date_extraction_confidence = float(result["date_extraction_confidence"])
+                if not 0 <= document.date_extraction_confidence <= 1:
+                    raise ValueError("date confidence out of range")
+        except (TypeError, ValueError):
+            document.date_extraction_confidence = None
+            document.analysis_review_required = True
     if extracted_any_date and document.date_extraction_confidence is None:
         # Dates without a model-provided extraction confidence are not auto-approved.
         document.date_extraction_confidence = 0.0
