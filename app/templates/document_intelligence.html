@@ -18,6 +18,7 @@
 {% endblock %}
 {% block extra_script %}
 <script>
+const USER_ROLE={{ user_role|tojson }};
 const AI=(()=>{
   let docs=[];
   let running=false;
@@ -131,6 +132,12 @@ const AI=(()=>{
           '</div>').join('')+
         '</div>';
     }
+    if(['admin','super_admin'].includes(USER_ROLE)){
+      h+='<div class="card"><b>🛡️ אישור חריג מנהלי</b><p class="muted">החריג אינו משנה את הסטטוס המחושב, נרשם ביומן ופג אוטומטית לאחר 90 יום.</p>'+
+        '<select id="docOverrideStatus"><option value="active">אישור תקף בחריג</option><option value="old_approval">אישור ישן</option><option value="expired">פג תוקף</option><option value="grace_period">תקופת חסד</option><option value="needs_manual_review">דורש בדיקה</option></select>'+
+        '<textarea id="docOverrideReason" rows="2" placeholder="סיבה מפורטת לאישור החריג (לפחות 10 תווים)"></textarea>'+
+        '<button class="btn" style="margin-top:8px" onclick="AI.applyOverride('+d.document_id+')">אשר חריג מתועד</button></div>';
+    }
     h+=await renderRelationships(id);
     (d.findings||[]).forEach((f,i)=>{
       h+='<div class="finding '+esc(f.severity)+'"><b>'+((i+1)+'. ')+esc(f.title)+'</b>'+
@@ -226,6 +233,22 @@ const AI=(()=>{
     }catch(e){alert(e.message||'שגיאה בשמירת התאריכים')}
   }
 
+  async function applyOverride(id){
+    const status=document.getElementById('docOverrideStatus')?.value;
+    const reason=document.getElementById('docOverrideReason')?.value||'';
+    if(reason.trim().length<10){alert('נדרשת סיבה מפורטת (לפחות 10 תווים)');return}
+    try{
+      const r=await fetch('/api/documents/'+id+'/date-override',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({status,reason})
+      });
+      const data=await r.json();
+      if(!r.ok)throw new Error(data.error||'לא ניתן לאשר חריג');
+      alert('החריג נשמר עד '+data.override_expires_at);
+      await load();await open(id);
+    }catch(e){alert(e.message||'שגיאה באישור חריג')}
+  }
+
   async function actions(id){
     const r=await fetch('/api/document-intelligence/'+id+'/create-actions',{method:'POST'});
     const d=await r.json();
@@ -233,7 +256,7 @@ const AI=(()=>{
     await open(id);
   }
 
-  return {load,open,analyze,analyzeAll,actions,saveRelationships,saveDates};
+  return {load,open,analyze,analyzeAll,actions,saveRelationships,saveDates,applyOverride};
 })();
 document.addEventListener('DOMContentLoaded',async()=>{await AI.load();const id=new URLSearchParams(window.location.search).get('document');if(id)await AI.open(Number(id));});
 </script>
