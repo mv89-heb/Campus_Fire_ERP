@@ -109,6 +109,26 @@ const AI=(()=>{
     let h='<h2>'+esc(d.file_name)+'</h2><div class="muted">'+esc(d.document_type||'לא זוהה')+' · '+(labels[d.ai_status]||d.ai_status)+(d.confidence!=null?' · ביטחון '+Math.round(d.confidence*100)+'%':'')+'</div>';
     if(d.error)h+='<div class="finding critical">'+esc(d.error)+'</div>';
     if(d.summary)h+='<div class="card"><b>סיכום הביקורת</b><p>'+esc(d.summary)+'</p></div>';
+    h+='<div class="card"><b>📅 תאריכי מסמך ותוקף</b>'+
+      '<div class="muted" style="margin:6px 0">סטטוס מחושב: <b>'+esc(d.calculated_status_label||d.calculated_status||'ממתין לחישוב')+'</b>'+
+      (d.is_multi_year?' · אישור רב-שנתי':'')+
+      (d.effective_status&&d.effective_status!==d.calculated_status?' · חריג ידני פעיל: '+esc(d.effective_status):'')+'</div>'+
+      '<div class="relationship-grid">'+
+      '<label>תאריך הנפקה<input id="docIssueDate" type="date" value="'+esc(d.issue_date||'')+'"></label>'+
+      '<label>תאריך תפוגה<input id="docExpiryDate" type="date" value="'+esc(d.expiry_date||'')+'"></label>'+
+      '</div><button class="btn btn-primary" style="margin-top:10px" onclick="AI.saveDates('+d.document_id+')">💾 שמור ואמת תאריכים</button>'+
+      (d.override_reason?'<p class="muted">סיבת חריג: '+esc(d.override_reason)+'</p>':'')+'</div>';
+    if(d.is_audit_summary&&d.reconciliation){
+      const rec=d.reconciliation;
+      h+='<div class="card"><b>🔎 הצלבת סיכום ביקורת '+esc(rec.audit_year||'')+'</b>'+
+        '<div class="muted">מסמכים שנבדקו בתיק: '+esc(rec.documents_checked??0)+'</div>'+
+        (rec.warning?'<div class="finding medium">'+esc(rec.warning)+'</div>':'')+
+        (rec.items||[]).map(x=>'<div class="finding '+(x.status==='conflict'?'high':x.status==='missing_document'?'critical':'medium')+'"><b>'+esc(x.finding)+'</b>'+
+          '<div class="muted">סטטוס: '+esc(x.status)+'</div><p>'+esc(x.reason)+'</p>'+
+          ((x.matched_documents||[]).length?'<ul>'+x.matched_documents.map(m=>'<li>'+esc(m.file_name)+' · '+esc(m.status_label)+'</li>').join('')+'</ul>':'')+
+          '</div>').join('')+
+        '</div>';
+    }
     h+=await renderRelationships(id);
     (d.findings||[]).forEach((f,i)=>{
       h+='<div class="finding '+esc(f.severity)+'"><b>'+((i+1)+'. ')+esc(f.title)+'</b>'+
@@ -188,6 +208,22 @@ const AI=(()=>{
     }
   }
 
+  async function saveDates(id){
+    const issueDate=document.getElementById('docIssueDate')?.value||'';
+    const expiryDate=document.getElementById('docExpiryDate')?.value||'';
+    if(!issueDate){alert('יש להזין תאריך הנפקה מאומת');return}
+    try{
+      const r=await fetch('/api/documents/'+id+'/date-review',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({issue_date:issueDate,expiry_date:expiryDate||null})
+      });
+      const data=await r.json();
+      if(!r.ok)throw new Error(data.error||'לא ניתן לשמור את התאריכים');
+      alert('התאריכים נשמרו. סטטוס: '+(data.status_label||data.calculated_status));
+      await load();await open(id);
+    }catch(e){alert(e.message||'שגיאה בשמירת התאריכים')}
+  }
+
   async function actions(id){
     const r=await fetch('/api/document-intelligence/'+id+'/create-actions',{method:'POST'});
     const d=await r.json();
@@ -195,7 +231,7 @@ const AI=(()=>{
     await open(id);
   }
 
-  return {load,open,analyze,analyzeAll,actions,saveRelationships};
+  return {load,open,analyze,analyzeAll,actions,saveRelationships,saveDates};
 })();
 document.addEventListener('DOMContentLoaded',async()=>{await AI.load();const id=new URLSearchParams(window.location.search).get('document');if(id)await AI.open(Number(id));});
 </script>
