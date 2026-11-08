@@ -296,6 +296,7 @@ def _ai_document_payload(doc):
         'document_id': doc.id,
         'file_name': doc.file_name,
         'ai_status': doc.ai_status,
+        'processing_stale': ai_svc.is_processing_stale(doc, stale_after_minutes=current_app.config.get('GEMINI_PROCESSING_STALE_MINUTES', 30)),
         'ai_model': doc.ai_model,
         'ai_analyzed_at': doc.ai_analyzed_at.isoformat() if doc.ai_analyzed_at else None,
         'document_type': doc.ai_document_type,
