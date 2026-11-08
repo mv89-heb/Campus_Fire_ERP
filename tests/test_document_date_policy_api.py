@@ -81,6 +81,20 @@ class DatePolicyApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["calculated_status"], "active")
 
+    def test_admin_cannot_override_conflicting_date_extraction_as_active(self):
+        with self.app.app_context():
+            document = db.session.get(Document, self.document_id)
+            document.date_extraction_conflict = True
+            db.session.commit()
+        self.login_as(self.admin_id, "admin")
+        response = self.client.post(
+            f"/api/documents/{self.document_id}/date-override",
+            json={"status": "active", "reason": "נבדק אך קיימת סתירה"},
+            headers={"X-CSRF-Token": "test-csrf"},
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.get_json()["code"], "DATE_CORRECTION_REQUIRED")
+
     def test_only_admin_can_apply_status_override(self):
         self.login_as(self.manager_id, "manager")
         denied = self.client.post(
