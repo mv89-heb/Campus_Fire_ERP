@@ -344,7 +344,7 @@ def document_intelligence_detail(doc_id):
     doc = db.session.get(Document, doc_id)
     if not doc:
         return jsonify({'error': 'המסמך לא נמצא'}), 404
-    return jsonify(_ai_document_payload(doc))
+    return jsonify(_ai_document_payload(doc, include_reconciliation=True))
 
 
 def _parse_document_date(value, field_name):
