@@ -17,14 +17,22 @@ try:
     # in CI, and surfaces Alembic output in Render startup logs.
     with app.app_context():
         migration_result = app.test_cli_runner().invoke(args=['db', 'upgrade'])
+
+        # Check the migration result before querying alembic_version. If the
+        # migration failed before creating/updating that table, querying it
+        # first would mask the original Alembic error with a secondary error.
+        if migration_result.exit_code != 0:
+            raise RuntimeError(
+                'Alembic startup migration failed: '
+                + (migration_result.output or 'no diagnostic output')
+            )
+
         database_backend = db.engine.url.get_backend_name()
         database_host = db.engine.url.host or 'local'
-        schema_revision = db.session.execute(text('SELECT version_num FROM alembic_version')).scalar()
-    if migration_result.exit_code != 0:
-        raise RuntimeError(
-            'Alembic startup migration failed: '
-            + (migration_result.output or 'no diagnostic output')
-        )
+        schema_revision = db.session.execute(
+            text('SELECT version_num FROM alembic_version')
+        ).scalar()
+
     print(
         '[startup-migration] '
         f'backend={database_backend} host={database_host} '
