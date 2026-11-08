@@ -112,7 +112,7 @@ const AI=(()=>{
     if(d.summary)h+='<div class="card"><b>סיכום הביקורת</b><p>'+esc(d.summary)+'</p></div>';
     h+='<div class="card"><b>📅 תאריכי מסמך ותוקף</b>'+
       '<div class="muted" style="margin:6px 0">סטטוס מחושב: <b>'+esc(d.calculated_status_label||d.calculated_status||'ממתין לחישוב')+'</b>'+
-      (d.is_multi_year?' · אישור רב-שנתי':'')+
+      (d.is_multi_year?' · אישור רב-שנתי':'')+'</div><p class="muted">'+esc(d.date_status_reason||'')+'</p>'+
       (d.effective_status&&d.effective_status!==d.calculated_status?' · חריג ידני פעיל: '+esc(d.effective_status):'')+'</div>'+
       '<div class="relationship-grid">'+
       '<label>תאריך הנפקה<input id="docIssueDate" type="date" value="'+esc(d.issue_date||'')+'"></label>'+
