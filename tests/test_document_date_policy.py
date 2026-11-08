@@ -42,6 +42,16 @@ class DocumentDatePolicyTests(unittest.TestCase):
         self.assertFalse(result["is_audit_summary"])
         self.assertFalse(result["date_policy_exempt"])
 
+    def test_incidental_invoice_reference_does_not_exempt_a_certificate(self):
+        result = classify_document(
+            filename="אישור תקינות.pdf",
+            document_type="אישור תקינות מערכת גילוי אש",
+            document_purpose="אישור בדיקה תקופתית למערכת גילוי אש",
+            body_text="אישור תקינות מערכת גילוי אש. מצורפת חשבונית מס עבור השירות.",
+        )
+        self.assertFalse(result["is_audit_summary"])
+        self.assertFalse(result["date_policy_exempt"])
+
     def test_fee_receipt_is_exempt_but_not_an_audit_summary(self):
         result = classify_document(
             filename="KAB2650733.pdf",
