@@ -5,6 +5,7 @@ from app.extensions import db
 from app.models import Document, Zone, SystemRequirement
 from app.services import storage
 from app.services.document_analysis_service import analyze_pdf_bytes, apply_analysis_to_document
+from app.services.document_date_policy_service import apply_document_policy
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +96,12 @@ class DMSService:
             requirement_note=analysis.get('requirement_note'),
             analysis_confidence=analysis.get('confidence'),
             analysis_review_required=analysis.get('status') == 'needs_review',
+            is_audit_summary=bool(analysis.get('is_audit_summary')),
+            audit_year=analysis.get('audit_year'),
             ai_status='not_requested',
         )
         apply_analysis_to_document(new_doc, analysis)
+        apply_document_policy(new_doc)
         db.session.add(new_doc)
         try:
             db.session.commit()
