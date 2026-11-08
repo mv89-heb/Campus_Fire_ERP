@@ -61,6 +61,12 @@ class DatePolicyApiTests(unittest.TestCase):
             sess["username"] = username
             sess["csrf_token"] = "test-csrf"
 
+    def test_document_intelligence_page_renders_with_admin_override_ui(self):
+        self.login_as(self.admin_id, "admin")
+        response = self.client.get("/document-intelligence")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("אישור חריג מנהלי", response.get_data(as_text=True))
+
     def test_future_issue_date_is_rejected_by_manual_review_api(self):
         self.login_as(self.manager_id, "manager")
         response = self.client.post(
