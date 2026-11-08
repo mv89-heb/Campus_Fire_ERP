@@ -6,8 +6,12 @@ from app.services import document_link_service as link_svc
 from app.services.dms_service import DMSService
 from app.services import storage
 from app.services.document_analysis_service import validity_status
+from app.services.document_date_policy_service import (
+    apply_document_policy, calculate_document_status, reconcile_audit_summary, STATUS_LABELS,
+)
+from app.services.audit_log_service import log as audit_log
 from app.utils.security import validate_and_save_pdf
-from datetime import date
+from datetime import date, datetime, timedelta
 import io
 import platform
 import os
@@ -306,6 +310,21 @@ def _ai_document_payload(doc):
         'confidence': doc.ai_confidence,
         'error': doc.ai_error,
         'review_required': doc.analysis_review_required,
+        'issue_date': doc.issue_date.isoformat() if doc.issue_date else None,
+        'expiry_date': doc.expiry_date.isoformat() if doc.expiry_date else None,
+        'document_year': doc.document_year or (doc.issue_date.year if doc.issue_date else None),
+        'calculated_status': doc.calculated_status,
+        'calculated_status_label': STATUS_LABELS.get(doc.calculated_status, doc.calculated_status),
+        'date_verification_status': doc.date_verification_status,
+        'is_multi_year': bool(doc.is_multi_year),
+        'is_audit_summary': bool(doc.is_audit_summary),
+        'audit_year': doc.audit_year,
+        'effective_status': (
+            doc.manual_status_override
+            if doc.manual_status_override and doc.override_expires_at and doc.override_expires_at > datetime.utcnow()
+            else doc.calculated_status
+        ),
+        'reconciliation': reconcile_audit_summary(doc) if doc.is_audit_summary else None,
         'relationships': {'site_id': doc.site_id, 'audit_id': doc.audit_id, 'supplier_id': doc.supplier_id},
         'relationship_review_required': doc.ai_status == 'completed' and not (doc.site_id or doc.audit_id or doc.supplier_id),
     }
@@ -317,6 +336,120 @@ def document_intelligence_detail(doc_id):
     if not doc:
         return jsonify({'error': 'המסמך לא נמצא'}), 404
     return jsonify(_ai_document_payload(doc))
+
+
+def _parse_document_date(value, field_name):
+    if value in (None, ""):
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except (TypeError, ValueError):
+        raise ValueError(f"תאריך {field_name} חייב להיות בפורמט YYYY-MM-DD")
+
+
+@main_bp.route('/api/documents/<int:doc_id>/date-review', methods=['POST'])
+def document_date_review(doc_id):
+    """Manager-level correction of dates after manual inspection of the source PDF."""
+    document = db.session.get(Document, doc_id)
+    if not document or document.status in {'deleted', 'archived'}:
+        return jsonify({'error': 'המסמך לא נמצא או אינו פעיל'}), 404
+    data = request.get_json(silent=True) or {}
+    if 'issue_date' not in data and 'expiry_date' not in data:
+        return jsonify({'error': 'יש למסור לפחות תאריך אחד לתיקון'}), 400
+    try:
+        issue_date = _parse_document_date(data.get('issue_date'), 'הנפקה') if 'issue_date' in data else document.issue_date
+        expiry_date = _parse_document_date(data.get('expiry_date'), 'תפוגה') if 'expiry_date' in data else document.expiry_date
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    today = date.today()
+    if issue_date and issue_date > today:
+        return jsonify({'error': 'תאריך ההנפקה אינו יכול להיות בעתיד', 'code': 'FUTURE_ISSUE_DATE'}), 422
+    if issue_date and expiry_date and expiry_date < issue_date:
+        return jsonify({'error': 'תאריך התפוגה אינו יכול להיות מוקדם מתאריך ההנפקה', 'code': 'EXPIRY_BEFORE_ISSUE'}), 422
+
+    old_values = {
+        'issue_date': document.issue_date.isoformat() if document.issue_date else None,
+        'expiry_date': document.expiry_date.isoformat() if document.expiry_date else None,
+    }
+    document.issue_date = issue_date
+    document.expiry_date = expiry_date
+    document.analysis_review_required = False
+    # A corrected source date invalidates a previous exception; recalculate from evidence.
+    document.manual_status_override = None
+    document.override_reason = None
+    document.override_by = None
+    document.override_at = None
+    document.override_expires_at = None
+    result = apply_document_policy(document)
+    audit_log(
+        'update', 'document_date', document.id, document.file_name,
+        old_values,
+        {'issue_date': issue_date.isoformat() if issue_date else None,
+         'expiry_date': expiry_date.isoformat() if expiry_date else None,
+         'calculated_status': result['status']},
+    )
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'document_id': document.id,
+        'calculated_status': result['status'],
+        'status_label': STATUS_LABELS.get(result['status'], result['status']),
+        'date_verification_status': result['verification'],
+        'reason': result['reason'],
+    })
+
+
+@main_bp.route('/api/documents/<int:doc_id>/date-override', methods=['POST'])
+def document_date_override(doc_id):
+    """Admin-only, reasoned exception. Calculated status remains unchanged."""
+    document = db.session.get(Document, doc_id)
+    if not document or document.status in {'deleted', 'archived'}:
+        return jsonify({'error': 'המסמך לא נמצא או אינו פעיל'}), 404
+    data = request.get_json(silent=True) or {}
+    allowed = {'active', 'old_approval', 'expired', 'grace_period', 'needs_manual_review'}
+    override_status = str(data.get('status') or '').strip()
+    reason = str(data.get('reason') or '').strip()
+    if override_status not in allowed:
+        return jsonify({'error': 'סטטוס החריג אינו מותר'}), 400
+    if len(reason) < 10:
+        return jsonify({'error': 'נדרשת סיבת חריג מפורטת (לפחות 10 תווים)'}), 400
+
+    expiry_value = data.get('expires_at')
+    try:
+        override_expires_at = (
+            datetime.fromisoformat(str(expiry_value).replace('Z', '+00:00')).replace(tzinfo=None)
+            if expiry_value else datetime.utcnow() + timedelta(days=90)
+        )
+    except (TypeError, ValueError):
+        return jsonify({'error': 'תאריך פקיעת החריג אינו תקין'}), 400
+    if override_expires_at <= datetime.utcnow():
+        return jsonify({'error': 'תוקף החריג חייב להיות בעתיד'}), 400
+
+    old_values = {
+        'manual_status_override': document.manual_status_override,
+        'override_reason': document.override_reason,
+        'override_expires_at': document.override_expires_at.isoformat() if document.override_expires_at else None,
+    }
+    document.manual_status_override = override_status
+    document.override_reason = reason
+    document.override_by = session.get('user_id')
+    document.override_at = datetime.utcnow()
+    document.override_expires_at = override_expires_at
+    audit_log(
+        'update', 'document_status_override', document.id, document.file_name,
+        old_values,
+        {'manual_status_override': override_status, 'reason': reason,
+         'override_expires_at': override_expires_at.isoformat()},
+    )
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'document_id': document.id,
+        'calculated_status': document.calculated_status,
+        'effective_status': override_status,
+        'override_expires_at': override_expires_at.isoformat(),
+    })
 
 
 @main_bp.route('/api/document-intelligence/documents')
