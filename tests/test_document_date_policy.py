@@ -8,6 +8,7 @@ from app.models import Audit, Document, Site
 from app.services.document_date_policy_service import (
     calculate_document_status,
     apply_document_policy,
+    document_dates,
     reconcile_audit_summary,
 )
 
@@ -69,6 +70,36 @@ class DocumentDatePolicyTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "expiring_soon")
 
+    def test_low_confidence_date_extraction_requires_manual_review(self):
+        result = calculate_document_status(
+            date(2026, 1, 1), date(2027, 1, 1),
+            policy_year=2026, today=date(2026, 11, 8),
+            date_extraction_confidence=0.62, minimum_date_confidence=0.80,
+        )
+        self.assertEqual(result["status"], "needs_manual_review")
+        self.assertEqual(result["verification"], "low_date_confidence")
+
+    def test_conflicting_local_and_gemini_dates_require_manual_review(self):
+        result = calculate_document_status(
+            date(2026, 1, 1), date(2027, 1, 1),
+            policy_year=2026, today=date(2026, 11, 8),
+            date_extraction_conflict=True,
+        )
+        self.assertEqual(result["status"], "needs_manual_review")
+        self.assertEqual(result["verification"], "extraction_conflict")
+
+    def test_manual_date_review_is_authoritative_without_erasing_gemini_evidence(self):
+        from datetime import datetime
+        document = Document(
+            file_name="reviewed.pdf", file_path="reviewed.pdf",
+            file_hash="e" * 64, issue_date=date(2026, 1, 1),
+            expiry_date=None, analysis_expiry_date=date(2027, 1, 1),
+            gemini_expiry_date=date(2027, 2, 1),
+            date_reviewed_at=datetime(2026, 11, 8),
+        )
+        self.assertEqual(document_dates(document), (date(2026, 1, 1), None))
+
+
     def test_february_29_multiyear_boundary_uses_calendar_year(self):
         result = calculate_document_status(
             date(2024, 2, 29), date(2025, 2, 28),
@@ -127,6 +158,19 @@ class AuditSummaryReconciliationTests(unittest.TestCase):
         self.assertEqual(result["documents_checked"], 1)
         self.assertEqual(result["items"][0]["status"], "conflict")
         self.assertEqual(result["items"][0]["matched_documents"][0]["document_id"], certificate.id)
+
+    def test_audit_summary_is_detected_from_local_pdf_text(self):
+        from unittest.mock import patch
+        from app.services.document_analysis_service import analyze_pdf_bytes
+        with patch(
+            "app.services.document_analysis_service._extract_text",
+            return_value=("סיכום ביקורת\nתאריך ביקורת: 01/11/2026", 1),
+        ):
+            result = analyze_pdf_bytes(b"fake-pdf", "audit.pdf")
+        self.assertTrue(result["is_audit_summary"])
+        self.assertEqual(result["audit_year"], 2026)
+        self.assertEqual(result["audit_date"], date(2026, 11, 1))
+
 
     def test_unlinked_audit_summary_requires_manual_site_link(self):
         summary = Document(
