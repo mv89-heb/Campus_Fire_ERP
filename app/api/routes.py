@@ -7,7 +7,7 @@ from app.services.dms_service import DMSService
 from app.services import storage
 from app.services.document_analysis_service import validity_status
 from app.services.document_date_policy_service import (
-    apply_document_policy, calculate_document_status, reconcile_audit_summary, STATUS_LABELS,
+    apply_document_policy, calculate_document_status, reconcile_audit_summary, STATUS_LABELS, today_israel,
 )
 from app.services.audit_log_service import log as audit_log
 from app.utils.security import validate_and_save_pdf
@@ -362,7 +362,7 @@ def document_date_review(doc_id):
     except ValueError as exc:
         return jsonify({'error': str(exc)}), 400
 
-    today = date.today()
+    today = today_israel()
     if issue_date and issue_date > today:
         return jsonify({'error': 'תאריך ההנפקה אינו יכול להיות בעתיד', 'code': 'FUTURE_ISSUE_DATE'}), 422
     if issue_date and expiry_date and expiry_date < issue_date:
