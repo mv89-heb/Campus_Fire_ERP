@@ -27,6 +27,7 @@ STATUS_LABELS = {
     "future_issue_date": "תאריך הנפקה עתידי – לא מאושר",
     "date_conflict": "סתירה בתאריכים",
     "grace_period": "בתקופת חסד מאושרת",
+    "not_applicable": "סיכום ביקורת – אינו אישור תוקף",
 }
 
 
@@ -59,10 +60,18 @@ def calculate_document_status(
     date_extraction_conflict: bool = False,
     date_extraction_confidence: float | None = None,
     minimum_date_confidence: float = 0.80,
+    is_audit_summary: bool = False,
 ) -> dict:
     """Return calculated status and reasons without mutating the document."""
     today = today or today_israel()
     grace_period_days = max(0, int(grace_period_days or 0))
+    if is_audit_summary:
+        return {
+            "status": "not_applicable",
+            "verification": "not_applicable",
+            "is_multi_year": False,
+            "reason": "סיכום ביקורת מנוהל לפי שנת הביקורת וממצאיה, ולא כאישור בעל תוקף.",
+        }
 
     if date_extraction_conflict:
         return {
@@ -93,6 +102,14 @@ def calculate_document_status(
             "verification": "future_issue_date",
             "is_multi_year": False,
             "reason": "תאריך ההנפקה מאוחר מהתאריך הנוכחי.",
+        }
+
+    if issue_date.year < 1900 or (expiry_date and expiry_date.year < 1900):
+        return {
+            "status": "needs_manual_review",
+            "verification": "implausible_date",
+            "is_multi_year": False,
+            "reason": "זוהה תאריך מוקדם באופן חריג (לפני 1900); ייתכן שגיאת OCR ויש לאמת מול המסמך.",
         }
 
     if expiry_date and expiry_date < issue_date:
@@ -190,8 +207,9 @@ def apply_document_policy(document, *, policy_year=None, today=None, grace_perio
             current_app.config.get("DOCUMENT_DATE_CONFIDENCE_MIN", 0.80)
             if has_app_context() else 0.80
         ),
+        is_audit_summary=bool(getattr(document, "is_audit_summary", False)),
     )
-    document.document_year = issue_date.year if issue_date else None
+    document.document_year = issue_date.year if issue_date and not getattr(document, 'is_audit_summary', False) else None
     document.is_multi_year = bool(result["is_multi_year"])
     document.calculated_status = result["status"]
     document.date_verification_status = result["verification"]
@@ -246,7 +264,7 @@ def reconcile_audit_summary(summary_document):
 
     audit = db.session.get(Audit, summary_document.audit_id) if summary_document.audit_id else None
     site_id = summary_document.site_id or (audit.site_id if audit else None)
-    query = Document.query.filter(Document.status.notin_(["deleted", "archived"]), Document.id != summary_document.id)
+    query = Document.query.filter(Document.status.notin_(["deleted", "archived"]), Document.id != summary_document.id, Document.is_audit_summary.is_(False))
     if site_id:
         from sqlalchemy import or_
         scope = [Document.site_id == site_id]

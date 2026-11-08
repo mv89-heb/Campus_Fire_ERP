@@ -87,6 +87,20 @@ class DatePolicyApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["calculated_status"], "active")
 
+    def test_audit_summary_cannot_receive_certificate_validity_override(self):
+        with self.app.app_context():
+            document = db.session.get(Document, self.document_id)
+            document.is_audit_summary = True
+            db.session.commit()
+        self.login_as(self.admin_id, "admin")
+        response = self.client.post(
+            f"/api/documents/{self.document_id}/date-override",
+            json={"status": "active", "reason": "אישור חריג לבדיקה מנהלית"},
+            headers={"X-CSRF-Token": "test-csrf"},
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.get_json()["code"], "AUDIT_SUMMARY_NOT_CERTIFICATE")
+
     def test_admin_cannot_override_conflicting_date_extraction_as_active(self):
         with self.app.app_context():
             document = db.session.get(Document, self.document_id)

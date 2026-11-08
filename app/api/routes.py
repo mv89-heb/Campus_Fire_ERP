@@ -224,6 +224,7 @@ def dashboard():
                         date_extraction_conflict=bool(latest.date_extraction_conflict),
                         date_extraction_confidence=latest.date_extraction_confidence,
                         minimum_date_confidence=current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80),
+                        is_audit_summary=bool(latest.is_audit_summary),
                     )
                     calculated_status = policy_result['status']
                     override_active = bool(
@@ -336,6 +337,7 @@ def _ai_document_payload(doc, include_reconciliation=False):
         date_extraction_conflict=bool(doc.date_extraction_conflict),
         date_extraction_confidence=doc.date_extraction_confidence,
         minimum_date_confidence=current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80),
+        is_audit_summary=bool(doc.is_audit_summary),
     )
     calculated_status = date_result['status']
     override_active = bool(
@@ -358,10 +360,11 @@ def _ai_document_payload(doc, include_reconciliation=False):
         'review_required': doc.analysis_review_required,
         'issue_date': doc.issue_date.isoformat() if doc.issue_date else None,
         'expiry_date': doc.expiry_date.isoformat() if doc.expiry_date else None,
-        'document_year': doc.document_year or (doc.issue_date.year if doc.issue_date else None),
+        'document_year': doc.document_year if doc.document_year is not None else (doc.issue_date.year if doc.issue_date and not doc.is_audit_summary else None),
         'calculated_status': calculated_status,
         'calculated_status_label': STATUS_LABELS.get(calculated_status, calculated_status),
         'date_verification_status': doc.date_verification_status,
+        'date_status_reason': date_result['reason'],
         'date_reviewed_at': doc.date_reviewed_at.isoformat() if doc.date_reviewed_at else None,
         'date_extraction_source': doc.date_extraction_source,
         'date_extraction_confidence': doc.date_extraction_confidence,
@@ -417,6 +420,8 @@ def document_date_review(doc_id):
         return jsonify({'error': 'תאריך הנפקה נדרש; אם אינו מופיע במסמך יש להעביר לבדיקה ידנית'}), 400
     if issue_date and issue_date > today:
         return jsonify({'error': 'תאריך ההנפקה אינו יכול להיות בעתיד', 'code': 'FUTURE_ISSUE_DATE'}), 422
+    if (issue_date and issue_date.year < 1900) or (expiry_date and expiry_date.year < 1900):
+        return jsonify({'error': 'התאריך מוקדם באופן חריג (לפני 1900). יש לבדוק את המסמך המקורי.', 'code': 'IMPLAUSIBLE_DATE'}), 422
     if issue_date and expiry_date and expiry_date < issue_date:
         return jsonify({'error': 'תאריך התפוגה אינו יכול להיות מוקדם מתאריך ההנפקה', 'code': 'EXPIRY_BEFORE_ISSUE'}), 422
 
@@ -483,6 +488,8 @@ def recalculate_document_date_policy():
 def document_date_override(doc_id):
     """Admin-only, reasoned exception. Calculated status remains unchanged."""
     document = db.session.get(Document, doc_id)
+    if document and document.is_audit_summary:
+        return jsonify({'error': 'סיכום ביקורת אינו אישור בעל תוקף ולכן לא ניתן להחיל עליו חריג תוקף', 'code': 'AUDIT_SUMMARY_NOT_CERTIFICATE'}), 409
     if not document or document.status in {'deleted', 'archived'}:
         return jsonify({'error': 'המסמך לא נמצא או אינו פעיל'}), 404
     data = request.get_json(silent=True) or {}
@@ -509,7 +516,7 @@ def document_date_override(doc_id):
     if override_expires_at <= datetime.utcnow():
         return jsonify({'error': 'תוקף החריג חייב להיות בעתיד'}), 400
     calculated = apply_document_policy(document)
-    if (calculated['status'] in {'future_issue_date', 'date_conflict'} or document.date_extraction_conflict or (document.date_extraction_confidence is not None and document.date_extraction_confidence < current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80))) and override_status == 'active':
+    if (calculated['status'] in {'future_issue_date', 'date_conflict'} or calculated['verification'] == 'implausible_date' or document.date_extraction_conflict or (document.date_extraction_confidence is not None and document.date_extraction_confidence < current_app.config.get('DOCUMENT_DATE_CONFIDENCE_MIN', 0.80))) and override_status == 'active':
         return jsonify({'error': 'יש לתקן ולאמת את התאריכים לפני אישור המסמך', 'code': 'DATE_CORRECTION_REQUIRED'}), 409
 
     old_values = {

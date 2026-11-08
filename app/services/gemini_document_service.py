@@ -205,53 +205,54 @@ def persist(document, result):
     document.ai_model = result.get("model")
     document.ai_analyzed_at = datetime.utcnow()
     document.ai_document_type = result.get("document_type")
-    date_fields = (
-        ("document_issue_date", "gemini_issue_date", "issue_date", "analysis_issue_date"),
-        ("document_expiry_date", "gemini_expiry_date", "expiry_date", "analysis_expiry_date"),
-    )
-    extracted_any_date = False
-    for source_key, evidence_field, effective_field, analysis_field in date_fields:
-        raw_value = result.get(source_key)
-        if not raw_value:
-            continue
-        try:
-            extracted_date = date.fromisoformat(str(raw_value)[:10])
-        except (TypeError, ValueError):
-            document.analysis_review_required = True
-            continue
-        setattr(document, evidence_field, extracted_date)
-        extracted_any_date = True
-        if not document.date_reviewed_at:
-            existing_date = getattr(document, effective_field)
-            if existing_date and existing_date != extracted_date:
-                document.date_extraction_conflict = True
-                document.analysis_review_required = True
-            elif not existing_date:
-                setattr(document, effective_field, extracted_date)
-                if not getattr(document, analysis_field):
-                    setattr(document, analysis_field, extracted_date)
-    if not document.date_reviewed_at:
-        try:
-            if result.get("date_extraction_confidence") is not None:
-                document.date_extraction_confidence = float(result["date_extraction_confidence"])
-                if not 0 <= document.date_extraction_confidence <= 1:
-                    raise ValueError("date confidence out of range")
-        except (TypeError, ValueError):
-            document.date_extraction_confidence = None
-            document.analysis_review_required = True
-    if extracted_any_date and document.date_extraction_confidence is None:
-        # Dates without a model-provided extraction confidence are not auto-approved.
-        document.date_extraction_confidence = 0.0
-        document.analysis_review_required = True
-    if extracted_any_date and not document.date_reviewed_at:
-        document.date_extraction_source = (
-            "conflicting_sources" if document.date_extraction_conflict else "gemini_pdf"
-        )
-    purpose_text = " ".join(str(result.get(key) or "") for key in ("document_type", "document_purpose", "summary")).lower()
+    purpose_text = " ".join([document.file_name or ""] + [str(result.get(key) or "") for key in ("document_type", "document_purpose", "summary")]).lower()
     document.is_audit_summary = bool(
         document.is_audit_summary or result.get("is_audit_summary") is True or
         any(term in purpose_text for term in ("סיכום ביקורת", "דוח ביקורת", "דו\"ח ביקורת", "audit report", "inspection report"))
     )
+    if not document.is_audit_summary:
+        date_fields = (
+            ("document_issue_date", "gemini_issue_date", "issue_date", "analysis_issue_date"),
+            ("document_expiry_date", "gemini_expiry_date", "expiry_date", "analysis_expiry_date"),
+        )
+        extracted_any_date = False
+        for source_key, evidence_field, effective_field, analysis_field in date_fields:
+            raw_value = result.get(source_key)
+            if not raw_value:
+                continue
+            try:
+                extracted_date = date.fromisoformat(str(raw_value)[:10])
+            except (TypeError, ValueError):
+                document.analysis_review_required = True
+                continue
+            setattr(document, evidence_field, extracted_date)
+            extracted_any_date = True
+            if not document.date_reviewed_at:
+                existing_date = getattr(document, effective_field)
+                if existing_date and existing_date != extracted_date:
+                    document.date_extraction_conflict = True
+                    document.analysis_review_required = True
+                elif not existing_date:
+                    setattr(document, effective_field, extracted_date)
+                    if not getattr(document, analysis_field):
+                        setattr(document, analysis_field, extracted_date)
+        if not document.date_reviewed_at:
+            try:
+                if result.get("date_extraction_confidence") is not None:
+                    document.date_extraction_confidence = float(result["date_extraction_confidence"])
+                    if not 0 <= document.date_extraction_confidence <= 1:
+                        raise ValueError("date confidence out of range")
+            except (TypeError, ValueError):
+                document.date_extraction_confidence = None
+                document.analysis_review_required = True
+        if extracted_any_date and document.date_extraction_confidence is None:
+            # Dates without a model-provided extraction confidence are not auto-approved.
+            document.date_extraction_confidence = 0.0
+            document.analysis_review_required = True
+        if extracted_any_date and not document.date_reviewed_at:
+            document.date_extraction_source = (
+                "conflicting_sources" if document.date_extraction_conflict else "gemini_pdf"
+            )
     audit_date_value = result.get("audit_date")
     if audit_date_value:
         try:
