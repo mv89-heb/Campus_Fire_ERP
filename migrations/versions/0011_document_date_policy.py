@@ -42,7 +42,6 @@ def upgrade():
                 op.add_column("documents", sa.Column(
                     name, column_type, nullable=False, server_default=sa.false()
                 ))
-                op.alter_column("documents", name, server_default=None)
             elif name == "override_by":
                 op.add_column("documents", sa.Column(
                     name, column_type, sa.ForeignKey("users.id"), nullable=nullable
