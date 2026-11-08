@@ -325,7 +325,7 @@ def upload_bulk():
 def document_intelligence_page():
     if not session.get('user_id'):
         return redirect('/login')
-    return render_template('document_intelligence.html', active_nav='document_intelligence')
+    return render_template('document_intelligence.html', active_nav='document_intelligence', user_role=session.get('role'))
 
 
 def _ai_document_payload(doc, include_reconciliation=False):
