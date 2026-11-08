@@ -134,5 +134,30 @@ class DatePolicyApiTests(unittest.TestCase):
         self.assertEqual(allowed.get_json()["effective_status"], "active")
 
 
+    def test_non_certificate_documents_cannot_receive_date_corrections_or_overrides(self):
+        with self.app.app_context():
+            document = db.session.get(Document, self.document_id)
+            document.date_policy_exempt = True
+            db.session.commit()
+
+        self.login_as(self.manager_id, "manager")
+        date_review = self.client.post(
+            f"/api/documents/{self.document_id}/date-review",
+            json={"issue_date": "2026-01-01", "expiry_date": "2027-01-01"},
+            headers={"X-CSRF-Token": "test-csrf"},
+        )
+        self.assertEqual(date_review.status_code, 409)
+        self.assertEqual(date_review.get_json()["code"], "DATE_POLICY_NOT_APPLICABLE")
+
+        self.login_as(self.admin_id, "admin")
+        override = self.client.post(
+            f"/api/documents/{self.document_id}/date-override",
+            json={"status": "active", "reason": "המסמך אינו אישור בעל תוקף"},
+            headers={"X-CSRF-Token": "test-csrf"},
+        )
+        self.assertEqual(override.status_code, 409)
+        self.assertEqual(override.get_json()["code"], "DATE_POLICY_NOT_APPLICABLE")
+
+
 if __name__ == "__main__":
     unittest.main()

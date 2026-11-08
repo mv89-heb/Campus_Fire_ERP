@@ -7,6 +7,7 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from app.services.document_validity_rules import requirement_cycle, resolve_validity
+from app.services.document_classification import classify_document
 
 _DATE_RE = re.compile(r"(?<!\d)(\d{1,2})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{2,4})(?!\d)")
 _FORM_RE = re.compile(r"\bטופס\s*(?:מס[\u05f3']?\s*)?(\d{1,2})\b", re.I)
@@ -264,11 +265,13 @@ def analyze_pdf_bytes(data: bytes, filename=""):
     inspection_date = inspection_evidence["date"] if inspection_evidence else None
 
     validity = resolve_validity(zone_code=zone_code, form_number=form, text=text, inspection_date=inspection_date, explicit_expiry=explicit_expiry)
-    normalized_text = " ".join(((text or "") + " " + (filename or "")).split()).lower()
-    is_audit_summary = any(
-        term in normalized_text
-        for term in ("סיכום ביקורת", "דוח ביקורת", 'דו"ח ביקורת', "audit report", "inspection report")
+    classification = classify_document(
+        filename=filename,
+        document_type=document_type,
+        body_text=text,
     )
+    is_audit_summary = classification["is_audit_summary"]
+    date_policy_exempt = classification["date_policy_exempt"]
     audit_date = inspection_date if is_audit_summary else None
     effective_expiry = validity.get("expiry_date")
     validity_source = validity.get("source") or "unknown"
@@ -312,6 +315,7 @@ def analyze_pdf_bytes(data: bytes, filename=""):
         "zone_evidence": zone_evidence,
         "inspection_date": inspection_date.isoformat() if inspection_date else None,
         "is_audit_summary": is_audit_summary,
+        "date_policy_exempt": date_policy_exempt,
         "audit_date": audit_date.isoformat() if audit_date else None,
         "inspection_evidence": inspection_json,
         "explicit_expiry_date": explicit_expiry.isoformat() if explicit_expiry else None,
@@ -340,6 +344,7 @@ def analyze_pdf_bytes(data: bytes, filename=""):
         "inspection_date": inspection_date,
         "issue_date": inspection_date,
         "is_audit_summary": is_audit_summary,
+        "date_policy_exempt": date_policy_exempt,
         "audit_date": audit_date,
         "audit_year": audit_date.year if audit_date else None,
         "inspection_evidence": inspection_evidence,

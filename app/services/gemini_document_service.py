@@ -14,6 +14,7 @@ from app.services import storage
 from app.services import integration_service as integration_svc
 from app.services import document_link_service as link_svc
 from app.services import ai_entity_sync_service as entity_sync_svc
+from app.services.document_classification import classify_document
 
 log = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ SYSTEM_PROMPT = """אתה מנתח מסמכי בטיחות אש עבור ERP.
 אם מידע אינו מופיע במסמך, החזר null או רשימה ריקה; לעולם אל תנחש.
 לכל ממצא: הסבר מה נמצא, למה זה חשוב, מה צריך לעשות בפועל, מי בדרך כלל מטפל
 אם אפשר להסיק זאת, ומה הראיה הדרושה לסגירה. הפרד עובדה מהמלצה וסמן אי-ודאות.
-אם המסמך הוא סיכום/דוח ביקורת או בדיקת בטיחות מסכמת, סמן is_audit_summary=true וחלץ את audit_date בפורמט ISO YYYY-MM-DD כפי שמופיע במסמך; אחרת false. חלץ document_issue_date ו-document_expiry_date רק כאשר תווית התאריך ברורה, בפורמט ISO YYYY-MM-DD; אל תבלבל תאריך חתימה, תאריך העלאה או תאריך בדיקה הבאה עם תאריך הנפקה/תפוגה. החזר date_extraction_confidence בין 0 ל-1 רק עבור ודאות זיהוי התאריכים. אל תציג המלצה משפטית כעובדה. כתוב בעברית ברורה ומעשית."""
+סמן is_audit_summary=true רק כאשר המסמך עצמו הוא סיכום ביקורת/דו"ח ממצאי ביקורת מרוכז של הרשות או של בודק האתר, הכולל ליקויים, דרישות או מסקנות ביקורת. אין לסמן true עבור טופסי אישור תקינות, אישורי תחזוקה ובדיקות תקופתיות של מערכת בודדת, דוחות בדיקה/תחזוקה שמצורפים לאישור, שוברים או דרישות תשלום, חשבוניות, הצעות מחיר, הזמנות עבודה או התכתבויות — גם אם מופיעות בהם המילים ביקורת או דו"ח ביקורת. אם המסמך הוא סיכום ביקורת, חלץ audit_date בפורמט ISO YYYY-MM-DD כפי שמופיע במסמך; אחרת false. חלץ document_issue_date ו-document_expiry_date רק כאשר תווית התאריך ברורה, בפורמט ISO YYYY-MM-DD; אל תבלבל תאריך חתימה, תאריך העלאה, תאריך ביקורת או מועד אחרון לתשלום עם תאריך הנפקה/תפוגה. החזר date_extraction_confidence בין 0 ל-1 רק עבור ודאות זיהוי התאריכים. אל תציג המלצה משפטית כעובדה. כתוב בעברית ברורה ומעשית."""
 
 def is_configured():
     return bool(current_app.config.get("GEMINI_API_KEY"))
@@ -205,12 +206,14 @@ def persist(document, result):
     document.ai_model = result.get("model")
     document.ai_analyzed_at = datetime.utcnow()
     document.ai_document_type = result.get("document_type")
-    purpose_text = " ".join([document.file_name or ""] + [str(result.get(key) or "") for key in ("document_type", "document_purpose", "summary")]).lower()
-    document.is_audit_summary = bool(
-        document.is_audit_summary or result.get("is_audit_summary") is True or
-        any(term in purpose_text for term in ("סיכום ביקורת", "דוח ביקורת", "דו\"ח ביקורת", "audit report", "inspection report"))
+    classification = classify_document(
+        filename=document.file_name,
+        document_type=result.get("document_type"),
+        document_purpose=result.get("document_purpose"),
     )
-    if not document.is_audit_summary:
+    document.is_audit_summary = classification["is_audit_summary"]
+    document.date_policy_exempt = classification["date_policy_exempt"]
+    if not document.is_audit_summary and not document.date_policy_exempt:
         date_fields = (
             ("document_issue_date", "gemini_issue_date", "issue_date", "analysis_issue_date"),
             ("document_expiry_date", "gemini_expiry_date", "expiry_date", "analysis_expiry_date"),

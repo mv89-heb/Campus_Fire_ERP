@@ -11,9 +11,65 @@ from app.services.document_date_policy_service import (
     document_dates,
     reconcile_audit_summary,
 )
+from app.services.document_classification import classify_document
 
 
 class DocumentDatePolicyTests(unittest.TestCase):
+    def test_administrative_document_is_exempt_from_certificate_expiry(self):
+        result = calculate_document_status(
+            None, None, policy_year=2026, today=date(2026, 11, 8),
+            date_policy_exempt=True,
+        )
+        self.assertEqual(result["status"], "not_applicable")
+        self.assertEqual(result["verification"], "not_applicable")
+
+    def test_maintenance_certificate_is_not_an_audit_summary(self):
+        result = classify_document(
+            filename="טופס 2.pdf",
+            document_type="טופס 2 - אישור תקינות ציוד כיבוי - תחזוקת מטפים",
+            document_purpose="אישור תקינות ובדיקה תקופתית שנתית למטפים",
+            body_text='דו"ח ביקורת שנתית ותחזוקת מטפים לפי ת"י 129 חלק 1',
+        )
+        self.assertFalse(result["is_audit_summary"])
+        self.assertFalse(result["date_policy_exempt"])
+
+    def test_maintenance_report_with_generic_audit_wording_is_not_a_summary(self):
+        result = classify_document(
+            filename="טופס 4.pdf",
+            document_type='טופס 4 ודו"ח ביקורת תחזוקה למערכת גילוי אש',
+            document_purpose="דיווח שנתי על ביצוע תחזוקה שוטפת למערכת גילוי אש",
+        )
+        self.assertFalse(result["is_audit_summary"])
+        self.assertFalse(result["date_policy_exempt"])
+
+    def test_fee_receipt_is_exempt_but_not_an_audit_summary(self):
+        result = classify_document(
+            filename="KAB2650733.pdf",
+            document_type="שובר אגרת בטיחות אש",
+            document_purpose="דרישת תשלום אגרה עבור ביקורת ציוד במקרקעין",
+            body_text="שובר תשלום אגרה. חסר דוח ממצאי הביקורת עצמו.",
+        )
+        self.assertFalse(result["is_audit_summary"])
+        self.assertTrue(result["date_policy_exempt"])
+
+    def test_explicit_audit_report_type_is_summary_when_not_a_certificate(self):
+        result = classify_document(
+            filename="report.pdf",
+            document_type='דו"ח ביקורת בטיחות אש',
+            document_purpose="סיכום ממצאי ביקורת באתר",
+        )
+        self.assertTrue(result["is_audit_summary"])
+        self.assertFalse(result["date_policy_exempt"])
+
+    def test_audit_findings_summary_is_classified_explicitly(self):
+        result = classify_document(
+            filename="סיכום ביקורת בסיסית.pdf",
+            document_type='דו"ח ליקויים בביקורת בטיחות אש',
+            document_purpose="פירוט ליקויים ודרישות בעקבות ביקורת בטיחות אש",
+        )
+        self.assertTrue(result["is_audit_summary"])
+        self.assertFalse(result["date_policy_exempt"])
+
     def test_audit_summary_is_not_treated_as_an_expiring_certificate(self):
         result = calculate_document_status(
             None, None, policy_year=2026, today=date(2026, 11, 8),
@@ -197,6 +253,28 @@ class AuditSummaryReconciliationTests(unittest.TestCase):
         self.assertEqual(result["audit_date"], date(2026, 11, 1))
 
 
+    def test_maintenance_form_text_does_not_become_audit_summary(self):
+        from unittest.mock import patch
+        from app.services.document_analysis_service import analyze_pdf_bytes
+        with patch(
+            "app.services.document_analysis_service._extract_text",
+            return_value=('טופס 2 - אישור תקינות. דו"ח ביקורת שנתית ותחזוקת מטפים לפי ת"י 129 חלק 1', 1),
+        ):
+            result = analyze_pdf_bytes(b"fake-pdf", "טופס 2.pdf")
+        self.assertFalse(result["is_audit_summary"])
+        self.assertFalse(result["date_policy_exempt"])
+
+    def test_fee_receipt_text_is_exempt_from_certificate_expiry(self):
+        from unittest.mock import patch
+        from app.services.document_analysis_service import analyze_pdf_bytes
+        with patch(
+            "app.services.document_analysis_service._extract_text",
+            return_value=("שובר אגרת בטיחות אש. תשלום בגין ביקורת ציוד במקרקעין.", 1),
+        ):
+            result = analyze_pdf_bytes(b"fake-pdf", "KAB2650733.pdf")
+        self.assertFalse(result["is_audit_summary"])
+        self.assertTrue(result["date_policy_exempt"])
+
     def test_audit_summary_is_detected_from_file_name_without_text_layer(self):
         from unittest.mock import patch
         from app.services.document_analysis_service import analyze_pdf_bytes
@@ -207,6 +285,34 @@ class AuditSummaryReconciliationTests(unittest.TestCase):
             result = analyze_pdf_bytes(b"fake-pdf", "סיכום ביקורת תקופתית.pdf")
         self.assertTrue(result["is_audit_summary"])
 
+
+    def test_administrative_receipt_is_not_matched_as_a_certificate(self):
+        site = Site(name="קמפוס בדיקה")
+        db.session.add(site)
+        db.session.flush()
+        summary = Document(
+            file_name="סיכום ביקורת.pdf",
+            file_path="summary.pdf",
+            file_hash="f" * 64,
+            site_id=site.id,
+            is_audit_summary=True,
+            audit_year=2026,
+            ai_actions_json='{"missing_items":["אישור חשמל"]}',
+        )
+        receipt = Document(
+            file_name="שובר אגרת בטיחות אש.pdf",
+            file_path="receipt.pdf",
+            file_hash="g" * 64,
+            site_id=site.id,
+            category="חשמל",
+            date_policy_exempt=True,
+        )
+        db.session.add_all([summary, receipt])
+        db.session.commit()
+
+        result = reconcile_audit_summary(summary)
+        self.assertEqual(result["documents_checked"], 0)
+        self.assertEqual(result["items"][0]["status"], "missing_document")
 
     def test_unlinked_audit_summary_requires_manual_site_link(self):
         summary = Document(
