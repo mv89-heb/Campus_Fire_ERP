@@ -52,6 +52,15 @@ class DocumentDatePolicyTests(unittest.TestCase):
         self.assertFalse(result["is_audit_summary"])
         self.assertTrue(result["date_policy_exempt"])
 
+    def test_explicit_audit_report_type_is_summary_when_not_a_certificate(self):
+        result = classify_document(
+            filename="report.pdf",
+            document_type='דו"ח ביקורת בטיחות אש',
+            document_purpose="סיכום ממצאי ביקורת באתר",
+        )
+        self.assertTrue(result["is_audit_summary"])
+        self.assertFalse(result["date_policy_exempt"])
+
     def test_audit_findings_summary_is_classified_explicitly(self):
         result = classify_document(
             filename="סיכום ביקורת בסיסית.pdf",
