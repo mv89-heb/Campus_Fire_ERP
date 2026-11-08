@@ -114,7 +114,7 @@ def upgrade():
             "status_policy_year": 2026,
             "status_calculated_at": datetime.utcnow(),
         }
-        if verification in {"missing_issue_date", "implausible_date", "future_issue_date", "date_conflict"}:
+        if not is_audit_summary and verification in {"missing_issue_date", "implausible_date", "future_issue_date", "date_conflict"}:
             values["analysis_review_required"] = True
         bind.execute(documents.update().where(documents.c.id == row["id"]).values(**values))
 
