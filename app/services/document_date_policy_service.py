@@ -56,10 +56,28 @@ def calculate_document_status(
     policy_year: int = DEFAULT_POLICY_YEAR,
     today: date | None = None,
     grace_period_days: int = DEFAULT_GRACE_DAYS,
+    date_extraction_conflict: bool = False,
+    date_extraction_confidence: float | None = None,
+    minimum_date_confidence: float = 0.80,
 ) -> dict:
     """Return calculated status and reasons without mutating the document."""
     today = today or today_israel()
     grace_period_days = max(0, int(grace_period_days or 0))
+
+    if date_extraction_conflict:
+        return {
+            "status": "needs_manual_review",
+            "verification": "extraction_conflict",
+            "is_multi_year": False,
+            "reason": "זוהו תאריכים שונים במקורות החילוץ; נדרש אימות מול המסמך המקורי.",
+        }
+    if date_extraction_confidence is not None and date_extraction_confidence < minimum_date_confidence:
+        return {
+            "status": "needs_manual_review",
+            "verification": "low_date_confidence",
+            "is_multi_year": False,
+            "reason": "רמת הביטחון בחילוץ התאריכים נמוכה מהסף המאושר.",
+        }
 
     if not issue_date:
         return {
@@ -166,6 +184,12 @@ def apply_document_policy(document, *, policy_year=None, today=None, grace_perio
     result = calculate_document_status(
         issue_date, expiry_date, policy_year=policy_year,
         today=today, grace_period_days=grace_period_days,
+        date_extraction_conflict=bool(getattr(document, "date_extraction_conflict", False)),
+        date_extraction_confidence=getattr(document, "date_extraction_confidence", None),
+        minimum_date_confidence=(
+            current_app.config.get("DOCUMENT_DATE_CONFIDENCE_MIN", 0.80)
+            if has_app_context() else 0.80
+        ),
     )
     document.document_year = issue_date.year if issue_date else None
     document.is_multi_year = bool(result["is_multi_year"])
