@@ -360,7 +360,7 @@ def _ai_document_payload(doc, include_reconciliation=False):
         'review_required': doc.analysis_review_required,
         'issue_date': doc.issue_date.isoformat() if doc.issue_date else None,
         'expiry_date': doc.expiry_date.isoformat() if doc.expiry_date else None,
-        'document_year': doc.document_year or (doc.issue_date.year if doc.issue_date else None),
+        'document_year': doc.document_year if doc.document_year is not None else (doc.issue_date.year if doc.issue_date and not doc.is_audit_summary else None),
         'calculated_status': calculated_status,
         'calculated_status_label': STATUS_LABELS.get(calculated_status, calculated_status),
         'date_verification_status': doc.date_verification_status,
