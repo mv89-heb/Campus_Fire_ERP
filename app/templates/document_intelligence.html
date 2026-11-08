@@ -122,7 +122,7 @@ const AI=(()=>{
           '<label>תאריך הנפקה<input id="docIssueDate" type="date" value="'+esc(d.issue_date||'')+'"></label>'+
           '<label>תאריך תפוגה<input id="docExpiryDate" type="date" value="'+esc(d.expiry_date||'')+'"></label>'+
           '</div><button class="btn btn-primary" style="margin-top:10px" onclick="AI.saveDates('+d.document_id+')">💾 שמור ואמת תאריכים</button>')+
-      (d.date_extraction_conflict?'<div class="finding high">נמצאה סתירה בין תאריכי החילוץ. תאריך Gemini: '+esc(d.gemini_issue_date||'לא זוהה')+' עד '+esc(d.gemini_expiry_date||'לא זוהה')+'. יש לבדוק מול ה-PDF ולאשר ידנית.</div>':'')+
+      ((d.date_extraction_conflict&&!d.is_audit_summary&&!d.date_policy_exempt)?'<div class="finding high">נמצאה סתירה בין תאריכי החילוץ. תאריך Gemini: '+esc(d.gemini_issue_date||'לא זוהה')+' עד '+esc(d.gemini_expiry_date||'לא זוהה')+'. יש לבדוק מול ה-PDF ולאשר ידנית.</div>':'')+
       (!d.is_audit_summary&&!d.date_policy_exempt&&d.date_extraction_confidence!=null?'<p class="muted">ביטחון חילוץ תאריכים: '+Math.round(d.date_extraction_confidence*100)+'% · מקור: '+esc(d.date_extraction_source||'לא ידוע')+'</p>':'')+
       (d.override_reason?'<p class="muted">סיבת חריג: '+esc(d.override_reason)+'</p>':'')+'</div>';
     if(d.is_audit_summary&&d.reconciliation){
