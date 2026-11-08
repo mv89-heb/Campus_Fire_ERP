@@ -77,7 +77,7 @@ def classify_document(filename=None, document_type=None, document_purpose=None, 
             "reason": "explicit_audit_summary_filename",
         }
 
-    if _contains_any(metadata_text, _ADMINISTRATIVE_MARKERS) or _contains_any(filename_text, _ADMINISTRATIVE_MARKERS):
+    if _contains_any(metadata_text, _ADMINISTRATIVE_MARKERS) or _contains_any(filename_text, _ADMINISTRATIVE_MARKERS) or _contains_any(body, _ADMINISTRATIVE_MARKERS):
         return {
             "is_audit_summary": False,
             "date_policy_exempt": True,
