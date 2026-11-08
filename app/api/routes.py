@@ -490,6 +490,8 @@ def system_health():
     ))
     result = {
         'status': 'degraded',
+        'production_mode': bool(current_app.config.get('IS_PRODUCTION')),
+        'secret_key_from_environment': bool(current_app.config.get('SECRET_KEY_FROM_ENV')),
         'db_connected': False,
         'zones_seeded': False,
         'upload_folder_writable': False,

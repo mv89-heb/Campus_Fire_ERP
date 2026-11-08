@@ -16,9 +16,15 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
+def _is_production_environment(env: str, render: bool) -> bool:
+    return str(env or '').strip().lower() in {'production', 'prod'} or bool(render)
+
+
 class Config:
-    ENV = os.environ.get('FLASK_ENV', os.environ.get('ENV', 'development')).strip().lower()
-    IS_PRODUCTION = ENV in {'production', 'prod'}
+    IS_RENDER = _env_bool('RENDER', False)
+    ENV = os.environ.get('FLASK_ENV', os.environ.get('ENV', 'production' if IS_RENDER else 'development')).strip().lower()
+    IS_PRODUCTION = _is_production_environment(ENV, IS_RENDER)
+    SECRET_KEY_FROM_ENV = bool(os.environ.get('SECRET_KEY'))
     SECRET_KEY = os.environ.get('SECRET_KEY') or (
         None if IS_PRODUCTION else secrets.token_hex(32)
     )
