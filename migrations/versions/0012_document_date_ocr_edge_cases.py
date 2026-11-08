@@ -33,11 +33,14 @@ def upgrade():
         documents.c.analysis_issue_date, documents.c.analysis_expiry_date,
         documents.c.ai_document_type, documents.c.ai_summary,
         documents.c.ai_actions_json, documents.c.audit_id, documents.c.audit_year,
+        documents.c.is_audit_summary, documents.c.date_reviewed_at,
+        documents.c.date_extraction_confidence, documents.c.date_extraction_conflict,
     )).mappings()
 
     for row in rows:
-        issue = _parse_date(row["issue_date"] or row["analysis_issue_date"])
-        expiry = _parse_date(row["expiry_date"] or row["analysis_expiry_date"])
+        manually_reviewed = bool(row["date_reviewed_at"])
+        issue = _parse_date(row["issue_date"] if manually_reviewed else (row["issue_date"] or row["analysis_issue_date"]))
+        expiry = _parse_date(row["expiry_date"] if manually_reviewed else (row["expiry_date"] or row["analysis_expiry_date"]))
         multi_year = False
         if issue and expiry and issue.year >= 1900 and expiry.year >= 1900:
             anniversary_year = issue.year + 1
@@ -47,7 +50,11 @@ def upgrade():
             )
             multi_year = expiry > anniversary
 
-        if not issue:
+        if row["date_extraction_conflict"]:
+            status, verification = "needs_manual_review", "extraction_conflict"
+        elif row["date_extraction_confidence"] is not None and row["date_extraction_confidence"] < 0.80:
+            status, verification = "needs_manual_review", "low_date_confidence"
+        elif not issue:
             status, verification = "needs_manual_review", "missing_issue_date"
         elif issue.year > today.year or issue > today:
             status, verification = "future_issue_date", "future_issue_date"
@@ -79,9 +86,9 @@ def upgrade():
         classification_text = " ".join(str(value or "") for value in (
             row["file_name"], row["ai_document_type"], row["ai_summary"], row["ai_actions_json"]
         )).lower()
-        is_audit_summary = any(term in classification_text for term in (
+        is_audit_summary = bool(row["is_audit_summary"] or any(term in classification_text for term in (
             "סיכום ביקורת", "דוח ביקורת", 'דו"ח ביקורת', "audit report", "inspection report"
-        ))
+        )))
 
         audit_year = row["audit_year"]
         audit_date = metadata.get("audit_date") if isinstance(metadata, dict) else None
