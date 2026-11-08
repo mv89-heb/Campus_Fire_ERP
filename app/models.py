@@ -66,6 +66,7 @@ class Document(db.Model):
     audit_year = db.Column(db.SmallInteger, nullable=True)
     calculated_status = db.Column(db.String(32), nullable=True, index=True)
     date_verification_status = db.Column(db.String(32), nullable=True)
+    date_reviewed_at = db.Column(db.DateTime, nullable=True)
     status_policy_year = db.Column(db.SmallInteger, nullable=True)
     status_calculated_at = db.Column(db.DateTime, nullable=True)
     manual_status_override = db.Column(db.String(32), nullable=True)
