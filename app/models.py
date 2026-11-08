@@ -63,6 +63,7 @@ class Document(db.Model):
     document_year = db.Column(db.SmallInteger, nullable=True)
     is_multi_year = db.Column(db.Boolean, default=False, nullable=False)
     is_audit_summary = db.Column(db.Boolean, default=False, nullable=False)
+    date_policy_exempt = db.Column(db.Boolean, default=False, nullable=False)
     audit_year = db.Column(db.SmallInteger, nullable=True)
     calculated_status = db.Column(db.String(32), nullable=True, index=True)
     date_verification_status = db.Column(db.String(32), nullable=True)
