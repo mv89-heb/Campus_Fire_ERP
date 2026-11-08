@@ -23,6 +23,11 @@ def upgrade():
         ("calculated_status", sa.String(length=32), True),
         ("date_verification_status", sa.String(length=32), True),
         ("date_reviewed_at", sa.DateTime(), True),
+        ("gemini_issue_date", sa.Date(), True),
+        ("gemini_expiry_date", sa.Date(), True),
+        ("date_extraction_confidence", sa.Float(), True),
+        ("date_extraction_source", sa.String(length=32), True),
+        ("date_extraction_conflict", sa.Boolean(), False),
         ("status_policy_year", sa.SmallInteger(), True),
         ("status_calculated_at", sa.DateTime(), True),
         ("manual_status_override", sa.String(length=32), True),
@@ -33,7 +38,7 @@ def upgrade():
     )
     for name, column_type, nullable in columns:
         if name not in existing:
-            if name in {"is_multi_year", "is_audit_summary"}:
+            if name in {"is_multi_year", "is_audit_summary", "date_extraction_conflict"}:
                 op.add_column("documents", sa.Column(
                     name, column_type, nullable=False, server_default=sa.false()
                 ))
@@ -132,6 +137,7 @@ def upgrade():
             date_verification_status=verification,
             status_policy_year=2026,
             status_calculated_at=datetime.utcnow(),
+            date_extraction_source="local_pdf_text" if (row["analysis_issue_date"] or row["analysis_expiry_date"]) else None,
         ))
 
 
