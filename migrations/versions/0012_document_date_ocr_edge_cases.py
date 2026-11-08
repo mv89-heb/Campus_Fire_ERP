@@ -90,6 +90,9 @@ def upgrade():
             "סיכום ביקורת", "דוח ביקורת", 'דו"ח ביקורת', "audit report", "inspection report"
         )))
 
+        if is_audit_summary:
+            status, verification, multi_year = "not_applicable", "not_applicable", False
+
         audit_year = row["audit_year"]
         audit_date = metadata.get("audit_date") if isinstance(metadata, dict) else None
         if not audit_year and audit_date:
