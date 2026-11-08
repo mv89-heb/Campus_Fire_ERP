@@ -109,7 +109,7 @@ const AI=(()=>{
     if(!r.ok){document.getElementById('detail').innerHTML='<div class="finding critical">'+esc(d.error||'שגיאה')+'</div>';return}
     let h='<h2>'+esc(d.file_name)+'</h2><div class="muted">'+esc(d.document_type||'לא זוהה')+' · '+(labels[d.ai_status]||d.ai_status)+(d.confidence!=null?' · ביטחון '+Math.round(d.confidence*100)+'%':'')+'</div>';
     if(d.error)h+='<div class="finding critical">'+esc(d.error)+'</div>';
-    if(d.summary)h+='<div class="card"><b>סיכום הביקורת</b><p>'+esc(d.summary)+'</p></div>';
+    if(d.summary)h+='<div class="card"><b>סיכום המסמך</b><p>'+esc(d.summary)+'</p></div>';
     h+='<div class="card"><b>📅 תאריכי מסמך ותוקף</b>'+
       '<div class="muted" style="margin:6px 0">סטטוס מחושב: <b>'+esc(d.calculated_status_label||d.calculated_status||'ממתין לחישוב')+'</b>'+
       (d.is_multi_year?' · אישור רב-שנתי':'')+'</div><p class="muted">'+esc(d.date_status_reason||'')+'</p>'+
@@ -123,7 +123,7 @@ const AI=(()=>{
           '<label>תאריך תפוגה<input id="docExpiryDate" type="date" value="'+esc(d.expiry_date||'')+'"></label>'+
           '</div><button class="btn btn-primary" style="margin-top:10px" onclick="AI.saveDates('+d.document_id+')">💾 שמור ואמת תאריכים</button>')+
       (d.date_extraction_conflict?'<div class="finding high">נמצאה סתירה בין תאריכי החילוץ. תאריך Gemini: '+esc(d.gemini_issue_date||'לא זוהה')+' עד '+esc(d.gemini_expiry_date||'לא זוהה')+'. יש לבדוק מול ה-PDF ולאשר ידנית.</div>':'')+
-      (d.date_extraction_confidence!=null?'<p class="muted">ביטחון חילוץ תאריכים: '+Math.round(d.date_extraction_confidence*100)+'% · מקור: '+esc(d.date_extraction_source||'לא ידוע')+'</p>':'')+
+      (!d.is_audit_summary&&!d.date_policy_exempt&&d.date_extraction_confidence!=null?'<p class="muted">ביטחון חילוץ תאריכים: '+Math.round(d.date_extraction_confidence*100)+'% · מקור: '+esc(d.date_extraction_source||'לא ידוע')+'</p>':'')+
       (d.override_reason?'<p class="muted">סיבת חריג: '+esc(d.override_reason)+'</p>':'')+'</div>';
     if(d.is_audit_summary&&d.reconciliation){
       const rec=d.reconciliation;
