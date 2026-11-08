@@ -182,12 +182,15 @@ const AI=(()=>{
   async function analyzeWithRetry(id,maxAttempts=2){
     for(let attempt=1;attempt<=maxAttempts;attempt++){
       try{
+        // Retry only a transport-level exception. An HTTP 502 can already
+        // represent a completed/charged provider request, so never repeat it blindly.
         const ok=await analyze(id, true);
         if(ok)return true;
+        return false;
       }catch(e){
         if(attempt===maxAttempts)return false;
+        await new Promise(resolve=>setTimeout(resolve,1500*attempt));
       }
-      if(attempt<maxAttempts)await new Promise(resolve=>setTimeout(resolve,1500*attempt));
     }
     return false;
   }
@@ -209,6 +212,17 @@ const AI=(()=>{
       if(!pending.length){
         text.textContent='כל המסמכים כבר נותחו.';
         bar.style.width='100%';
+        return;
+      }
+      const approved=confirm(
+        'נמצאו '+pending.length+' מסמכים לניתוח.\n\n'+
+        'הפעולה תשלח כל מסמך בנפרד ל-Gemini, תצרוך מכסת API ועלולה לגרור עלות. '+
+        'כשל זמני של Gemini לא יפעיל שליחה חוזרת אוטומטית; ניתן יהיה לנסות שוב ידנית.\n\n'+
+        'להתחיל בניתוח '+pending.length+' המסמכים?'
+      );
+      if(!approved){
+        text.textContent='הניתוח בוטל. לא נשלחו בקשות ל-Gemini.';
+        bar.style.width='0%';
         return;
       }
       let done=0, failed=0;
