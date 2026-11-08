@@ -128,7 +128,7 @@ def extract_inspection_date_evidence(text):
     # Match only the immediate colon form so phrases such as
     # "תאריך התחזוקה הבאה" are not mistaken for the inspection date.
     generic_date_label = re.compile(
-        r"(?<![\\w])תאריך\\s*[:：]\\s*" + _DATE_RE.pattern,
+        r"(?<![\w])תאריך\s*[:：]\s*" + _DATE_RE.pattern,
         re.I,
     )
     for line in lines:
