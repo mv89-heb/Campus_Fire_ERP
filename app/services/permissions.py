@@ -24,6 +24,7 @@ PATH_ROLE_RULES = (
     ("/api/users", ADMIN_ROLES),
     ("/api/users/*", ADMIN_ROLES),
     ("/api/admin/*", ADMIN_ROLES),
+    ("/api/documents/*/date-override", ADMIN_ROLES),
     ("/api/storage/*", ADMIN_ROLES),
 
     # Inspection workflow.
