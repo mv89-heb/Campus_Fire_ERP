@@ -168,7 +168,7 @@ def apply_document_policy(document, *, policy_year=None, today=None, grace_perio
 
 def _normalise(value):
     value = (value or "").lower()
-    value = re.sub(r"[^\\w\\u0590-\\u05ff]+", " ", value)
+    value = re.sub(r"[^\w\u0590-\u05ff]+", " ", value)
     return " ".join(value.split())
 
 
