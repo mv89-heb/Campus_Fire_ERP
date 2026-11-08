@@ -201,6 +201,17 @@ def persist(document, result):
     document.ai_model = result.get("model")
     document.ai_analyzed_at = datetime.utcnow()
     document.ai_document_type = result.get("document_type")
+    purpose_text = " ".join(str(result.get(key) or "") for key in ("document_type", "document_purpose", "summary")).lower()
+    document.is_audit_summary = bool(
+        document.is_audit_summary or
+        any(term in purpose_text for term in ("סיכום ביקורת", "דוח ביקורת", "דו\"ח ביקורת", "audit report", "inspection report"))
+    )
+    audit_date_value = result.get("audit_date")
+    if audit_date_value:
+        try:
+            document.audit_year = date.fromisoformat(str(audit_date_value)[:10]).year
+        except (TypeError, ValueError):
+            document.analysis_review_required = True
     document.ai_summary = result.get("summary")
     document.ai_findings_json = json.dumps(result.get("key_findings", []), ensure_ascii=False)
     document.ai_actions_json = json.dumps({
@@ -238,6 +249,8 @@ def persist(document, result):
     except (TypeError, ValueError):
         document.ai_confidence = None
     document.ai_error = None
+    from app.services.document_date_policy_service import apply_document_policy
+    apply_document_policy(document)
 
     # Materialize every extracted business entity into the ERP first.
     # This is what makes Gemini data visible in Suppliers/Sites/Audits and
