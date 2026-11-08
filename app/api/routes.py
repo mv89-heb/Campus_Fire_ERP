@@ -495,7 +495,9 @@ def recalculate_document_date_policy():
 def document_date_override(doc_id):
     """Admin-only, reasoned exception. Calculated status remains unchanged."""
     document = db.session.get(Document, doc_id)
-    if document and (document.is_audit_summary or document.date_policy_exempt):
+    if document and document.is_audit_summary:
+        return jsonify({'error': 'סיכום ביקורת אינו אישור בעל תוקף ולכן לא ניתן להחיל עליו חריג תוקף', 'code': 'AUDIT_SUMMARY_NOT_CERTIFICATE'}), 409
+    if document and document.date_policy_exempt:
         return jsonify({'error': 'המסמך אינו אישור בעל תוקף ולכן לא ניתן להחיל עליו חריג תוקף', 'code': 'DATE_POLICY_NOT_APPLICABLE'}), 409
     if not document or document.status in {'deleted', 'archived'}:
         return jsonify({'error': 'המסמך לא נמצא או אינו פעיל'}), 404
