@@ -35,6 +35,11 @@ ZONE_INFO = {
 }
 
 _EXPLICIT_EXPIRY_PATTERNS = (
+    re.compile(
+        r"(?:תוקף|בתוקף|תקף)\s+(?:האישור|הרישיון|המסמך|התעודה|ההיתר|הביטוח|החוזה)\s*(?:עד|ליום|בתאריך)\s*[:\-]?\s*"
+        + _DATE_RE.pattern,
+        re.I,
+    ),
     re.compile(r"(?:תוקף|בתוקף|תקף)\s*(?:עד|ליום|בתאריך)?\s*[:\-]?\s*" + _DATE_RE.pattern, re.I),
     re.compile(r"(?:valid\s+(?:until|through)|expires?|expiry|expiration)\s*[:\-]?\s*" + _DATE_RE.pattern, re.I),
 )
@@ -123,6 +128,20 @@ def extract_explicit_expiry(text):
 def extract_inspection_date_evidence(text):
     lines = _normalise_lines(text)
     candidates = []
+
+    # A bare "תאריך: dd/mm/yyyy" is a common inspection-date label.
+    # Match only the immediate colon form so phrases such as
+    # "תאריך התחזוקה הבאה" are not mistaken for the inspection date.
+    generic_date_label = re.compile(
+        r"(?<![\w])תאריך\s*[:：]\s*" + _DATE_RE.pattern,
+        re.I,
+    )
+    for line in lines:
+        for match in generic_date_label.finditer(line):
+            value = _parse_date_match(match)
+            if value:
+                candidates.append((40, value, line))
+
     for i in range(len(lines)):
         context = " ".join(lines[max(0, i - 1):min(len(lines), i + 2)])
         low = context.lower()

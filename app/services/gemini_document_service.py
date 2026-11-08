@@ -95,6 +95,30 @@ SYSTEM_PROMPT = """אתה מנתח מסמכי בטיחות אש עבור ERP.
 def is_configured():
     return bool(current_app.config.get("GEMINI_API_KEY"))
 
+
+class DocumentAnalysisInProgress(Exception):
+    """Raised when another non-stale analysis is already running."""
+
+
+def is_processing_stale(document, now=None, stale_after_minutes=30):
+    """Detect abandoned synchronous analyses without stealing active work.
+
+    Older records predate ai_processing_started_at. For those legacy rows,
+    uploaded_at is used only as a conservative 24-hour fallback.
+    """
+    if getattr(document, "ai_status", None) != "processing":
+        return False
+    now = now or datetime.utcnow()
+    started_at = getattr(document, "ai_processing_started_at", None)
+    if started_at is not None:
+        try:
+            threshold = max(5, int(stale_after_minutes))
+        except (TypeError, ValueError):
+            threshold = 30
+        return started_at <= now - timedelta(minutes=threshold)
+    uploaded_at = getattr(document, "uploaded_at", None)
+    return bool(uploaded_at and uploaded_at <= now - timedelta(hours=24))
+
 def _client():
     if not is_configured():
         raise RuntimeError("GEMINI_API_KEY אינו מוגדר")
@@ -173,6 +197,7 @@ def analyze(document):
 
 def persist(document, result):
     document.ai_status = "completed"
+    document.ai_processing_started_at = None
     document.ai_model = result.get("model")
     document.ai_analyzed_at = datetime.utcnow()
     document.ai_document_type = result.get("document_type")
@@ -233,12 +258,30 @@ def persist(document, result):
     create_operational_actions(document)
 
 def analyze_and_persist(document_id):
-    document = db.session.get(Document, document_id)
+    # Serialize analysis starts per document. This prevents browser retries
+    # from racing and gives interrupted requests a bounded recovery lease.
+    document = (
+        db.session.query(Document)
+        .filter_by(id=document_id)
+        .with_for_update()
+        .first()
+    )
     if not document:
         raise ValueError("המסמך לא נמצא")
+
+    now = datetime.utcnow()
+    if document.ai_status == "processing" and not is_processing_stale(
+        document,
+        now=now,
+        stale_after_minutes=current_app.config.get("GEMINI_PROCESSING_STALE_MINUTES", 30),
+    ):
+        raise DocumentAnalysisInProgress("המסמך כבר נמצא בתהליך ניתוח. נסה שוב לאחר סיום.")
+
     document.ai_status = "processing"
+    document.ai_processing_started_at = now
     document.ai_error = None
     db.session.commit()
+
     try:
         result = analyze(document)
         persist(document, result)
@@ -246,9 +289,11 @@ def analyze_and_persist(document_id):
     except Exception as exc:
         db.session.rollback()
         document = db.session.get(Document, document_id)
-        document.ai_status = "failed"
-        document.ai_error = str(exc)[:2000]
-        db.session.commit()
+        if document:
+            document.ai_status = "failed"
+            document.ai_processing_started_at = None
+            document.ai_error = str(exc)[:2000]
+            db.session.commit()
         raise
 
 

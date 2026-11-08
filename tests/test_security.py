@@ -1,8 +1,14 @@
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from flask import session
 
 from app import create_app
 from app.extensions import db
+from app.models import Document, User
+from app.api.routes import _document_access_allowed
 from app.services.permissions import can_write
 
 
@@ -135,6 +141,45 @@ class SecurityGuardTests(unittest.TestCase):
         self.assertTrue(can_write('manager', '/api/sites'))
         self.assertTrue(can_write('admin', '/api/users/12'))
         self.assertTrue(can_write('super_admin', '/api/admin/storage'))
+
+
+    def test_inactive_session_user_cannot_access_document_file(self):
+        with self.app.test_request_context('/api/documents/1/file'):
+            session['user_id'] = 123
+            with patch('app.api.routes.db.session.get', return_value=SimpleNamespace(active=False)):
+                self.assertFalse(_document_access_allowed(1))
+            self.assertNotIn('user_id', session)
+
+    def test_active_session_user_can_access_document_file(self):
+        with self.app.test_request_context('/api/documents/1/file'):
+            session['user_id'] = 123
+            with patch('app.api.routes.db.session.get', return_value=SimpleNamespace(active=True)):
+                self.assertTrue(_document_access_allowed(1))
+
+    def test_document_context_get_does_not_persist_automatic_links(self):
+        with self.app.app_context():
+            user = User(username='context-admin', password_hash='unused', role='admin', active=True)
+            document = Document(
+                file_name='context.pdf',
+                file_path='documents/context.pdf',
+                file_hash='c' * 64,
+                status='active',
+            )
+            db.session.add_all([user, document])
+            db.session.commit()
+            user_id, document_id = user.id, document.id
+
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = user_id
+            sess['username'] = 'context-admin'
+            sess['role'] = 'admin'
+
+        with patch('app.api.routes.link_svc.resolve_document', return_value={'site': {'status': 'missing'}}) as resolve:
+            response = self.client.get(f'/api/document-intelligence/{document_id}/context')
+
+        self.assertEqual(response.status_code, 200)
+        resolve.assert_called_once()
+        self.assertFalse(resolve.call_args.kwargs.get('persist', True))
 
 
 if __name__ == '__main__':

@@ -67,12 +67,14 @@ class Config:
     SUPABASE_URL = os.environ.get('SUPABASE_URL')
     SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY')
     SUPABASE_BUCKET = os.environ.get('SUPABASE_BUCKET', 'documents')
+    REQUIRE_SUPABASE_STORAGE = _env_bool('REQUIRE_SUPABASE_STORAGE', IS_PRODUCTION)
 
     MAX_PDF_BYTES = int(os.environ.get('MAX_PDF_BYTES', str(100 * 1024 * 1024)))
 
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
     GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.8-flash')
     GEMINI_THINKING_LEVEL = os.environ.get('GEMINI_THINKING_LEVEL', 'medium')
+    GEMINI_PROCESSING_STALE_MINUTES = int(os.environ.get('GEMINI_PROCESSING_STALE_MINUTES', '30'))
     GEMINI_REVIEW_CONFIDENCE = float(os.environ.get('GEMINI_REVIEW_CONFIDENCE', '0.80'))
     GEMINI_MAX_INLINE_PDF_BYTES = int(os.environ.get('GEMINI_MAX_INLINE_PDF_BYTES', str(50 * 1024 * 1024)))
     ALLOWED_PDF_MIME_TYPES = ('application/pdf', 'application/x-pdf')

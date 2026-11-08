@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, current_app, render_template, send_file, redirect, session
 from app.extensions import db
-from app.models import Zone, SystemRequirement, Document
+from app.models import Zone, SystemRequirement, Document, User
 from app.services import gemini_document_service as ai_svc
 from app.services import document_link_service as link_svc
 from app.services.dms_service import DMSService
@@ -11,6 +11,7 @@ from datetime import date
 import io
 import platform
 import os
+import tempfile
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 main_bp = Blueprint('main', __name__)
@@ -34,8 +35,18 @@ def _document_token_valid(token, doc_id):
 
 
 def _document_access_allowed(doc_id):
-    if session.get('user_id'):
-        return True
+    user_id = session.get('user_id')
+    if user_id:
+        try:
+            user = db.session.get(User, user_id)
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception('Could not validate session user for document %s', doc_id)
+            user = None
+        if user and user.active:
+            return True
+        session.clear()
+
     token = request.args.get('access_token') or request.headers.get('X-Document-Access-Token') or request.cookies.get(f'doc_access_{int(doc_id)}')
     return _document_token_valid(token, doc_id)
 
@@ -146,7 +157,7 @@ def serve_upload(filename):
             return _pdf_response(data, _safe_pdf_filename(doc, doc.id), download=False)
         except ValueError as exc:
             return jsonify({'error': str(exc)}), 502
-    return jsonify({'error': f'File not found. Looking in: {full_path}'}), 404
+    return jsonify({'error': 'File not found'}), 404
 
 
 @main_bp.route('/api/documents/<int:doc_id>/file', methods=['GET'])
@@ -168,15 +179,13 @@ def document_file(doc_id):
             fallback = _supabase_signed_redirect(resolved_path, doc_id)
             if fallback:
                 return fallback
-        return jsonify({'error': 'המסמך נמצא ב-Supabase אך לא ניתן להוריד אותו', 'document_id': doc_id,
-                        'resolved_path': resolved_path, 'details': error}), 502
+        return jsonify({'error': 'המסמך נמצא באחסון אך לא ניתן להוריד אותו', 'document_id': doc_id}), 502
     base_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     full_path = os.path.abspath(os.path.join(base_dir, os.path.basename(doc.file_path)))
     if os.path.commonpath([full_path, base_dir]) != base_dir:
         return jsonify({'error': 'Invalid file path'}), 400
     if not os.path.isfile(full_path):
-        return jsonify({'error': 'File not found', 'document_id': doc_id, 'db_file_path': doc.file_path,
-                        'looking_in': full_path, 'supabase_resolved': False}), 404
+        return jsonify({'error': 'File not found', 'document_id': doc_id}), 404
     try:
         with open(full_path, 'rb') as local_file:
             data = local_file.read()
@@ -287,6 +296,7 @@ def _ai_document_payload(doc):
         'document_id': doc.id,
         'file_name': doc.file_name,
         'ai_status': doc.ai_status,
+        'processing_stale': ai_svc.is_processing_stale(doc, stale_after_minutes=current_app.config.get('GEMINI_PROCESSING_STALE_MINUTES', 30)),
         'ai_model': doc.ai_model,
         'ai_analyzed_at': doc.ai_analyzed_at.isoformat() if doc.ai_analyzed_at else None,
         'document_type': doc.ai_document_type,
@@ -333,13 +343,13 @@ def document_intelligence_analyze(doc_id):
         return jsonify({'error': 'המסמך לא נמצא'}), 404
     if doc.status in {'deleted', 'archived'}:
         return jsonify({'error': 'לא ניתן לנתח מסמך שנמחק או הועבר לארכיון'}), 409
-    if doc.ai_status == 'processing':
-        return jsonify({'error': 'המסמך כבר נמצא בתהליך ניתוח. נסה שוב לאחר סיום.'}), 409
-
     try:
         result = ai_svc.analyze_and_persist(doc.id)
         doc = db.session.get(Document, doc.id)
         return jsonify(_ai_document_payload(doc) | {'result': result}), 200
+    except ai_svc.DocumentAnalysisInProgress as exc:
+        db.session.rollback()
+        return jsonify({'error': str(exc), 'ai_status': 'processing'}), 409
     except Exception:
         current_app.logger.exception('Web Gemini analysis failed for document %s', doc_id)
         doc = db.session.get(Document, doc_id)
@@ -356,7 +366,7 @@ def document_intelligence_context(doc_id):
     if not doc:
         return jsonify({'error': 'המסמך לא נמצא'}), 404
     try:
-        links = link_svc.resolve_document(doc, persist=True)
+        links = link_svc.resolve_document(doc, persist=False)
         return jsonify({
             'document_id': doc.id,
             'file_name': doc.file_name,
@@ -473,35 +483,70 @@ def document_intelligence_overview():
 
 @main_bp.route('/api/system/health')
 def system_health():
-    result = {'db_connected': False, 'zones_seeded': False, 'upload_folder_writable': False}
+    """Public, side-effect-light readiness probe for Render and GitHub Actions."""
+    storage_required = bool(current_app.config.get(
+        'REQUIRE_SUPABASE_STORAGE',
+        current_app.config.get('IS_PRODUCTION', False),
+    ))
+    result = {
+        'status': 'degraded',
+        'db_connected': False,
+        'zones_seeded': False,
+        'upload_folder_writable': False,
+        'supabase_required': storage_required,
+        'supabase_configured': False,
+        'storage_connected': False,
+        'gemini_configured': bool(current_app.config.get('GEMINI_API_KEY')),
+    }
+
     try:
         zone_count = Zone.query.count()
         result['db_connected'] = True
         result['zones_seeded'] = zone_count > 0
         result['zone_count'] = zone_count
-    except Exception as e:
-        result['db_error'] = str(e)
-    try:
-        test_path = os.path.join(current_app.config['UPLOAD_FOLDER'], '.write_test')
-        with open(test_path, 'w') as f:
-            f.write('ok')
-        os.remove(test_path)
-        result['upload_folder_writable'] = True
-    except Exception as e:
-        result['upload_folder_error'] = str(e)
-    result['database_url_source'] = 'DATABASE_URL (custom, e.g. Neon)' if os.environ.get('DATABASE_URL') else 'SQLite מקומי (ברירת מחדל - DATABASE_URL לא הוגדר)'
-    result['supabase_configured'] = storage.is_configured()
-    if result['supabase_configured']:
-        connected, storage_error = storage.check_connection()
-        result['storage_connected'] = connected
-        if storage_error:
-            result['storage_error'] = storage_error
-    else:
-        result['storage_connected'] = False
-        result['storage_note'] = 'Supabase לא מוגדר - מסמכים חדשים יישמרו מקומית'
-    status_code = 200 if result['db_connected'] and result['upload_folder_writable'] else 503
-    return jsonify(result), status_code
+    except Exception:
+        current_app.logger.exception('Health check database probe failed')
 
+    try:
+        with tempfile.NamedTemporaryFile(
+            prefix='.healthcheck-',
+            dir=current_app.config['UPLOAD_FOLDER'],
+            delete=True,
+        ) as probe_file:
+            probe_file.write(b'ok')
+            probe_file.flush()
+        result['upload_folder_writable'] = True
+    except Exception:
+        current_app.logger.exception('Health check upload-folder probe failed')
+
+    try:
+        result['supabase_configured'] = storage.is_configured()
+        if result['supabase_configured']:
+            connected, storage_error = storage.check_connection()
+            result['storage_connected'] = bool(connected)
+            if not connected:
+                current_app.logger.warning(
+                    'Health check Supabase Storage probe failed: %s',
+                    storage_error or 'unknown storage error',
+                )
+        elif not storage_required:
+            result['storage_note'] = 'Supabase is not configured; local storage fallback is enabled'
+    except Exception:
+        current_app.logger.exception('Health check Supabase Storage probe failed')
+        result['storage_connected'] = False
+
+    storage_ready = (
+        not storage_required or
+        (result['supabase_configured'] and result['storage_connected'])
+    )
+    ready = (
+        result['db_connected'] and
+        result['zones_seeded'] and
+        result['upload_folder_writable'] and
+        storage_ready
+    )
+    result['status'] = 'ok' if ready else 'degraded'
+    return jsonify(result), (200 if ready else 503)
 
 @main_bp.route('/api/outlook', methods=['POST'])
 def outlook():
