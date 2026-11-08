@@ -114,8 +114,10 @@ const AI=(()=>{
       '<div class="muted" style="margin:6px 0">סטטוס מחושב: <b>'+esc(d.calculated_status_label||d.calculated_status||'ממתין לחישוב')+'</b>'+
       (d.is_multi_year?' · אישור רב-שנתי':'')+'</div><p class="muted">'+esc(d.date_status_reason||'')+'</p>'+
       (d.effective_status&&d.effective_status!==d.calculated_status?' · חריג ידני פעיל: '+esc(d.effective_status):'')+'</div>'+
-      (d.is_audit_summary
-        ?'<p class="muted">זהו סיכום ביקורת ולא אישור בעל תוקף. שנת הביקורת: '+esc(d.audit_year||'לא זוהתה')+'.</p>'
+      ((d.is_audit_summary || d.date_policy_exempt)
+        ?(d.is_audit_summary
+          ?'<p class="muted">זהו סיכום ביקורת ולא אישור בעל תוקף. שנת הביקורת: '+esc(d.audit_year||'לא זוהתה')+'.</p>'
+          :'<p class="muted">זהו מסמך מנהלי/כספי שאינו אישור בעל תוקף. לא נדרש עבורו חישוב תוקף.</p>')
         :'<div class="relationship-grid">'+
           '<label>תאריך הנפקה<input id="docIssueDate" type="date" value="'+esc(d.issue_date||'')+'"></label>'+
           '<label>תאריך תפוגה<input id="docExpiryDate" type="date" value="'+esc(d.expiry_date||'')+'"></label>'+
