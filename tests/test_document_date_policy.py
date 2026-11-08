@@ -14,6 +14,14 @@ from app.services.document_date_policy_service import (
 
 
 class DocumentDatePolicyTests(unittest.TestCase):
+    def test_audit_summary_is_not_treated_as_an_expiring_certificate(self):
+        result = calculate_document_status(
+            None, None, policy_year=2026, today=date(2026, 11, 8),
+            is_audit_summary=True,
+        )
+        self.assertEqual(result["status"], "not_applicable")
+        self.assertEqual(result["verification"], "not_applicable")
+
     def test_2025_document_without_multiyear_proof_is_old(self):
         result = calculate_document_status(
             date(2025, 4, 10), None,
