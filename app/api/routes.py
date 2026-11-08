@@ -411,6 +411,29 @@ def document_date_review(doc_id):
     })
 
 
+@main_bp.route('/api/admin/documents/recalculate-date-policy', methods=['POST'])
+def recalculate_document_date_policy():
+    """Admin-only full recalculation after an approved policy-year change."""
+    documents = Document.query.filter(Document.status.notin_(['deleted', 'archived'])).all()
+    counts = {}
+    for document in documents:
+        result = apply_document_policy(document)
+        counts[result['status']] = counts.get(result['status'], 0) + 1
+    audit_log(
+        'update', 'document_date_policy', None, 'Recalculation of document date policy',
+        None,
+        {'policy_year': current_app.config.get('DOCUMENT_POLICY_YEAR', 2026),
+         'documents_processed': len(documents), 'status_counts': counts},
+    )
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'policy_year': current_app.config.get('DOCUMENT_POLICY_YEAR', 2026),
+        'documents_processed': len(documents),
+        'status_counts': counts,
+    })
+
+
 @main_bp.route('/api/documents/<int:doc_id>/date-override', methods=['POST'])
 def document_date_override(doc_id):
     """Admin-only, reasoned exception. Calculated status remains unchanged."""
