@@ -222,7 +222,7 @@ def dashboard():
                         today=today_israel(),
                         grace_period_days=current_app.config.get('DOCUMENT_GRACE_PERIOD_DAYS', 0),
                     )
-                    calculated_status = latest.calculated_status or policy_result['status']
+                    calculated_status = policy_result['status']
                     override_active = bool(
                         latest.manual_status_override and latest.override_expires_at
                         and latest.override_expires_at > datetime.utcnow()
@@ -322,7 +322,7 @@ def _ai_document_payload(doc, include_reconciliation=False):
         policy_year=current_app.config.get('DOCUMENT_POLICY_YEAR', 2026),
         grace_period_days=current_app.config.get('DOCUMENT_GRACE_PERIOD_DAYS', 0),
     )
-    calculated_status = doc.calculated_status or date_result['status']
+    calculated_status = date_result['status']
     override_active = bool(
         doc.manual_status_override and doc.override_expires_at
         and doc.override_expires_at > datetime.utcnow()
@@ -480,7 +480,8 @@ def document_date_override(doc_id):
         return jsonify({'error': 'תאריך פקיעת החריג אינו תקין'}), 400
     if override_expires_at <= datetime.utcnow():
         return jsonify({'error': 'תוקף החריג חייב להיות בעתיד'}), 400
-    if document.calculated_status in {'future_issue_date', 'date_conflict'} and override_status == 'active':
+    calculated = apply_document_policy(document)
+    if calculated['status'] in {'future_issue_date', 'date_conflict'} and override_status == 'active':
         return jsonify({'error': 'יש לתקן ולאמת את התאריכים לפני אישור המסמך', 'code': 'DATE_CORRECTION_REQUIRED'}), 409
 
     old_values = {
