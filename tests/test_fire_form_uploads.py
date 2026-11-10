@@ -1,0 +1,35 @@
+import unittest
+
+import fitz
+from flask import Flask
+
+from app.api.fire_forms_routes import _as_pdf
+
+
+class FireFormUploadValidationTests(unittest.TestCase):
+    def test_accepts_valid_pdf_and_preserves_page_count(self):
+        doc = fitz.open()
+        doc.new_page()
+        doc.new_page()
+        data = doc.tobytes()
+        doc.close()
+
+        normalized, page_count = _as_pdf(data, "fire-form.pdf")
+        self.assertTrue(normalized.startswith(b"%PDF-"))
+        self.assertEqual(page_count, 2)
+
+    def test_rejects_renamed_non_pdf_payload(self):
+        with self.assertRaises(ValueError):
+            _as_pdf(b"not a pdf", "fire-form.pdf")
+
+    def test_rejects_unsupported_extension(self):
+        with self.assertRaises(ValueError):
+            _as_pdf(b"content", "certificate.docx")
+
+    def test_rejects_empty_upload(self):
+        with self.assertRaises(ValueError):
+            _as_pdf(b"", "certificate.pdf")
+
+
+if __name__ == "__main__":
+    unittest.main()
