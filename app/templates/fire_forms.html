@@ -21,7 +21,8 @@
   </section>
 
   <section class="ff-card">
-    <div class="ff-title"><h2>הטפסים השמורים</h2><button class="ff-btn secondary" type="button" onclick="loadTemplates()">רענון</button></div>
+    <div class="ff-title"><h2>הטפסים השמורים</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ff-btn" type="button" onclick="openBatchPrint()">מילוי והדפסת טפסים נבחרים</button><button class="ff-btn secondary" type="button" onclick="selectAllTemplates(true)">בחירת הכול</button><button class="ff-btn secondary" type="button" onclick="selectAllTemplates(false)">ביטול בחירה</button><button class="ff-btn secondary" type="button" onclick="loadTemplates()">רענון</button></div></div>
+    <p class="ff-muted">סמן טופס אחד או יותר כדי להפיק חבילת PDF אחת. פרטי המילוי מוזנים פעם אחת ומשולבים בכל הטפסים שבהם הוגדר אותו שדה.</p>
     <div id="ffTemplateList" class="ff-list">טוען...</div>
   </section>
 
@@ -57,7 +58,7 @@
   </section>
 </div>
 <script>
-let selectedTemplateId = null;
+let selectedTemplateIds = [];
 let fireTemplates = [];
 async function csrfToken(){ const r=await fetch('/api/auth/me'); if(!r.ok) throw new Error('פג תוקף החיבור'); const u=await r.json(); if(!u?.csrf_token) throw new Error('לא ניתן לאמת את הבקשה'); return u.csrf_token; }
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -76,8 +77,11 @@ async function loadTemplates(){
     if(!res.ok) throw new Error('לא ניתן לטעון את המאגר');
     const items=await res.json();fireTemplates=items;
     if(!items.length){target.innerHTML='<p class="ff-muted">עדיין לא הועלו טפסים.</p>';return;}
-    target.innerHTML=items.map(item=>'<div class="ff-row"><div><b>'+escapeHtml(item.title)+'</b><div class="ff-muted">'+escapeHtml(item.original_filename)+' · '+item.page_count+' עמודים</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="ff-btn secondary" target="_blank" rel="noopener" href="/api/fire-form-templates/'+item.id+'/file">תצוגה</a><button class="ff-btn secondary" type="button" onclick="openMapping('+item.id+')">הגדרת שדות</button><button class="ff-btn" type="button" onclick="openPrint('+item.id+')">מילוי והדפסה</button><button class="ff-btn secondary" type="button" onclick="deleteTemplate('+item.id+')">מחיקה</button></div></div>').join('');
+    target.innerHTML=items.map(item=>'<div class="ff-row"><div style="display:flex;gap:10px;align-items:center"><input type="checkbox" class="ff-template-select" value="'+item.id+'" aria-label="בחירת '+escapeHtml(item.title)+'"><div><b>'+escapeHtml(item.title)+'</b><div class="ff-muted">'+escapeHtml(item.original_filename)+' · '+item.page_count+' עמודים · '+(item.fields_schema?.length||0)+' שדות מוגדרים</div></div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="ff-btn secondary" target="_blank" rel="noopener" href="/api/fire-form-templates/'+item.id+'/file">תצוגה</a><button class="ff-btn secondary" type="button" onclick="openMapping('+item.id+')">הגדרת שדות</button><button class="ff-btn" type="button" onclick="openPrint('+item.id+')">מילוי והדפסה</button><button class="ff-btn secondary" type="button" onclick="deleteTemplate('+item.id+')">מחיקה</button></div></div>').join('');
   }catch(err){target.textContent=err.message;}
+}
+function selectAllTemplates(checked){
+  document.querySelectorAll('.ff-template-select').forEach(input=>input.checked=checked);
 }
 async function deleteTemplate(id){
   if(!confirm('למחוק את הטופס מהמאגר?')) return;
@@ -140,16 +144,21 @@ async function saveMapping(){
   }catch(err){status.textContent=err.message;}
 }
 
-function openPrint(id){
-  selectedTemplateId=id;
-  const selected=fireTemplates.find(item=>item.id===id);
-  document.getElementById('ffPrintTitle').textContent='מילוי והדפסה · '+(selected?.title||'טופס');
-  const fields=selected?.fields_schema||[];
-  document.getElementById('ffPrintValues').innerHTML=fields.length?fields.map(field=>'<label>'+escapeHtml(field.label)+'<input class="ff-input" data-fire-field="'+escapeHtml(field.key)+'" maxlength="500"></label>').join(''):'<p class="ff-muted">לטופס זה עדיין לא הוגדרו שדות. ניתן להגדירם בכפתור הגדרת שדות.</p>';
+function openBatchPrint(ids=null){
+  const selectedIds=ids||[...document.querySelectorAll('.ff-template-select:checked')].map(input=>Number(input.value));
+  if(!selectedIds.length){alert('יש לבחור לפחות טופס אחד');return;}
+  selectedTemplateIds=selectedIds;
+  const selected=fireTemplates.filter(item=>selectedIds.includes(item.id));
+  const fieldMap=new Map();
+  selected.forEach(item=>(item.fields_schema||[]).forEach(field=>{if(!fieldMap.has(field.key))fieldMap.set(field.key,field);}));
+  const fields=[...fieldMap.values()];
+  document.getElementById('ffPrintTitle').textContent='מילוי והדפסת '+selected.length+' טפסים בחבילה אחת';
+  document.getElementById('ffPrintValues').innerHTML=fields.length?fields.map(field=>'<label>'+escapeHtml(field.label)+'<input class="ff-input" data-fire-field="'+escapeHtml(field.key)+'" maxlength="500"></label>').join(''):'<p class="ff-muted">לטפסים שנבחרו עדיין לא הוגדרו שדות. ניתן להגדירם תחילה דרך „הגדרת שדות”.</p>';
   document.getElementById('ffPrintCard').hidden=false;
   document.getElementById('ffPrintCard').scrollIntoView({behavior:'smooth'});
 }
-function closePrint(){selectedTemplateId=null;document.getElementById('ffPrintCard').hidden=true;document.getElementById('ffPrintForm').reset();}
+function openPrint(id){openBatchPrint([id]);}
+function closePrint(){selectedTemplateIds=[];document.getElementById('ffPrintCard').hidden=true;document.getElementById('ffPrintForm').reset();}
 document.getElementById('ffUploadForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const files=[...document.getElementById('ffFiles').files];
@@ -173,17 +182,17 @@ document.getElementById('ffUploadForm').addEventListener('submit',async e=>{
   finally{button.disabled=false;}
 });
 document.getElementById('ffPrintForm').addEventListener('submit',async e=>{
-  e.preventDefault();if(!selectedTemplateId)return;
+  e.preventDefault();if(!selectedTemplateIds.length)return;
   const file=document.getElementById('ffCertificate').files[0];
   if(!file)return;
   const button=document.getElementById('ffPrintButton'),status=document.getElementById('ffPrintStatus');
   button.disabled=true;status.textContent='מפיק PDF...';
-  const data=new FormData();data.append('certificate',file);const values={};document.querySelectorAll('#ffPrintValues [data-fire-field]').forEach(input=>values[input.dataset.fireField]=input.value);data.append('values',JSON.stringify(values));
+  const data=new FormData();data.append('certificate',file);data.append('template_ids',JSON.stringify(selectedTemplateIds));const values={};document.querySelectorAll('#ffPrintValues [data-fire-field]').forEach(input=>values[input.dataset.fireField]=input.value);data.append('values',JSON.stringify(values));
   try{
-    const res=await fetch('/api/fire-form-templates/'+selectedTemplateId+'/print-package',{method:'POST',body:data,headers:{'X-CSRF-Token':await csrfToken()}});
+    const res=await fetch('/api/fire-form-templates/print-package',{method:'POST',body:data,headers:{'X-CSRF-Token':await csrfToken()}});
     if(!res.ok){const result=await res.json();throw new Error(result.error||'הפקת הקובץ נכשלה');}
     const blob=await res.blob(),url=URL.createObjectURL(blob),a=document.createElement('a');
-    a.href=url;a.download='fire-form-'+selectedTemplateId+'-print.pdf';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    a.href=url;a.download='fire-forms-print-package.pdf';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
     status.textContent='הקובץ הופק. התעודה לא נשמרה במאגר.';
     document.getElementById('ffPrintForm').reset();document.getElementById('ffCertificateName').textContent='';
   }catch(err){status.textContent=err.message;}
