@@ -96,6 +96,46 @@ class FireFormUploadValidationTests(unittest.TestCase):
 
         self.assertEqual(_suggest_fields_for_pdf(pdf_bytes), [])
 
+    def test_auto_mapping_uses_fields_found_in_historical_completed_approvals(self):
+        document = fitz.open()
+        page = document.new_page(width=595, height=842)
+        labels = [
+            ("מספר תיק ברשות הכבאות", "fire_case_number"),
+            ("מהות העסק", "business_type"),
+            ("כתובת דואר אלקטרוני", "contact_email"),
+            ("מספר אישור בחברה", "company_certificate_number"),
+            ("שם הבודק", "inspector_name"),
+            ("בתוקף עד", "expiry_date"),
+        ]
+        for index, (label, _key) in enumerate(labels):
+            y = 90 + index * 55
+            page.insert_htmlbox(
+                fitz.Rect(350, y - 10, 560, y + 10),
+                '<div dir="rtl" style="font-family:sans-serif">' + label + '</div>',
+            )
+            page.draw_line(fitz.Point(100, y), fitz.Point(345, y), width=0.7)
+        pdf_bytes = document.tobytes()
+        document.close()
+
+        fields = _suggest_fields_for_pdf(pdf_bytes)
+        mapped = {field["key"] for field in fields}
+        self.assertEqual(mapped, {key for _label, key in labels})
+        self.assertTrue(all(field["source"] == "auto_rule_label" for field in fields))
+
+    def test_generic_date_label_is_not_misclassified_as_inspection_date(self):
+        document = fitz.open()
+        page = document.new_page(width=595, height=842)
+        page.insert_htmlbox(
+            fitz.Rect(350, 90, 560, 110),
+            '<div dir="rtl" style="font-family:sans-serif">תאריך בדיקה</div>',
+        )
+        page.draw_line(fitz.Point(100, 100), fitz.Point(345, 100), width=0.7)
+        pdf_bytes = document.tobytes()
+        document.close()
+
+        fields = _suggest_fields_for_pdf(pdf_bytes)
+        self.assertEqual([field["key"] for field in fields], ["inspection_date"])
+
 
 if __name__ == "__main__":
     unittest.main()
