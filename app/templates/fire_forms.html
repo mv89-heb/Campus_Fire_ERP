@@ -21,7 +21,7 @@
   </section>
 
   <section class="ff-card">
-    <div class="ff-title"><h2>הטפסים השמורים</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ff-btn" type="button" onclick="openBatchPrint()">מילוי והדפסת טפסים נבחרים</button><button class="ff-btn secondary" type="button" onclick="loadTemplates()">רענון</button></div></div>
+    <div class="ff-title"><h2>הטפסים השמורים</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ff-btn" type="button" onclick="openBatchPrint()">מילוי והדפסת טפסים נבחרים</button><button class="ff-btn secondary" type="button" onclick="selectAllTemplates(true)">בחירת הכול</button><button class="ff-btn secondary" type="button" onclick="selectAllTemplates(false)">ביטול בחירה</button><button class="ff-btn secondary" type="button" onclick="loadTemplates()">רענון</button></div></div>
     <p class="ff-muted">סמן טופס אחד או יותר כדי להפיק חבילת PDF אחת. פרטי המילוי מוזנים פעם אחת ומשולבים בכל הטפסים שבהם הוגדר אותו שדה.</p>
     <div id="ffTemplateList" class="ff-list">טוען...</div>
   </section>
@@ -79,6 +79,9 @@ async function loadTemplates(){
     if(!items.length){target.innerHTML='<p class="ff-muted">עדיין לא הועלו טפסים.</p>';return;}
     target.innerHTML=items.map(item=>'<div class="ff-row"><div style="display:flex;gap:10px;align-items:center"><input type="checkbox" class="ff-template-select" value="'+item.id+'" aria-label="בחירת '+escapeHtml(item.title)+'"><div><b>'+escapeHtml(item.title)+'</b><div class="ff-muted">'+escapeHtml(item.original_filename)+' · '+item.page_count+' עמודים · '+(item.fields_schema?.length||0)+' שדות מוגדרים</div></div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="ff-btn secondary" target="_blank" rel="noopener" href="/api/fire-form-templates/'+item.id+'/file">תצוגה</a><button class="ff-btn secondary" type="button" onclick="openMapping('+item.id+')">הגדרת שדות</button><button class="ff-btn" type="button" onclick="openPrint('+item.id+')">מילוי והדפסה</button><button class="ff-btn secondary" type="button" onclick="deleteTemplate('+item.id+')">מחיקה</button></div></div>').join('');
   }catch(err){target.textContent=err.message;}
+}
+function selectAllTemplates(checked){
+  document.querySelectorAll('.ff-template-select').forEach(input=>input.checked=checked);
 }
 async function deleteTemplate(id){
   if(!confirm('למחוק את הטופס מהמאגר?')) return;
