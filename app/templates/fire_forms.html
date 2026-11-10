@@ -85,10 +85,10 @@ async function loadTemplates(){
 function selectAllTemplates(checked){
   document.querySelectorAll('.ff-template-select').forEach(input=>input.checked=checked);
 }
-async function autoMapAllTemplates(){
+async function autoMapAllTemplates(askFirst=true){
   const button=document.getElementById('ffAutoMapButton');
   const status=document.getElementById('ffAutoMapStatus');
-  if(!confirm('להריץ סריקה על כל הטפסים השמורים? מיפויים קיימים לא יידרסו.'))return;
+  if(askFirst&&!confirm('להריץ סריקה על כל הטפסים השמורים? מיפויים קיימים לא יידרסו.'))return;
   button.disabled=true;status.textContent='סורק את קובצי ה-PDF ומחפש תוויות וקווי מילוי...';
   try{
     const res=await fetch('/api/fire-form-templates/auto-map-all',{method:'POST',headers:{'X-CSRF-Token':await csrfToken()}});
@@ -219,6 +219,12 @@ document.getElementById('ffPrintForm').addEventListener('submit',async e=>{
   }catch(err){status.textContent=err.message;}
   finally{button.disabled=false;}
 });
-loadTemplates();
+loadTemplates().then(()=>{
+  const scanKey='fire_forms_auto_map_scan_v1';
+  if(!sessionStorage.getItem(scanKey)){
+    sessionStorage.setItem(scanKey,'running');
+    autoMapAllTemplates(false).then(()=>sessionStorage.setItem(scanKey,'done')).catch(()=>sessionStorage.removeItem(scanKey));
+  }
+});
 </script>
 {% endblock %}
