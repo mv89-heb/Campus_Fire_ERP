@@ -4,6 +4,7 @@ import html
 import io
 import json
 import os
+import re
 import uuid
 from datetime import datetime
 
@@ -256,6 +257,149 @@ def fire_form_mapping(template_id):
     item.fields_schema = json.dumps(cleaned, ensure_ascii=False)
     db.session.commit()
     return jsonify({"success": True, "fields": cleaned})
+
+# Only labels that describe writable data are eligible. Dates and signatures
+# are intentionally excluded because the professional completes them by hand.
+_AUTO_FIELD_LABELS = [
+    ("institution_name", "שם המוסד", ("שם המוסד", "שם העסק", "שם הנכס", "שם האתר", "שם המפעל")),
+    ("address", "כתובת", ("כתובת", "מען")),
+    ("city", "יישוב", ("יישוב", "ישוב", "עיר")),
+    ("owner_name", "שם בעל העסק", ("שם בעל העסק", "שם בעל הנכס", "בעל העסק")),
+    ("contact_phone", "טלפון ליצירת קשר", ("טלפון ליצירת קשר", "מספר טלפון", "טלפון", "נייד")),
+    ("contractor_name", "שם החברה / הקבלן", ("שם החברה", "שם הקבלן", "שם נותן השירות", "חברת התחזוקה")),
+    ("inspector_name", "שם הבודק / הטכנאי", ("שם הבודק", "שם הטכנאי", "שם המתקין", "שם המבצע")),
+    ("license_number", "מספר רישיון", ("מספר רישיון", "מס רישיון", "מספר רשיון", "מס רשיון")),
+    ("system_description", "תיאור המערכת", ("תיאור המערכת", "סוג המערכת", "תיאור מערכת")),
+    ("system_location", "מיקום המערכת", ("מיקום המערכת", "מיקום המתקן", "מיקום")),
+    ("quantity", "כמות / מספר יחידות", ("מספר יחידות", "כמות יחידות", "כמות")),
+]
+
+
+def _normalized_hebrew_text(value):
+    value = str(value or "").replace('"', " ").replace("׳", " ").replace("״", " ")
+    value = re.sub(r"[^0-9a-zA-Zא-ת]+", " ", value.lower())
+    return " ".join(value.split())
+
+
+def _horizontal_segments(page):
+    segments = []
+    for drawing in page.get_drawings():
+        for item in drawing.get("items", []):
+            if not item or item[0] != "l":
+                continue
+            first, second = item[1], item[2]
+            if abs(first.y - second.y) > 2.5:
+                continue
+            left, right = sorted((first.x, second.x))
+            if right - left >= 28:
+                segments.append((left, right, (first.y + second.y) / 2))
+    return segments
+
+
+def _suggest_fields_for_pdf(pdf_bytes):
+    """Suggest fields only where a writable horizontal rule is adjacent to a known label."""
+    document = fitz.open(stream=pdf_bytes, filetype="pdf")
+    suggestions, seen = [], set()
+    try:
+        for page_number, page in enumerate(document):
+            segments = _horizontal_segments(page)
+            page_dict = page.get_text("dict")
+            for block in page_dict.get("blocks", []):
+                for line in block.get("lines", []):
+                    spans = [span for span in line.get("spans", []) if span.get("text", "").strip()]
+                    if not spans:
+                        continue
+                    line_text = _normalized_hebrew_text(" ".join(span["text"] for span in spans))
+                    if not line_text:
+                        continue
+                    bbox = fitz.Rect(
+                        min(span["bbox"][0] for span in spans),
+                        min(span["bbox"][1] for span in spans),
+                        max(span["bbox"][2] for span in spans),
+                        max(span["bbox"][3] for span in spans),
+                    )
+                    for key, label, aliases in _AUTO_FIELD_LABELS:
+                        if key in seen or not any(_normalized_hebrew_text(alias) in line_text for alias in aliases):
+                            continue
+                        # A line immediately to the left of the Hebrew label is the
+                        # safest writable target. Never guess a position without one.
+                        nearby = [
+                            segment for segment in segments
+                            if segment[1] <= bbox.x0 + 8
+                            and segment[1] >= bbox.x0 - min(page.rect.width * 0.45, 220)
+                            and abs(segment[2] - (bbox.y0 + bbox.y1) / 2) <= 15
+                        ]
+                        if not nearby:
+                            continue
+                        left, right, line_y = min(
+                            nearby,
+                            key=lambda segment: abs(segment[1] - bbox.x0) + abs(segment[2] - (bbox.y0 + bbox.y1) / 2),
+                        )
+                        font_size = 10.0
+                        suggestions.append({
+                            "key": key,
+                            "label": label,
+                            "page": page_number,
+                            "x": round(right / page.rect.width, 5),
+                            "y": round(max(0, line_y - font_size * 1.35) / page.rect.height, 5),
+                            "font_size": font_size,
+                            "source": "auto_rule_label",
+                        })
+                        seen.add(key)
+    finally:
+        document.close()
+    return suggestions
+
+
+def _auto_map_all_templates():
+    results = []
+    rows = FireFormTemplate.query.filter_by(active=True).order_by(FireFormTemplate.id.asc()).all()
+    for item in rows:
+        existing = json.loads(item.fields_schema or "[]")
+        if existing:
+            results.append({
+                "id": item.id, "title": item.title, "status": "kept_existing",
+                "field_count": len(existing), "message": "מיפוי קיים נשמר ללא שינוי",
+            })
+            continue
+        try:
+            suggestions = _suggest_fields_for_pdf(_read_template(item.storage_path))
+            if suggestions:
+                item.fields_schema = json.dumps(suggestions, ensure_ascii=False)
+                db.session.commit()
+                results.append({
+                    "id": item.id, "title": item.title, "status": "mapped",
+                    "field_count": len(suggestions), "message": "זוהו תוויות וקווי מילוי תואמים",
+                })
+            else:
+                results.append({
+                    "id": item.id, "title": item.title, "status": "manual_review",
+                    "field_count": 0, "message": "לא זוהה קו מילוי חד-משמעי; נדרשת בדיקה ידנית",
+                })
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Automatic fire form mapping failed for template id=%s", item.id)
+            results.append({
+                "id": item.id, "title": item.title, "status": "error",
+                "field_count": 0, "message": "לא ניתן היה לנתח את הקובץ",
+            })
+    return results
+
+
+@fire_forms_bp.route("/api/fire-form-templates/auto-map-all", methods=["POST"])
+def auto_map_all_fire_form_templates():
+    _admin()
+    results = _auto_map_all_templates()
+    return jsonify({
+        "success": True,
+        "total": len(results),
+        "mapped": sum(row["status"] == "mapped" for row in results),
+        "kept_existing": sum(row["status"] == "kept_existing" for row in results),
+        "manual_review": sum(row["status"] == "manual_review" for row in results),
+        "errors": sum(row["status"] == "error" for row in results),
+        "results": results,
+    })
+
 
 def _overlay_mapped_values(document, item, values):
     """Overlay transient values onto one PDF using its saved field coordinates."""
