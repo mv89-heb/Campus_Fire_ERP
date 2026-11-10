@@ -23,6 +23,8 @@
   <section class="ff-card">
     <div class="ff-title"><h2>הטפסים השמורים</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ff-btn" type="button" onclick="openBatchPrint()">מילוי והדפסת טפסים נבחרים</button><button class="ff-btn secondary" type="button" onclick="selectAllTemplates(true)">בחירת הכול</button><button class="ff-btn secondary" type="button" onclick="selectAllTemplates(false)">ביטול בחירה</button><button class="ff-btn secondary" type="button" onclick="loadTemplates()">רענון</button></div></div>
     <p class="ff-muted">סמן טופס אחד או יותר כדי להפיק חבילת PDF אחת. פרטי המילוי מוזנים פעם אחת ומשולבים בכל הטפסים שבהם הוגדר אותו שדה.</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0"><button class="ff-btn" id="ffAutoMapButton" type="button" onclick="autoMapAllTemplates()">סריקה ומיפוי אוטומטי לכל 24 הטפסים</button><span class="ff-muted">המערכת תשמור מיקום רק כשנמצאו תווית וקו מילוי תואמים. טופס שלא זוהה יישאר ללא מיפוי שגוי.</span></div>
+    <div id="ffAutoMapStatus" class="ff-status" role="status" aria-live="polite"></div>
     <div id="ffTemplateList" class="ff-list">טוען...</div>
   </section>
 
@@ -82,6 +84,23 @@ async function loadTemplates(){
 }
 function selectAllTemplates(checked){
   document.querySelectorAll('.ff-template-select').forEach(input=>input.checked=checked);
+}
+async function autoMapAllTemplates(){
+  const button=document.getElementById('ffAutoMapButton');
+  const status=document.getElementById('ffAutoMapStatus');
+  if(!confirm('להריץ סריקה על כל הטפסים השמורים? מיפויים קיימים לא יידרסו.'))return;
+  button.disabled=true;status.textContent='סורק את קובצי ה-PDF ומחפש תוויות וקווי מילוי...';
+  try{
+    const res=await fetch('/api/fire-form-templates/auto-map-all',{method:'POST',headers:{'X-CSRF-Token':await csrfToken()}});
+    const data=await res.json();if(!res.ok)throw new Error(data.error||'הסריקה נכשלה');
+    const details=(data.results||[]).map(row=>{
+      const state=row.status==='mapped'?'מופה':row.status==='kept_existing'?'מיפוי קיים נשמר':row.status==='manual_review'?'נדרשת בדיקה ידנית':'שגיאה';
+      return '<div class="ff-field-row"><span><b>'+escapeHtml(row.title)+'</b> · '+state+' · '+row.field_count+' שדות · '+escapeHtml(row.message)+'</span></div>';
+    }).join('');
+    status.innerHTML='<b>הסריקה הסתיימה:</b> '+data.mapped+' מופו אוטומטית, '+data.kept_existing+' עם מיפוי קיים, '+data.manual_review+' לבדיקה ידנית, '+data.errors+' שגיאות.'+details;
+    await loadTemplates();
+  }catch(err){status.textContent=err.message;}
+  finally{button.disabled=false;}
 }
 async function deleteTemplate(id){
   if(!confirm('למחוק את הטופס מהמאגר?')) return;
