@@ -130,7 +130,8 @@ def upload_fire_form_templates():
         return jsonify({"error": f"ניתן להעלות עד {MAX_TEMPLATE_FILES} טפסים בפעימה"}), 400
 
     created, errors = [], []
-    for uploaded in files:
+    for file_index, uploaded in enumerate(files):
+        stored_path = None
         original_name = secure_filename(uploaded.filename or "")
         try:
             raw = uploaded.read(current_app.config.get("MAX_PDF_BYTES", 100 * 1024 * 1024) + 1)
@@ -141,7 +142,7 @@ def upload_fire_form_templates():
                 continue
             template_id = uuid.uuid4().hex
             stored_path = _store_template(template_id, pdf_data)
-            title = (request.form.get("title_" + str(files.index(uploaded))) or os.path.splitext(original_name)[0]).strip()[:180]
+            title = (request.form.get("title_" + str(file_index)) or os.path.splitext(original_name)[0]).strip()[:180]
             item = FireFormTemplate(
                 title=title or "טופס כיבוי",
                 original_filename=original_name[:255],
@@ -152,17 +153,16 @@ def upload_fire_form_templates():
                 uploaded_by=user.id,
             )
             db.session.add(item)
-            db.session.flush()
+            db.session.commit()
             created.append(_serialize(item))
         except Exception as exc:
             db.session.rollback()
+            if stored_path:
+                try:
+                    _delete_template_file(stored_path)
+                except Exception:
+                    current_app.logger.exception("Could not clean up failed fire form upload")
             errors.append({"file": original_name or "קובץ ללא שם", "error": str(exc)[:240]})
-    try:
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Fire form template metadata commit failed")
-        return jsonify({"error": "שמירת פרטי הטפסים נכשלה"}), 500
     return jsonify({"created": created, "errors": errors, "created_count": len(created)}), (207 if errors else 201)
 
 
