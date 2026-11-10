@@ -274,13 +274,13 @@ _AUTO_FIELD_LABELS = [
     ("house_number", "מספר בית", ("מספר בית", "מס בית")),
     ("postal_code", "מיקוד", ("מיקוד",)),
     ("po_box", "תיבת דואר", ("ת ד", "תיבת דואר")),
-    ("owner_name", "שם בעל העסק / מורשה חתימה", ("שם בעל העסק", "שם בעל הנכס", "בעל העסק", "מורשה חתימה")),
+    ("owner_name", "שם בעל העסק / מורשה חתימה", ("שם בעל העסק", "שם בעל הנכס", "בעל העסק", "מורשה חתימה")),\n    ("contact_name", "שם איש הקשר", ("שם איש קשר", "שם איש קשר ראשי")),
     ("contact_phone", "טלפון איש קשר", ("טלפון ליצירת קשר", "מספר טלפון נייד", "טלפון נייד", "טלפון", "נייד")),
     ("contact_email", "דואר אלקטרוני", ("כתובת דואר אלקטרוני", "דואר אלקטרוני", "כתובת אימייל", "אימייל")),
     ("contact_role", "תפקיד איש קשר", ("תפקיד",)),
     ("company_name", "שם החברה המבצעת", ("שם החברה", "שם חברת התחזוקה", "חברה מבצעת")),
     ("company_certificate_number", "מספר אישור בחברה", ("מספר אישור בחברה", "מס אישור בחברה")),
-    ("inspector_name", "שם הבודק / המבצע", ("שם הבודק", "שם הטכנאי", "שם המתקין", "שם המבצע", "שם המבצע ת")),
+    ("inspector_name", "שם הבודק / המבצע", ("שם הבודק", "שם הטכנאי", "שם המתקין", "שם המבצע", "שם המבצע ת", "אני הח מ")),
     ("inspector_id", "תעודת זהות של הבודק", ("ת ז של הבודק", "תעודת זהות של הבודק", "מספר זהות של הבודק")),
     ("professional_license_number", "מספר רישיון מקצועי", ("מספר רישיון", "מס רישיון", "מספר רשיון", "מס רשיון", "מספר רישיון חשמלאי")),
     ("document_date", "תאריך המסמך", ("תאריך המסמך",)),
@@ -330,7 +330,7 @@ def _suggest_fields_for_pdf(pdf_bytes):
             segments = _horizontal_segments(page)
             page_dict = page.get_text("dict")
             for block in page_dict.get("blocks", []):
-                for line in block.get("lines", []):
+                page_text = _normalized_hebrew_text(page.get_text("text"))\n            for line in block.get("lines", []):
                     spans = [span for span in line.get("spans", []) if span.get("text", "").strip()]
                     if not spans:
                         continue
