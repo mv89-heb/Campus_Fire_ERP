@@ -1,5 +1,6 @@
 """Reusable official fire-form library and transient print-package generation."""
 import hashlib
+import html
 import io
 import json
 import os
@@ -299,10 +300,16 @@ def create_fire_form_print_package(template_id):
                 continue
             value = "".join(ch for ch in value if ch >= " " and ch != chr(127))[:500]
             page = merged[int(field["page"])]
-            rect = page.rect
-            page.insert_text((float(field["x"]) * rect.width, float(field["y"]) * rect.height),
-                             value, fontsize=float(field.get("font_size", 10)),
-                             fontname="helv", color=(0, 0, 0), overlay=True)
+            page_rect = page.rect
+            anchor_x = float(field["x"]) * page_rect.width
+            anchor_y = float(field["y"]) * page_rect.height
+            font_size = float(field.get("font_size", 10))
+            # HTML text layout handles Hebrew shaping and right-to-left direction.
+            text_rect = fitz.Rect(max(0, anchor_x - page_rect.width * 0.45), anchor_y,
+                                  anchor_x, min(page_rect.height, anchor_y + max(28, font_size * 3)))
+            safe_value = html.escape(value)
+            html_text = '<div dir="rtl" style="font-family:sans-serif;font-size:' + str(font_size) + 'pt;line-height:1.2;text-align:right;color:#000">' + safe_value + '</div>'
+            page.insert_htmlbox(text_rect, html_text, overlay=True)
         attachment = fitz.open(stream=cert_pdf, filetype="pdf")
         merged.insert_pdf(attachment)
         attachment.close()
