@@ -7,7 +7,6 @@ from datetime import datetime
 
 import fitz
 from flask import Blueprint, abort, current_app, jsonify, make_response, render_template, request, send_file, session
-from werkzeug.utils import secure_filename
 
 from app.extensions import db
 from app.models import FireFormTemplate, User
@@ -29,7 +28,7 @@ def _user():
 
 def _as_pdf(data: bytes, filename: str) -> tuple[bytes, int]:
     """Validate and normalize an uploaded PDF or image entirely as bytes."""
-    ext = os.path.splitext(secure_filename(filename or ""))[1].lower()
+    ext = os.path.splitext((filename or "").replace("\\\\", "/").rsplit("/", 1)[-1])[1].lower()
     if ext not in ALLOWED_TEMPLATE_EXTENSIONS:
         raise ValueError("אפשר להעלות PDF או תמונת PNG/JPG בלבד")
     if not data:
@@ -132,7 +131,7 @@ def upload_fire_form_templates():
     created, errors = [], []
     for file_index, uploaded in enumerate(files):
         stored_path = None
-        original_name = secure_filename(uploaded.filename or "")
+        original_name = os.path.basename((uploaded.filename or "").replace("\\\\", "/"))[:255]
         try:
             raw = uploaded.read(current_app.config.get("MAX_PDF_BYTES", 100 * 1024 * 1024) + 1)
             pdf_data, pages = _as_pdf(raw, original_name)
