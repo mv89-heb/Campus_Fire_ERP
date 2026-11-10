@@ -3,7 +3,7 @@ import unittest
 import fitz
 from flask import Flask
 
-from app.api.fire_forms_routes import _as_pdf
+from app.api.fire_forms_routes import _as_pdf, fire_forms_bp
 
 
 class FireFormUploadValidationTests(unittest.TestCase):
@@ -38,6 +38,15 @@ class FireFormUploadValidationTests(unittest.TestCase):
     def test_rejects_empty_upload(self):
         with self.assertRaises(ValueError):
             _as_pdf(b"", "certificate.pdf")
+
+    def test_page_preview_route_is_registered_once(self):
+        app = Flask("fire-form-route-test")
+        app.register_blueprint(fire_forms_bp)
+        routes = [
+            rule for rule in app.url_map.iter_rules()
+            if rule.rule.endswith("/pages/<int:page_number>.png")
+        ]
+        self.assertEqual(len(routes), 1)
 
 
 if __name__ == "__main__":

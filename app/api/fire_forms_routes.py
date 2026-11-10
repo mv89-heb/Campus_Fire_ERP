@@ -27,6 +27,12 @@ def _user():
         abort(401)
     return user
 
+def _admin():
+    user = _user()
+    if user.role not in {"admin", "super_admin"}:
+        abort(403)
+    return user
+
 
 def _as_pdf(data: bytes, filename: str) -> tuple[bytes, int]:
     """Validate and normalize an uploaded PDF or image entirely as bytes."""
@@ -111,7 +117,7 @@ def _serialize(item):
 
 @fire_forms_bp.route("/fire-forms")
 def fire_forms_page():
-    _user()
+    _admin()
     return render_template("fire_forms.html", active_nav="fire_forms")
 
 
@@ -124,7 +130,7 @@ def list_fire_form_templates():
 
 @fire_forms_bp.route("/api/fire-form-templates", methods=["POST"])
 def upload_fire_form_templates():
-    user = _user()
+    user = _admin()
     files = request.files.getlist("files")
     if not files:
         return jsonify({"error": "לא נבחרו קבצים"}), 400
@@ -170,7 +176,7 @@ def upload_fire_form_templates():
 
 @fire_forms_bp.route("/api/fire-form-templates/<int:template_id>", methods=["DELETE"])
 def delete_fire_form_template(template_id):
-    _user()
+    _admin()
     item = db.session.get(FireFormTemplate, template_id)
     if not item:
         return jsonify({"error": "הטופס לא נמצא"}), 404
@@ -200,7 +206,7 @@ def preview_fire_form_template(template_id):
 
 @fire_forms_bp.route("/api/fire-form-templates/<int:template_id>/pages/<int:page_number>.png", methods=["GET"])
 def fire_form_template_page_image(template_id, page_number):
-    _user()
+    _admin()
     item = db.session.get(FireFormTemplate, template_id)
     if not item or not item.active or page_number < 0 or page_number >= item.page_count:
         return jsonify({"error": "העמוד לא נמצא"}), 404
@@ -215,26 +221,10 @@ def fire_form_template_page_image(template_id, page_number):
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response
 
-@fire_forms_bp.route("/api/fire-form-templates/<int:template_id>/pages/<int:page_number>.png", methods=["GET"])
-def fire_form_template_page_image(template_id, page_number):
-    _user()
-    item = db.session.get(FireFormTemplate, template_id)
-    if not item or not item.active or page_number < 0 or page_number >= item.page_count:
-        return jsonify({"error": "העמוד לא נמצא"}), 404
-    document = fitz.open(stream=_read_template(item.storage_path), filetype="pdf")
-    page = document[page_number]
-    pixmap = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5), alpha=False)
-    image_data = pixmap.tobytes("png")
-    document.close()
-    response = make_response(image_data)
-    response.headers["Content-Type"] = "image/png"
-    response.headers["Cache-Control"] = "private, no-store, max-age=0"
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    return response
 
 @fire_forms_bp.route("/api/fire-form-templates/<int:template_id>/mapping", methods=["GET", "PUT"])
 def fire_form_mapping(template_id):
-    _user()
+    _admin()
     item = db.session.get(FireFormTemplate, template_id)
     if not item or not item.active:
         return jsonify({"error": "הטופס לא נמצא"}), 404
