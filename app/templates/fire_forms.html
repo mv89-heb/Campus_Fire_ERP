@@ -44,7 +44,7 @@
   <section class="ff-card" id="ffPrintCard" hidden>
     <h2 id="ffPrintTitle">הפקת חבילת הדפסה</h2>
     <p class="ff-muted">בחר/י תעודת הסמכה או רישיון של בעל המקצוע. הקובץ מצורף אוטומטית כעמוד האחרון בחבילת ההדפסה ואינו נשמר במאגר הטפסים.</p>
-    <div class="ff-warning ff-muted">הטופס הרשמי נשאר ללא שינוי. תאריך וחתימת בעל המקצוע ימולאו ידנית על גבי העותק המודפס. בשלב זה המערכת אינה ממקמת טקסט בשדות הטופס, משום שטרם הוגדר מיפוי שדות לכל אחד מהטפסים.</div>
+    <div class="ff-warning ff-muted">המערכת ממלאת את השדות שהוגדרו במיפוי על גבי עותק זמני של הטופס. תאריך וחתימת בעל המקצוע נשארים למילוי ידני. תעודת ההסמכה מצורפת להדפסה בלבד ואינה נשמרת.</div>
     <form id="ffPrintForm">
       <div id="ffPrintValues" class="ff-grid"></div>
       <label for="ffCertificate">תעודה / רישיון (PDF או תמונת PNG/JPG, עד 12MB)</label>
@@ -76,7 +76,7 @@ async function loadTemplates(){
     if(!res.ok) throw new Error('לא ניתן לטעון את המאגר');
     const items=await res.json();fireTemplates=items;
     if(!items.length){target.innerHTML='<p class="ff-muted">עדיין לא הועלו טפסים.</p>';return;}
-    target.innerHTML=items.map(item=>'<div class="ff-row"><div><b>'+escapeHtml(item.title)+'</b><div class="ff-muted">'+escapeHtml(item.original_filename)+' · '+item.page_count+' עמודים</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="ff-btn secondary" target="_blank" rel="noopener" href="/api/fire-form-templates/'+item.id+'/file">תצוגה</a><button class="ff-btn" type="button" onclick="openMapping('+item.id+')">הדפסה</button><button class="ff-btn secondary" type="button" onclick="deleteTemplate('+item.id+')">מחיקה</button></div></div>').join('');
+    target.innerHTML=items.map(item=>'<div class="ff-row"><div><b>'+escapeHtml(item.title)+'</b><div class="ff-muted">'+escapeHtml(item.original_filename)+' · '+item.page_count+' עמודים</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="ff-btn secondary" target="_blank" rel="noopener" href="/api/fire-form-templates/'+item.id+'/file">תצוגה</a><button class="ff-btn secondary" type="button" onclick="openMapping('+item.id+')">הגדרת שדות</button><button class="ff-btn" type="button" onclick="openPrint('+item.id+')">מילוי והדפסה</button><button class="ff-btn secondary" type="button" onclick="deleteTemplate('+item.id+')">מחיקה</button></div></div>').join('');
   }catch(err){target.textContent=err.message;}
 }
 async function deleteTemplate(id){
