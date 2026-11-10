@@ -82,16 +82,20 @@ document.getElementById('ffUploadForm').addEventListener('submit',async e=>{
   if(!files.length)return;
   const button=document.getElementById('ffUploadButton'),status=document.getElementById('ffUploadStatus');
   button.disabled=true;status.textContent='מעלה ומאמת קבצים...';
-  const data=new FormData();files.forEach(f=>data.append('files',f));
+  let uploaded=0;const errors=[];
   try{
-    const res=await fetch('/api/fire-form-templates',{method:'POST',body:data,headers:{'X-CSRF-Token':decodeURIComponent(csrfToken())}});
-    const result=await res.json();
-    if(!res.ok && res.status!==207) throw new Error(result.error||'ההעלאה נכשלה');
-    const errors=(result.errors||[]).map(x=>x.file+': '+x.error).join(' | ');
-    status.textContent='נשמרו '+result.created_count+' טפסים.'+(errors?' לא הועלו: '+errors:'');
+    for(let index=0;index<files.length;index++){
+      const data=new FormData();data.append('files',files[index]);
+      status.textContent='מעלה טופס '+(index+1)+' מתוך '+files.length+'...';
+      const res=await fetch('/api/fire-form-templates',{method:'POST',body:data,headers:{'X-CSRF-Token':await csrfToken()}});
+      const result=await res.json();
+      if(res.ok && result.created_count===1) uploaded++;
+      else errors.push(files[index].name+': '+((result.errors||[])[0]?.error||result.error||'ההעלאה נכשלה'));
+    }
+    status.textContent='נשמרו '+uploaded+' מתוך '+files.length+' טפסים.'+(errors.length?' לא הועלו: '+errors.join(' | '):'');
     document.getElementById('ffUploadForm').reset();document.getElementById('ffSelected').textContent='';
     loadTemplates();
-  }catch(err){status.textContent=err.message;}
+  }catch(err){status.textContent='הועלו '+uploaded+' קבצים לפני התקלה: '+err.message;}
   finally{button.disabled=false;}
 });
 document.getElementById('ffPrintForm').addEventListener('submit',async e=>{
@@ -102,7 +106,7 @@ document.getElementById('ffPrintForm').addEventListener('submit',async e=>{
   button.disabled=true;status.textContent='מפיק PDF...';
   const data=new FormData();data.append('certificate',file);
   try{
-    const res=await fetch('/api/fire-form-templates/'+selectedTemplateId+'/print-package',{method:'POST',body:data,headers:{'X-CSRF-Token':decodeURIComponent(csrfToken())}});
+    const res=await fetch('/api/fire-form-templates/'+selectedTemplateId+'/print-package',{method:'POST',body:data,headers:{'X-CSRF-Token':await csrfToken()}});
     if(!res.ok){const result=await res.json();throw new Error(result.error||'הפקת הקובץ נכשלה');}
     const blob=await res.blob(),url=URL.createObjectURL(blob),a=document.createElement('a');
     a.href=url;a.download='fire-form-'+selectedTemplateId+'-print.pdf';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
