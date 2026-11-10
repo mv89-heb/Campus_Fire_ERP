@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import fitz
 from flask import Flask
 
-from app.api.fire_forms_routes import _as_pdf, _overlay_mapped_values, fire_forms_bp
+from app.api.fire_forms_routes import _as_pdf, _overlay_mapped_values, _suggest_fields_for_pdf, fire_forms_bp
 
 
 class FireFormUploadValidationTests(unittest.TestCase):
@@ -66,6 +66,35 @@ class FireFormUploadValidationTests(unittest.TestCase):
         document.close()
         self.assertTrue(output.startswith(b"%PDF-"))
         self.assertGreater(len(output), 500)
+
+    def test_auto_mapping_requires_a_matching_writable_rule(self):
+        document = fitz.open()
+        page = document.new_page(width=595, height=842)
+        page.insert_htmlbox(
+            fitz.Rect(350, 90, 560, 130),
+            '<div dir="rtl" style="font-family:sans-serif">שם המוסד</div>',
+        )
+        page.draw_line(fitz.Point(120, 110), fitz.Point(345, 110), width=0.7)
+        pdf_bytes = document.tobytes()
+        document.close()
+
+        fields = _suggest_fields_for_pdf(pdf_bytes)
+        self.assertEqual(len(fields), 1)
+        self.assertEqual(fields[0]["key"], "institution_name")
+        self.assertEqual(fields[0]["page"], 0)
+        self.assertEqual(fields[0]["source"], "auto_rule_label")
+
+    def test_auto_mapping_does_not_guess_without_a_writable_rule(self):
+        document = fitz.open()
+        page = document.new_page(width=595, height=842)
+        page.insert_htmlbox(
+            fitz.Rect(350, 90, 560, 130),
+            '<div dir="rtl" style="font-family:sans-serif">שם המוסד</div>',
+        )
+        pdf_bytes = document.tobytes()
+        document.close()
+
+        self.assertEqual(_suggest_fields_for_pdf(pdf_bytes), [])
 
 
 if __name__ == "__main__":
