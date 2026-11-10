@@ -258,20 +258,46 @@ def fire_form_mapping(template_id):
     db.session.commit()
     return jsonify({"success": True, "fields": cleaned})
 
-# Only labels that describe writable data are eligible. Dates and signatures
-# are intentionally excluded because the professional completes them by hand.
+# Shared field vocabulary derived from the previously uploaded, completed
+# fire approvals (forms 2, 3, 4, 5, 6, 7, 10, 13, 16 and 18).
+# These are blank-field coordinates only: no historical person, certificate,
+# inspection date, expiry date or site-specific value is copied into a new form.
+# Dates are mappable input fields; signatures remain handwritten.
 _AUTO_FIELD_LABELS = [
-    ("institution_name", "שם המוסד", ("שם המוסד", "שם העסק", "שם הנכס", "שם האתר", "שם המפעל")),
-    ("address", "כתובת", ("כתובת", "מען")),
+    ("institution_name", "שם המוסד / העסק", ("שם המוסד", "שם העסק", "שם הנכס", "שם האתר", "שם המפעל")),
+    ("business_type", "מהות העסק", ("מהות העסק", "סוג העסק", "ייעוד הנכס")),
+    ("business_id", "ח.פ / ע.מ / ע.ר / ת.ז", ("ח פ ע מ ע ר ת ז", "ח פ", "מספר חברה", "מספר עוסק")),
+    ("fire_case_number", "מספר תיק ברשות הכבאות", ("מס תיק ברשות הכבאות", "מספר תיק ברשות הכבאות", "מס תיק כבאות", "מספר תיק כבאות")),
+    ("address", "כתובת הנכס", ("כתובת הנכס", "כתובת העסק", "כתובת", "מען")),
     ("city", "יישוב", ("יישוב", "ישוב", "עיר")),
-    ("owner_name", "שם בעל העסק", ("שם בעל העסק", "שם בעל הנכס", "בעל העסק")),
-    ("contact_phone", "טלפון ליצירת קשר", ("טלפון ליצירת קשר", "מספר טלפון", "טלפון", "נייד")),
-    ("contractor_name", "שם החברה / הקבלן", ("שם החברה", "שם הקבלן", "שם נותן השירות", "חברת התחזוקה")),
-    ("inspector_name", "שם הבודק / הטכנאי", ("שם הבודק", "שם הטכנאי", "שם המתקין", "שם המבצע")),
-    ("license_number", "מספר רישיון", ("מספר רישיון", "מס רישיון", "מספר רשיון", "מס רשיון")),
-    ("system_description", "תיאור המערכת", ("תיאור המערכת", "סוג המערכת", "תיאור מערכת")),
-    ("system_location", "מיקום המערכת", ("מיקום המערכת", "מיקום המתקן", "מיקום")),
+    ("street", "רחוב", ("רחוב",)),
+    ("house_number", "מספר בית", ("מספר בית", "מס בית")),
+    ("postal_code", "מיקוד", ("מיקוד",)),
+    ("po_box", "תיבת דואר", ("ת ד", "תיבת דואר")),
+    ("owner_name", "שם בעל העסק / מורשה חתימה", ("שם בעל העסק", "שם בעל הנכס", "בעל העסק", "מורשה חתימה")),
+    ("contact_name", "שם איש הקשר", ("שם איש קשר", "שם איש קשר ראשי")),
+    ("contact_phone", "טלפון איש קשר", ("טלפון ליצירת קשר", "מספר טלפון נייד", "טלפון נייד", "טלפון", "נייד")),
+    ("contact_email", "דואר אלקטרוני", ("כתובת דואר אלקטרוני", "דואר אלקטרוני", "כתובת אימייל", "אימייל")),
+    ("contact_role", "תפקיד איש קשר", ("תפקיד",)),
+    ("company_name", "שם החברה המבצעת", ("שם החברה", "שם חברת התחזוקה", "חברה מבצעת")),
+    ("company_certificate_number", "מספר אישור בחברה", ("מספר אישור בחברה", "מס אישור בחברה")),
+    ("inspector_name", "שם הבודק / המבצע", ("שם הבודק", "שם הטכנאי", "שם המתקין", "שם המבצע", "שם המבצע ת", "אני הח מ")),
+    ("inspector_id", "תעודת זהות של הבודק", ("ת ז של הבודק", "תעודת זהות של הבודק", "מספר זהות של הבודק")),
+    ("professional_license_number", "מספר רישיון מקצועי", ("מספר רישיון", "מס רישיון", "מספר רשיון", "מס רשיון", "מספר רישיון חשמלאי")),
+    ("document_date", "תאריך המסמך", ("תאריך המסמך",)),
+    ("inspection_date", "תאריך בדיקה / ביצוע", ("תאריך בדיקה", "מועד בדיקה", "בתאריך")),
+    ("expiry_date", "תאריך תוקף מפורש", ("בתוקף עד", "תאריך תפוגה", "תוקף עד")),
+    ("next_inspection_date", "מועד בדיקה הבאה", ("מועד בדיקה הבאה", "בדיקה הבאה", "מועד הבדיקה הבא")),
+    ("inspection_type", "סוג הבדיקה", ("סוג הבדיקה", "סוג בדיקה", "בדיקה שבוצעה")),
+    ("inspection_result", "תוצאת הבדיקה", ("תוצאת הבדיקה", "נמצאה תקינה", "נמצאו תקינים", "תקין לא תקין")),
+    ("system_description", "תיאור / סוג המערכת", ("תיאור המערכת", "סוג המערכת", "תיאור מערכת", "מערכת שנבדקה")),
+    ("system_location", "מיקום המערכת", ("מיקום המערכת", "מיקום המתקן", "מיקום המערכת שנבדקה")),
     ("quantity", "כמות / מספר יחידות", ("מספר יחידות", "כמות יחידות", "כמות")),
+    ("manufacturer", "יצרן", ("שם יצרן", "יצרן")),
+    ("model", "דגם", ("דגם המערכת", "דגם")),
+    ("serial_number", "מספר סידורי", ("מספר סידורי", "מס סידורי", "מספר מוטבע")),
+    ("system_standard", "תקן / הוראת נציב", ("תקן ישראלי", "לפי ת י", "הוראת נציב")),
+    ("maintenance_description", "תיאור הטיפול / התחזוקה", ("תיאור הטיפול", "פרטי הטיפול", "הטיפול שבוצע", "פעולות תחזוקה")),
 ]
 
 
@@ -304,6 +330,7 @@ def _suggest_fields_for_pdf(pdf_bytes):
         for page_number, page in enumerate(document):
             segments = _horizontal_segments(page)
             page_dict = page.get_text("dict")
+            page_text = _normalized_hebrew_text(page.get_text("text"))
             for block in page_dict.get("blocks", []):
                 for line in block.get("lines", []):
                     spans = [span for span in line.get("spans", []) if span.get("text", "").strip()]
@@ -319,7 +346,24 @@ def _suggest_fields_for_pdf(pdf_bytes):
                         max(span["bbox"][3] for span in spans),
                     )
                     for key, label, aliases in _AUTO_FIELD_LABELS:
-                        if key in seen or not any(_normalized_hebrew_text(alias) in line_text for alias in aliases):
+                        matched = any(_normalized_hebrew_text(alias) in line_text for alias in aliases)
+                        # "ת ד" is an OCR split of תיבת דואר; require standalone tokens
+                        # so it cannot match the end of "כתובת דואר אלקטרוני".
+                        if key == "po_box":
+                            tokens = line_text.split()
+                            matched = "תיבת דואר" in line_text or any(
+                                tokens[index:index + 2] == ["ת", "ד"]
+                                for index in range(len(tokens) - 1)
+                            )
+                        # Older filled approvals label the contact person's value only
+                        # as "שם מלא" beneath the contact-details section heading.
+                        if (key == "contact_name" and "שם מלא" in line_text
+                                and "פרטי התקשרות איש קשר ראשי" in page_text):
+                            matched = True
+                        # A property address must never be mapped to an e-mail field.
+                        if key == "address" and ("דואר אלקטרוני" in line_text or "אימייל" in line_text):
+                            matched = False
+                        if key in seen or not matched:
                             continue
                         # A line immediately to the left of the Hebrew label is the
                         # safest writable target. Never guess a position without one.
