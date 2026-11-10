@@ -92,14 +92,15 @@ async function autoMapAllTemplates(askFirst=true){
   button.disabled=true;status.textContent='סורק את קובצי ה-PDF ומחפש תוויות וקווי מילוי...';
   try{
     const res=await fetch('/api/fire-form-templates/auto-map-all',{method:'POST',headers:{'X-CSRF-Token':await csrfToken()}});
-    const data=await res.json();if(!res.ok)throw new Error(data.error||'הסריקה נכשלה');
+    const data=await res.json();if(!res.ok||data.success!==true)throw new Error(data.error||'הסריקה נכשלה');
     const details=(data.results||[]).map(row=>{
       const state=row.status==='mapped'?'מופה':row.status==='kept_existing'?'מיפוי קיים נשמר':row.status==='manual_review'?'נדרשת בדיקה ידנית':'שגיאה';
       return '<div class="ff-field-row"><span><b>'+escapeHtml(row.title)+'</b> · '+state+' · '+row.field_count+' שדות · '+escapeHtml(row.message)+'</span></div>';
     }).join('');
     status.innerHTML='<b>הסריקה הסתיימה:</b> '+data.mapped+' מופו אוטומטית, '+data.kept_existing+' עם מיפוי קיים, '+data.manual_review+' לבדיקה ידנית, '+data.errors+' שגיאות.'+details;
     await loadTemplates();
-  }catch(err){status.textContent=err.message;}
+    return Number(data.errors||0)===0;
+  }catch(err){status.textContent=err.message;return false;}
   finally{button.disabled=false;}
 }
 async function deleteTemplate(id){
@@ -221,9 +222,14 @@ document.getElementById('ffPrintForm').addEventListener('submit',async e=>{
 });
 loadTemplates().then(()=>{
   const scanKey='fire_forms_auto_map_scan_v1';
-  if(!sessionStorage.getItem(scanKey)){
+  // Only a fully successful scan is remembered. Interrupted or partially failed
+  // scans are retried on the next page visit; already-mapped forms are preserved.
+  if(sessionStorage.getItem(scanKey)!=='done'){
     sessionStorage.setItem(scanKey,'running');
-    autoMapAllTemplates(false).then(()=>sessionStorage.setItem(scanKey,'done')).catch(()=>sessionStorage.removeItem(scanKey));
+    autoMapAllTemplates(false).then(success=>{
+      if(success)sessionStorage.setItem(scanKey,'done');
+      else sessionStorage.removeItem(scanKey);
+    });
   }
 });
 </script>
