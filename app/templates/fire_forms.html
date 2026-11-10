@@ -46,6 +46,7 @@
     <p class="ff-muted">בחר/י תעודת הסמכה או רישיון של בעל המקצוע. הקובץ מצורף אוטומטית כעמוד האחרון בחבילת ההדפסה ואינו נשמר במאגר הטפסים.</p>
     <div class="ff-warning ff-muted">הטופס הרשמי נשאר ללא שינוי. תאריך וחתימת בעל המקצוע ימולאו ידנית על גבי העותק המודפס. בשלב זה המערכת אינה ממקמת טקסט בשדות הטופס, משום שטרם הוגדר מיפוי שדות לכל אחד מהטפסים.</div>
     <form id="ffPrintForm">
+      <div id="ffPrintValues" class="ff-grid"></div>
       <label for="ffCertificate">תעודה / רישיון (PDF או תמונת PNG/JPG, עד 12MB)</label>
       <input class="ff-input" id="ffCertificate" name="certificate" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" required>
       <div id="ffCertificateName" class="ff-muted"></div>
@@ -142,7 +143,9 @@ async function saveMapping(){
 function openPrint(id){
   selectedTemplateId=id;
   const selected=fireTemplates.find(item=>item.id===id);
-  document.getElementById('ffPrintTitle').textContent='הפקת חבילת הדפסה · '+(selected?.title||'טופס');
+  document.getElementById('ffPrintTitle').textContent='מילוי והדפסה · '+(selected?.title||'טופס');
+  const fields=selected?.fields_schema||[];
+  document.getElementById('ffPrintValues').innerHTML=fields.length?fields.map(field=>'<label>'+escapeHtml(field.label)+'<input class="ff-input" data-fire-field="'+escapeHtml(field.key)+'" maxlength="500"></label>').join(''):'<p class="ff-muted">לטופס זה עדיין לא הוגדרו שדות. ניתן להגדירם בכפתור הגדרת שדות.</p>';
   document.getElementById('ffPrintCard').hidden=false;
   document.getElementById('ffPrintCard').scrollIntoView({behavior:'smooth'});
 }
@@ -175,7 +178,7 @@ document.getElementById('ffPrintForm').addEventListener('submit',async e=>{
   if(!file)return;
   const button=document.getElementById('ffPrintButton'),status=document.getElementById('ffPrintStatus');
   button.disabled=true;status.textContent='מפיק PDF...';
-  const data=new FormData();data.append('certificate',file);
+  const data=new FormData();data.append('certificate',file);const values={};document.querySelectorAll('#ffPrintValues [data-fire-field]').forEach(input=>values[input.dataset.fireField]=input.value);data.append('values',JSON.stringify(values));
   try{
     const res=await fetch('/api/fire-form-templates/'+selectedTemplateId+'/print-package',{method:'POST',body:data,headers:{'X-CSRF-Token':await csrfToken()}});
     if(!res.ok){const result=await res.json();throw new Error(result.error||'הפקת הקובץ נכשלה');}
