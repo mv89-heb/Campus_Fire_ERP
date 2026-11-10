@@ -329,8 +329,9 @@ def _suggest_fields_for_pdf(pdf_bytes):
         for page_number, page in enumerate(document):
             segments = _horizontal_segments(page)
             page_dict = page.get_text("dict")
+            page_text = _normalized_hebrew_text(page.get_text("text"))
             for block in page_dict.get("blocks", []):
-                page_text = _normalized_hebrew_text(page.get_text("text"))\n            for line in block.get("lines", []):
+                for line in block.get("lines", []):
                     spans = [span for span in line.get("spans", []) if span.get("text", "").strip()]
                     if not spans:
                         continue
@@ -344,7 +345,22 @@ def _suggest_fields_for_pdf(pdf_bytes):
                         max(span["bbox"][3] for span in spans),
                     )
                     for key, label, aliases in _AUTO_FIELD_LABELS:
-                        if key in seen or not any(_normalized_hebrew_text(alias) in line_text for alias in aliases):
+                        matched = any(_normalized_hebrew_text(alias) in line_text for alias in aliases)
+                        # "ת ד" is an OCR split of תיבת דואר; require standalone tokens
+                        # so it cannot match the end of "כתובת דואר אלקטרוני".
+                        if key == "po_box":
+                            matched = "תיבת דואר" in line_text or bool(
+                                re.search(r"(?<!\\S)ת ד(?!\\S)", line_text)
+                            )
+                        # Older filled approvals label the contact person's value only
+                        # as "שם מלא" beneath the contact-details section heading.
+                        if (key == "contact_name" and "שם מלא" in line_text
+                                and "פרטי התקשרות איש קשר ראשי" in page_text):
+                            matched = True
+                        # A property address must never be mapped to an e-mail field.
+                        if key == "address" and ("דואר אלקטרוני" in line_text or "אימייל" in line_text):
+                            matched = False
+                        if key in seen or not matched:
                             continue
                         # A line immediately to the left of the Hebrew label is the
                         # safest writable target. Never guess a position without one.
