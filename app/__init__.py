@@ -212,7 +212,7 @@ def create_app(config_class=Config):
         Zone, SystemRequirement, Document,
         Site, Building, Floor, Area,
         Supplier, Equipment, Task, Audit, Deficiency,
-        DocumentHistory, User, Notification, AuditLog,
+        DocumentHistory, User, Notification, AuditLog, FireFormTemplate,
     )
 
     with app.app_context():
@@ -234,6 +234,8 @@ def create_app(config_class=Config):
     app.register_blueprint(sites_bp)
     from .api.permits_routes import permits_bp
     app.register_blueprint(permits_bp)
+    from .api.fire_forms_routes import fire_forms_bp
+    app.register_blueprint(fire_forms_bp)
     from .api.suppliers_routes import suppliers_bp
     app.register_blueprint(suppliers_bp)
     from .api.equipment_routes import equipment_bp
