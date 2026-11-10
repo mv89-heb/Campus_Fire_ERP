@@ -1,0 +1,114 @@
+{% extends "_shell.html" %}
+{% block title %}מאגר טפסי כיבוי והדפסה{% endblock %}
+{% block extra_style %}
+.fire-forms{max-width:1100px;margin:0 auto}.ff-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin:0 0 16px}.ff-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.ff-muted{color:var(--text-muted);font-size:.9rem;line-height:1.6}.ff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}.ff-input{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border-mid);border-radius:8px;background:var(--bg);color:var(--text)}.ff-btn{padding:10px 15px;border:0;border-radius:8px;background:var(--accent);color:#111;font-weight:700;cursor:pointer}.ff-btn.secondary{background:var(--bg-hover);color:var(--text);border:1px solid var(--border)}.ff-btn:disabled{opacity:.5;cursor:not-allowed}.ff-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}.ff-row:last-child{border-bottom:0}.ff-status{min-height:22px;margin-top:10px}.ff-list{margin-top:10px}.ff-warning{border-right:4px solid var(--warning);padding:10px 12px;background:rgba(227,179,65,.08);border-radius:6px}
+{% endblock %}
+{% block content %}
+<div class="fire-forms">
+  <div class="ff-title"><h1>📄 מאגר טפסי כיבוי והדפסה</h1><a class="ff-btn secondary" href="/">חזרה לאישורים</a></div>
+  <p class="ff-muted">מעלים כאן את הטפסים הרשמיים פעם אחת. הקבצים נשמרים במאגר המערכת וניתן להשתמש בהם שוב להפקת חבילות הדפסה.</p>
+
+  <section class="ff-card">
+    <h2>העלאה מרוכזת של טפסים</h2>
+    <p class="ff-muted">אפשר לבחור עד 25 קובצי PDF או תמונות PNG/JPG בפעימה. ניתן להעלות את 20 הטפסים יחד, בכפוף למגבלת גודל הבקשה.</p>
+    <form id="ffUploadForm">
+      <label for="ffFiles">בחירת קבצים</label>
+      <input class="ff-input" id="ffFiles" name="files" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" multiple required>
+      <div id="ffSelected" class="ff-muted"></div>
+      <button class="ff-btn" id="ffUploadButton" type="submit">העלאת הטפסים למאגר</button>
+      <div id="ffUploadStatus" class="ff-status" role="status" aria-live="polite"></div>
+    </form>
+  </section>
+
+  <section class="ff-card">
+    <div class="ff-title"><h2>הטפסים השמורים</h2><button class="ff-btn secondary" type="button" onclick="loadTemplates()">רענון</button></div>
+    <div id="ffTemplateList" class="ff-list">טוען...</div>
+  </section>
+
+  <section class="ff-card" id="ffPrintCard" hidden>
+    <h2 id="ffPrintTitle">הפקת חבילת הדפסה</h2>
+    <p class="ff-muted">בחר/י תעודת הסמכה או רישיון של בעל המקצוע. הקובץ מצורף אוטומטית כעמוד האחרון בחבילת ההדפסה ואינו נשמר במאגר הטפסים.</p>
+    <div class="ff-warning ff-muted">הטופס הרשמי נשאר ללא שינוי. תאריך וחתימת בעל המקצוע ימולאו ידנית על גבי העותק המודפס. בשלב זה המערכת אינה ממקמת טקסט בשדות הטופס, משום שטרם הוגדר מיפוי שדות לכל אחד מהטפסים.</div>
+    <form id="ffPrintForm">
+      <label for="ffCertificate">תעודה / רישיון (PDF או תמונת PNG/JPG, עד 12MB)</label>
+      <input class="ff-input" id="ffCertificate" name="certificate" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" required>
+      <div id="ffCertificateName" class="ff-muted"></div>
+      <button class="ff-btn" id="ffPrintButton" type="submit">הפקת חבילת PDF להדפסה</button>
+      <button class="ff-btn secondary" type="button" onclick="closePrint()">ביטול</button>
+      <div id="ffPrintStatus" class="ff-status" role="status" aria-live="polite"></div>
+    </form>
+  </section>
+</div>
+<script>
+let selectedTemplateId = null;
+const csrfToken = () => document.cookie.split('; ').find(x => x.startsWith('erp_csrf_token='))?.split('=').slice(1).join('=') || '';
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+document.getElementById('ffFiles').addEventListener('change', e => {
+  const files = [...e.target.files];
+  document.getElementById('ffSelected').textContent = files.length ? files.map(f=>f.name).join(' · ') : '';
+});
+document.getElementById('ffCertificate').addEventListener('change', e => {
+  document.getElementById('ffCertificateName').textContent = e.target.files[0]?.name || '';
+});
+async function loadTemplates(){
+  const target=document.getElementById('ffTemplateList');
+  target.textContent='טוען...';
+  try{
+    const res=await fetch('/api/fire-form-templates');
+    if(!res.ok) throw new Error('לא ניתן לטעון את המאגר');
+    const items=await res.json();
+    if(!items.length){target.innerHTML='<p class="ff-muted">עדיין לא הועלו טפסים.</p>';return;}
+    target.innerHTML=items.map(item=>'<div class="ff-row"><div><b>'+escapeHtml(item.title)+'</b><div class="ff-muted">'+escapeHtml(item.original_filename)+' · '+item.page_count+' עמודים</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="ff-btn secondary" target="_blank" rel="noopener" href="/api/fire-form-templates/'+item.id+'/file">תצוגה</a><button class="ff-btn" type="button" onclick="openPrint('+item.id+',\''+escapeHtml(item.title).replace(/'/g,"&#39;")+'\')">הדפסה</button><button class="ff-btn secondary" type="button" onclick="deleteTemplate('+item.id+')">מחיקה</button></div></div>').join('');
+  }catch(err){target.textContent=err.message;}
+}
+async function deleteTemplate(id){
+  if(!confirm('למחוק את הטופס מהמאגר?')) return;
+  const res=await fetch('/api/fire-form-templates/'+id,{method:'DELETE',headers:{'X-CSRF-Token':decodeURIComponent(csrfToken())}});
+  if(!res.ok){alert('מחיקת הטופס נכשלה');return;}
+  loadTemplates();
+}
+function openPrint(id,title){
+  selectedTemplateId=id;
+  document.getElementById('ffPrintTitle').textContent='הפקת חבילת הדפסה · '+title;
+  document.getElementById('ffPrintCard').hidden=false;
+  document.getElementById('ffPrintCard').scrollIntoView({behavior:'smooth'});
+}
+function closePrint(){selectedTemplateId=null;document.getElementById('ffPrintCard').hidden=true;document.getElementById('ffPrintForm').reset();}
+document.getElementById('ffUploadForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const files=[...document.getElementById('ffFiles').files];
+  if(!files.length)return;
+  const button=document.getElementById('ffUploadButton'),status=document.getElementById('ffUploadStatus');
+  button.disabled=true;status.textContent='מעלה ומאמת קבצים...';
+  const data=new FormData();files.forEach(f=>data.append('files',f));
+  try{
+    const res=await fetch('/api/fire-form-templates',{method:'POST',body:data,headers:{'X-CSRF-Token':decodeURIComponent(csrfToken())}});
+    const result=await res.json();
+    if(!res.ok && res.status!==207) throw new Error(result.error||'ההעלאה נכשלה');
+    const errors=(result.errors||[]).map(x=>x.file+': '+x.error).join(' | ');
+    status.textContent='נשמרו '+result.created_count+' טפסים.'+(errors?' לא הועלו: '+errors:'');
+    document.getElementById('ffUploadForm').reset();document.getElementById('ffSelected').textContent='';
+    loadTemplates();
+  }catch(err){status.textContent=err.message;}
+  finally{button.disabled=false;}
+});
+document.getElementById('ffPrintForm').addEventListener('submit',async e=>{
+  e.preventDefault();if(!selectedTemplateId)return;
+  const file=document.getElementById('ffCertificate').files[0];
+  if(!file)return;
+  const button=document.getElementById('ffPrintButton'),status=document.getElementById('ffPrintStatus');
+  button.disabled=true;status.textContent='מפיק PDF...';
+  const data=new FormData();data.append('certificate',file);
+  try{
+    const res=await fetch('/api/fire-form-templates/'+selectedTemplateId+'/print-package',{method:'POST',body:data,headers:{'X-CSRF-Token':decodeURIComponent(csrfToken())}});
+    if(!res.ok){const result=await res.json();throw new Error(result.error||'הפקת הקובץ נכשלה');}
+    const blob=await res.blob(),url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='fire-form-'+selectedTemplateId+'-print.pdf';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    status.textContent='הקובץ הופק. התעודה לא נשמרה במאגר.';
+    document.getElementById('ffPrintForm').reset();document.getElementById('ffCertificateName').textContent='';
+  }catch(err){status.textContent=err.message;}
+  finally{button.disabled=false;}
+});
+loadTemplates();
+</script>
+{% endblock %}
