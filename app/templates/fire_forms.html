@@ -140,7 +140,9 @@ async function saveMapping(){
   try{
     const res=await fetch('/api/fire-form-templates/'+mappingTemplateId+'/mapping',{method:'PUT',headers:{'Content-Type':'application/json','X-CSRF-Token':await csrfToken()},body:JSON.stringify({fields:mappedFields})});
     const data=await res.json();if(!res.ok)throw new Error(data.error||'שמירה נכשלה');
-    status.textContent='המיפוי נשמר בהצלחה.';
+    const currentTemplate=fireTemplates.find(item=>item.id===mappingTemplateId);
+    if(currentTemplate)currentTemplate.fields_schema=data.fields||[...mappedFields];
+    status.textContent='המיפוי נשמר בהצלחה. אפשר לעבור למילוי ולהדפסה בלי לרענן את הדף.';
   }catch(err){status.textContent=err.message;}
 }
 
