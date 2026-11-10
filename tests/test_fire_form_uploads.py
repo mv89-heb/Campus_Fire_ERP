@@ -1,9 +1,11 @@
+import json
 import unittest
+from types import SimpleNamespace
 
 import fitz
 from flask import Flask
 
-from app.api.fire_forms_routes import _as_pdf, fire_forms_bp
+from app.api.fire_forms_routes import _as_pdf, _overlay_mapped_values, fire_forms_bp
 
 
 class FireFormUploadValidationTests(unittest.TestCase):
@@ -47,6 +49,23 @@ class FireFormUploadValidationTests(unittest.TestCase):
             if rule.rule.endswith("/pages/<int:page_number>.png")
         ]
         self.assertEqual(len(routes), 1)
+
+    def test_mapped_hebrew_values_overlay_without_persisting_them(self):
+        document = fitz.open()
+        document.new_page(width=595, height=842)
+        template = SimpleNamespace(fields_schema=json.dumps([{
+            "key": "institution_name",
+            "label": "שם המוסד",
+            "page": 0,
+            "x": 0.75,
+            "y": 0.35,
+            "font_size": 11,
+        }], ensure_ascii=False))
+        _overlay_mapped_values(document, template, {"institution_name": "ישיבת אוהבי ירושלים"})
+        output = document.tobytes()
+        document.close()
+        self.assertTrue(output.startswith(b"%PDF-"))
+        self.assertGreater(len(output), 500)
 
 
 if __name__ == "__main__":
