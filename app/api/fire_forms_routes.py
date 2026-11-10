@@ -350,8 +350,10 @@ def _suggest_fields_for_pdf(pdf_bytes):
                         # "ת ד" is an OCR split of תיבת דואר; require standalone tokens
                         # so it cannot match the end of "כתובת דואר אלקטרוני".
                         if key == "po_box":
-                            matched = "תיבת דואר" in line_text or bool(
-                                re.search(r"(?<!\\S)ת ד(?!\\S)", line_text)
+                            tokens = line_text.split()
+                            matched = "תיבת דואר" in line_text or any(
+                                tokens[index:index + 2] == ["ת", "ד"]
+                                for index in range(len(tokens) - 1)
                             )
                         # Older filled approvals label the contact person's value only
                         # as "שם מלא" beneath the contact-details section heading.
