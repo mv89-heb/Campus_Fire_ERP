@@ -257,6 +257,95 @@ def fire_form_mapping(template_id):
     db.session.commit()
     return jsonify({"success": True, "fields": cleaned})
 
+def _overlay_mapped_values(document, item, values):
+    """Overlay transient values onto one PDF using its saved field coordinates."""
+    schema = json.loads(item.fields_schema or "[]")
+    for field in schema:
+        value = str(values.get(field["key"], "") or "").strip()
+        if not value:
+            continue
+        value = "".join(ch for ch in value if ch >= " " and ch != chr(127))[:500]
+        page = document[int(field["page"])]
+        page_rect = page.rect
+        anchor_x = float(field["x"]) * page_rect.width
+        anchor_y = float(field["y"]) * page_rect.height
+        font_size = float(field.get("font_size", 10))
+        text_top = min(anchor_y, max(0, page_rect.height - 30))
+        text_rect = fitz.Rect(max(0, anchor_x - page_rect.width * 0.45), text_top,
+                              anchor_x, min(page_rect.height, text_top + max(28, font_size * 3)))
+        safe_value = html.escape(value)
+        html_text = '<div dir="rtl" style="font-family:sans-serif;font-size:' + str(font_size) + 'pt;line-height:1.2;text-align:right;color:#000">' + safe_value + '</div>'
+        page.insert_htmlbox(text_rect, html_text, overlay=True)
+
+
+@fire_forms_bp.route("/api/fire-form-templates/print-package", methods=["POST"])
+def create_fire_forms_batch_print_package():
+    """Create one combined print PDF for selected forms; all submitted values stay transient."""
+    _user()
+    certificate = request.files.get("certificate")
+    if certificate is None or not certificate.filename:
+        return jsonify({"error": "יש לצרף תעודת הסמכה או רישיון לצורך ההדפסה"}), 400
+    try:
+        template_ids = json.loads(request.form.get("template_ids", "[]"))
+        values = json.loads(request.form.get("values", "{}"))
+        if (not isinstance(template_ids, list) or not template_ids or len(template_ids) > 24
+                or not isinstance(values, dict)):
+            raise ValueError
+        ids = [int(value) for value in template_ids]
+        if len(set(ids)) != len(ids):
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({"error": "רשימת הטפסים או נתוני המילוי אינם תקינים"}), 400
+
+    templates_by_id = {
+        item.id: item for item in FireFormTemplate.query.filter(
+            FireFormTemplate.id.in_(ids), FireFormTemplate.active.is_(True)
+        ).all()
+    }
+    if len(templates_by_id) != len(ids):
+        return jsonify({"error": "אחד מהטפסים שנבחרו אינו זמין"}), 404
+
+    cert_bytes = certificate.read(MAX_CERTIFICATE_BYTES + 1)
+    if not cert_bytes or len(cert_bytes) > MAX_CERTIFICATE_BYTES:
+        return jsonify({"error": "התעודה ריקה או גדולה מ-12MB"}), 400
+
+    combined = fitz.open()
+    try:
+        cert_pdf, _ = _as_pdf(cert_bytes, certificate.filename)
+        for template_id in ids:
+            item = templates_by_id[template_id]
+            source = fitz.open(stream=_read_template(item.storage_path), filetype="pdf")
+            try:
+                _overlay_mapped_values(source, item, values)
+                combined.insert_pdf(source)
+            finally:
+                source.close()
+        attachment = fitz.open(stream=cert_pdf, filetype="pdf")
+        try:
+            combined.insert_pdf(attachment)
+        finally:
+            attachment.close()
+        output = combined.tobytes(garbage=4, deflate=True)
+    except Exception:
+        current_app.logger.exception("Fire forms batch print generation failed")
+        return jsonify({"error": "הפקת חבילת ההדפסה נכשלה. הקבצים הזמניים לא נשמרו"}), 400
+    finally:
+        combined.close()
+
+    response = send_file(
+        io.BytesIO(output),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="fire-forms-print-package.pdf",
+        max_age=0,
+    )
+    response.headers["Cache-Control"] = "private, no-store, max-age=0, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Temp-Certificate-Persisted"] = "false"
+    return response
+
+
 @fire_forms_bp.route("/api/fire-form-templates/<int:template_id>/print-package", methods=["POST"])
 def create_fire_form_print_package(template_id):
     """Append a one-time professional certificate to the selected official form."""
@@ -284,24 +373,8 @@ def create_fire_form_print_package(template_id):
         cert_pdf, _ = _as_pdf(cert_bytes, certificate.filename)
         source_pdf = _read_template(item.storage_path)
         merged = fitz.open(stream=source_pdf, filetype="pdf")
-        # Overlay only explicitly mapped values; handwritten date/signature stay blank.
-        schema = json.loads(item.fields_schema or "[]")
-        for field in schema:
-            value = str(values.get(field["key"], "") or "").strip()
-            if not value:
-                continue
-            value = "".join(ch for ch in value if ch >= " " and ch != chr(127))[:500]
-            page = merged[int(field["page"])]
-            page_rect = page.rect
-            anchor_x = float(field["x"]) * page_rect.width
-            anchor_y = float(field["y"]) * page_rect.height
-            font_size = float(field.get("font_size", 10))
-            # HTML text layout handles Hebrew shaping and right-to-left direction.
-            text_rect = fitz.Rect(max(0, anchor_x - page_rect.width * 0.45), anchor_y,
-                                  anchor_x, min(page_rect.height, anchor_y + max(28, font_size * 3)))
-            safe_value = html.escape(value)
-            html_text = '<div dir="rtl" style="font-family:sans-serif;font-size:' + str(font_size) + 'pt;line-height:1.2;text-align:right;color:#000">' + safe_value + '</div>'
-            page.insert_htmlbox(text_rect, html_text, overlay=True)
+        # Date and signature are intentionally not mapped; they remain handwritten.
+        _overlay_mapped_values(merged, item, values)
         attachment = fitz.open(stream=cert_pdf, filetype="pdf")
         merged.insert_pdf(attachment)
         attachment.close()
