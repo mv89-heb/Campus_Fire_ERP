@@ -1,7 +1,7 @@
 {% extends "_shell.html" %}
 {% block title %}מאגר טפסי כיבוי והדפסה{% endblock %}
 {% block extra_style %}
-.fire-forms{max-width:1100px;margin:0 auto}.ff-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin:0 0 16px}.ff-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.ff-muted{color:var(--text-muted);font-size:.9rem;line-height:1.6}.ff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}.ff-input{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border-mid);border-radius:8px;background:var(--bg);color:var(--text)}.ff-btn{padding:10px 15px;border:0;border-radius:8px;background:var(--accent);color:#111;font-weight:700;cursor:pointer}.ff-btn.secondary{background:var(--bg-hover);color:var(--text);border:1px solid var(--border)}.ff-btn:disabled{opacity:.5;cursor:not-allowed}.ff-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}.ff-row:last-child{border-bottom:0}.ff-status{min-height:22px;margin-top:10px}.ff-list{margin-top:10px}.ff-warning{border-right:4px solid var(--warning);padding:10px 12px;background:rgba(227,179,65,.08);border-radius:6px}
+.fire-forms{max-width:1100px;margin:0 auto}.ff-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin:0 0 16px}.ff-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.ff-muted{color:var(--text-muted);font-size:.9rem;line-height:1.6}.ff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}.ff-input{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border-mid);border-radius:8px;background:var(--bg);color:var(--text)}.ff-btn{padding:10px 15px;border:0;border-radius:8px;background:var(--accent);color:#111;font-weight:700;cursor:pointer}.ff-btn.secondary{background:var(--bg-hover);color:var(--text);border:1px solid var(--border)}.ff-btn:disabled{opacity:.5;cursor:not-allowed}.ff-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}.ff-row:last-child{border-bottom:0}.ff-status{min-height:22px;margin-top:10px}.ff-list{margin-top:10px}.ff-warning{border-right:4px solid var(--warning);padding:10px 12px;background:rgba(227,179,65,.08);border-radius:6px}.ff-preview{max-width:100%;height:auto;border:1px solid var(--border);cursor:crosshair;display:block}.ff-field-row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid var(--border);flex-wrap:wrap}
 {% endblock %}
 {% block content %}
 <div class="fire-forms">
@@ -25,11 +25,28 @@
     <div id="ffTemplateList" class="ff-list">טוען...</div>
   </section>
 
+
+  <section class="ff-card" id="ffMappingCard" hidden>
+    <div class="ff-title"><h2 id="ffMappingTitle">הגדרת שדות למילוי</h2><button class="ff-btn secondary" type="button" onclick="closeMapping()">סגירה</button></div>
+    <p class="ff-muted">בחר עמוד, לחץ על המקום שבו יודפס הערך, והגדר שם שדה. נשמרים רק שמות השדות והמיקומים, לא הערכים שתמלא בהמשך.</p>
+    <div class="ff-grid">
+      <div><label for="ffMapPage">עמוד</label><select class="ff-input" id="ffMapPage"></select><img id="ffMapImage" class="ff-preview" alt="תצוגת הטופס" style="margin-top:10px"><div id="ffMapPosition" class="ff-muted">לחץ על נקודת ההדפסה בטופס.</div></div>
+      <div><label for="ffMapLabel">שם השדה</label><input class="ff-input" id="ffMapLabel" placeholder="שם המוסד">
+        <label for="ffMapKey">מזהה באנגלית</label><input class="ff-input" id="ffMapKey" placeholder="institution_name">
+        <label for="ffMapFont">גודל גופן</label><input class="ff-input" id="ffMapFont" type="number" min="5" max="24" value="10">
+        <button class="ff-btn" type="button" onclick="addMappedField()">הוספת שדה</button>
+        <h3>שדות שהוגדרו</h3><div id="ffMappedFields" class="ff-muted">אין שדות מוגדרים.</div>
+        <button class="ff-btn" type="button" onclick="saveMapping()">שמירת מיפוי</button><div id="ffMappingStatus" class="ff-status" role="status"></div>
+      </div>
+    </div>
+  </section>
+
   <section class="ff-card" id="ffPrintCard" hidden>
     <h2 id="ffPrintTitle">הפקת חבילת הדפסה</h2>
     <p class="ff-muted">בחר/י תעודת הסמכה או רישיון של בעל המקצוע. הקובץ מצורף אוטומטית כעמוד האחרון בחבילת ההדפסה ואינו נשמר במאגר הטפסים.</p>
     <div class="ff-warning ff-muted">הטופס הרשמי נשאר ללא שינוי. תאריך וחתימת בעל המקצוע ימולאו ידנית על גבי העותק המודפס. בשלב זה המערכת אינה ממקמת טקסט בשדות הטופס, משום שטרם הוגדר מיפוי שדות לכל אחד מהטפסים.</div>
     <form id="ffPrintForm">
+      <div id="ffPrintValues" class="ff-grid"></div>
       <label for="ffCertificate">תעודה / רישיון (PDF או תמונת PNG/JPG, עד 12MB)</label>
       <input class="ff-input" id="ffCertificate" name="certificate" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" required>
       <div id="ffCertificateName" class="ff-muted"></div>
@@ -59,7 +76,7 @@ async function loadTemplates(){
     if(!res.ok) throw new Error('לא ניתן לטעון את המאגר');
     const items=await res.json();fireTemplates=items;
     if(!items.length){target.innerHTML='<p class="ff-muted">עדיין לא הועלו טפסים.</p>';return;}
-    target.innerHTML=items.map(item=>'<div class="ff-row"><div><b>'+escapeHtml(item.title)+'</b><div class="ff-muted">'+escapeHtml(item.original_filename)+' · '+item.page_count+' עמודים</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="ff-btn secondary" target="_blank" rel="noopener" href="/api/fire-form-templates/'+item.id+'/file">תצוגה</a><button class="ff-btn" type="button" onclick="openPrint('+item.id+')">הדפסה</button><button class="ff-btn secondary" type="button" onclick="deleteTemplate('+item.id+')">מחיקה</button></div></div>').join('');
+    target.innerHTML=items.map(item=>'<div class="ff-row"><div><b>'+escapeHtml(item.title)+'</b><div class="ff-muted">'+escapeHtml(item.original_filename)+' · '+item.page_count+' עמודים</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="ff-btn secondary" target="_blank" rel="noopener" href="/api/fire-form-templates/'+item.id+'/file">תצוגה</a><button class="ff-btn" type="button" onclick="openMapping('+item.id+')">הדפסה</button><button class="ff-btn secondary" type="button" onclick="deleteTemplate('+item.id+')">מחיקה</button></div></div>').join('');
   }catch(err){target.textContent=err.message;}
 }
 async function deleteTemplate(id){
@@ -68,10 +85,67 @@ async function deleteTemplate(id){
   if(!res.ok){alert('מחיקת הטופס נכשלה');return;}
   loadTemplates();
 }
+
+let mappingTemplateId=null, mappedFields=[], selectedMapPoint=null;
+async function openMapping(id){
+  mappingTemplateId=id;
+  const item=fireTemplates.find(x=>x.id===id);
+  document.getElementById('ffMappingTitle').textContent='הגדרת שדות · '+(item?.title||'טופס');
+  const response=await fetch('/api/fire-form-templates/'+id+'/mapping');
+  if(!response.ok){alert('לא ניתן לטעון את הגדרות השדות');return;}
+  const data=await response.json();mappedFields=data.fields||[];
+  const select=document.getElementById('ffMapPage');
+  select.innerHTML=Array.from({length:data.page_count},(_,i)=>'<option value="'+i+'">עמוד '+(i+1)+'</option>').join('');
+  select.onchange=loadMapPage;
+  document.getElementById('ffMapImage').onclick=mapImageClick;
+  document.getElementById('ffMappingCard').hidden=false;
+  renderMappedFields();await loadMapPage();
+  document.getElementById('ffMappingCard').scrollIntoView({behavior:'smooth'});
+}
+function closeMapping(){mappingTemplateId=null;document.getElementById('ffMappingCard').hidden=true;}
+async function loadMapPage(){
+  if(!mappingTemplateId)return;
+  const page=document.getElementById('ffMapPage').value||0;
+  document.getElementById('ffMapImage').src='/api/fire-form-templates/'+mappingTemplateId+'/pages/'+page+'.png';
+  selectedMapPoint=null;
+  document.getElementById('ffMapPosition').textContent='לחץ על נקודת ההדפסה בטופס.';
+}
+function mapImageClick(event){
+  const rect=event.currentTarget.getBoundingClientRect();
+  selectedMapPoint={x:(event.clientX-rect.left)/rect.width,y:(event.clientY-rect.top)/rect.height,page:Number(document.getElementById('ffMapPage').value)};
+  document.getElementById('ffMapPosition').textContent='נבחר מיקום: '+Math.round(selectedMapPoint.x*100)+'%, '+Math.round(selectedMapPoint.y*100)+'%';
+}
+function addMappedField(){
+  if(!selectedMapPoint){alert('יש ללחוץ תחילה על המיקום בטופס');return;}
+  const label=document.getElementById('ffMapLabel').value.trim();
+  const key=document.getElementById('ffMapKey').value.trim();
+  const font_size=Number(document.getElementById('ffMapFont').value||10);
+  if(!label||!key){alert('יש למלא שם שדה ומזהה באנגלית');return;}
+  if(mappedFields.some(f=>f.key===key)){alert('מזהה השדה כבר קיים');return;}
+  mappedFields.push({...selectedMapPoint,label,key,font_size});
+  document.getElementById('ffMapLabel').value='';document.getElementById('ffMapKey').value='';
+  selectedMapPoint=null;renderMappedFields();
+}
+function renderMappedFields(){
+  const target=document.getElementById('ffMappedFields');
+  target.innerHTML=mappedFields.length?mappedFields.map((f,i)=>'<div class="ff-field-row"><span><b>'+escapeHtml(f.label)+'</b> · '+escapeHtml(f.key)+' · עמוד '+(f.page+1)+'</span><button class="ff-btn secondary" type="button" onclick="removeMappedField('+i+')">הסרה</button></div>').join(''):'אין שדות מוגדרים.';
+}
+function removeMappedField(index){mappedFields.splice(index,1);renderMappedFields();}
+async function saveMapping(){
+  const status=document.getElementById('ffMappingStatus');status.textContent='שומר...';
+  try{
+    const res=await fetch('/api/fire-form-templates/'+mappingTemplateId+'/mapping',{method:'PUT',headers:{'Content-Type':'application/json','X-CSRF-Token':await csrfToken()},body:JSON.stringify({fields:mappedFields})});
+    const data=await res.json();if(!res.ok)throw new Error(data.error||'שמירה נכשלה');
+    status.textContent='המיפוי נשמר בהצלחה.';
+  }catch(err){status.textContent=err.message;}
+}
+
 function openPrint(id){
   selectedTemplateId=id;
   const selected=fireTemplates.find(item=>item.id===id);
-  document.getElementById('ffPrintTitle').textContent='הפקת חבילת הדפסה · '+(selected?.title||'טופס');
+  document.getElementById('ffPrintTitle').textContent='מילוי והדפסה · '+(selected?.title||'טופס');
+  const fields=selected?.fields_schema||[];
+  document.getElementById('ffPrintValues').innerHTML=fields.length?fields.map(field=>'<label>'+escapeHtml(field.label)+'<input class="ff-input" data-fire-field="'+escapeHtml(field.key)+'" maxlength="500"></label>').join(''):'<p class="ff-muted">לטופס זה עדיין לא הוגדרו שדות. ניתן להגדירם בכפתור הגדרת שדות.</p>';
   document.getElementById('ffPrintCard').hidden=false;
   document.getElementById('ffPrintCard').scrollIntoView({behavior:'smooth'});
 }
@@ -104,7 +178,7 @@ document.getElementById('ffPrintForm').addEventListener('submit',async e=>{
   if(!file)return;
   const button=document.getElementById('ffPrintButton'),status=document.getElementById('ffPrintStatus');
   button.disabled=true;status.textContent='מפיק PDF...';
-  const data=new FormData();data.append('certificate',file);
+  const data=new FormData();data.append('certificate',file);const values={};document.querySelectorAll('#ffPrintValues [data-fire-field]').forEach(input=>values[input.dataset.fireField]=input.value);data.append('values',JSON.stringify(values));
   try{
     const res=await fetch('/api/fire-form-templates/'+selectedTemplateId+'/print-package',{method:'POST',body:data,headers:{'X-CSRF-Token':await csrfToken()}});
     if(!res.ok){const result=await res.json();throw new Error(result.error||'הפקת הקובץ נכשלה');}

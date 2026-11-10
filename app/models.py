@@ -290,6 +290,8 @@ class FireFormTemplate(db.Model):
     file_hash = db.Column(db.String(64), nullable=False, unique=True)
     page_count = db.Column(db.Integer, nullable=False, default=1)
     file_size = db.Column(db.Integer, nullable=False)
+    # JSON field definitions with normalized page coordinates; contains no submitted form values.
+    fields_schema = db.Column(db.Text, nullable=False, default='[]')
     active = db.Column(db.Boolean, nullable=False, default=True, index=True)
     uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     uploaded_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

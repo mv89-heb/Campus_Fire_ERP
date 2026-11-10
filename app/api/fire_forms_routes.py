@@ -1,6 +1,8 @@
 """Reusable official fire-form library and transient print-package generation."""
 import hashlib
+import html
 import io
+import json
 import os
 import uuid
 from datetime import datetime
@@ -102,6 +104,7 @@ def _serialize(item):
         "original_filename": item.original_filename,
         "page_count": item.page_count,
         "file_size": item.file_size,
+        "fields_schema": json.loads(item.fields_schema or "[]"),
         "uploaded_at": item.uploaded_at.isoformat() if item.uploaded_at else None,
     }
 
@@ -195,6 +198,73 @@ def preview_fire_form_template(template_id):
     return response
 
 
+@fire_forms_bp.route("/api/fire-form-templates/<int:template_id>/pages/<int:page_number>.png", methods=["GET"])
+def fire_form_template_page_image(template_id, page_number):
+    _user()
+    item = db.session.get(FireFormTemplate, template_id)
+    if not item or not item.active or page_number < 0 or page_number >= item.page_count:
+        return jsonify({"error": "העמוד לא נמצא"}), 404
+    document = fitz.open(stream=_read_template(item.storage_path), filetype="pdf")
+    page = document[page_number]
+    pixmap = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5), alpha=False)
+    image_data = pixmap.tobytes("png")
+    document.close()
+    response = make_response(image_data)
+    response.headers["Content-Type"] = "image/png"
+    response.headers["Cache-Control"] = "private, no-store, max-age=0"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+@fire_forms_bp.route("/api/fire-form-templates/<int:template_id>/pages/<int:page_number>.png", methods=["GET"])
+def fire_form_template_page_image(template_id, page_number):
+    _user()
+    item = db.session.get(FireFormTemplate, template_id)
+    if not item or not item.active or page_number < 0 or page_number >= item.page_count:
+        return jsonify({"error": "העמוד לא נמצא"}), 404
+    document = fitz.open(stream=_read_template(item.storage_path), filetype="pdf")
+    page = document[page_number]
+    pixmap = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5), alpha=False)
+    image_data = pixmap.tobytes("png")
+    document.close()
+    response = make_response(image_data)
+    response.headers["Content-Type"] = "image/png"
+    response.headers["Cache-Control"] = "private, no-store, max-age=0"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+@fire_forms_bp.route("/api/fire-form-templates/<int:template_id>/mapping", methods=["GET", "PUT"])
+def fire_form_mapping(template_id):
+    _user()
+    item = db.session.get(FireFormTemplate, template_id)
+    if not item or not item.active:
+        return jsonify({"error": "הטופס לא נמצא"}), 404
+    if request.method == "GET":
+        return jsonify({"fields": json.loads(item.fields_schema or "[]"), "page_count": item.page_count})
+    payload = request.get_json(silent=True) or {}
+    fields = payload.get("fields")
+    if not isinstance(fields, list) or len(fields) > 100:
+        return jsonify({"error": "יש להגדיר רשימת שדות תקינה (עד 100 שדות)"}), 400
+    cleaned, keys = [], set()
+    for field in fields:
+        if not isinstance(field, dict):
+            return jsonify({"error": "הגדרת שדה אינה תקינה"}), 400
+        key = str(field.get("key") or "").strip()[:60]
+        label = str(field.get("label") or "").strip()[:100]
+        try:
+            page = int(field.get("page", 0))
+            x, y = float(field.get("x")), float(field.get("y"))
+            font_size = float(field.get("font_size", 10))
+        except (TypeError, ValueError):
+            return jsonify({"error": "מיקום או גודל גופן אינם תקינים"}), 400
+        if (not key or not label or key in keys or page < 0 or page >= item.page_count
+                or not 0 <= x <= 1 or not 0 <= y <= 1 or not 5 <= font_size <= 24):
+            return jsonify({"error": "יש לבדוק שם, עמוד, מיקום וגודל גופן של כל שדה"}), 400
+        keys.add(key)
+        cleaned.append({"key": key, "label": label, "page": page, "x": x, "y": y, "font_size": font_size})
+    item.fields_schema = json.dumps(cleaned, ensure_ascii=False)
+    db.session.commit()
+    return jsonify({"success": True, "fields": cleaned})
+
 @fire_forms_bp.route("/api/fire-form-templates/<int:template_id>/print-package", methods=["POST"])
 def create_fire_form_print_package(template_id):
     """Append a one-time professional certificate to the selected official form."""
@@ -206,6 +276,12 @@ def create_fire_form_print_package(template_id):
     certificate = request.files.get("certificate")
     if certificate is None or not certificate.filename:
         return jsonify({"error": "יש לצרף תעודת הסמכה או רישיון לצורך ההדפסה"}), 400
+    try:
+        values = json.loads(request.form.get("values", "{}"))
+        if not isinstance(values, dict):
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({"error": "נתוני השדות אינם תקינים"}), 400
 
     # Do not log the uploaded filename or contents. Read once, process in memory,
     # append to the selected PDF, and never persist certificate bytes or metadata.
@@ -216,6 +292,24 @@ def create_fire_form_print_package(template_id):
         cert_pdf, _ = _as_pdf(cert_bytes, certificate.filename)
         source_pdf = _read_template(item.storage_path)
         merged = fitz.open(stream=source_pdf, filetype="pdf")
+        # Overlay only explicitly mapped values; handwritten date/signature stay blank.
+        schema = json.loads(item.fields_schema or "[]")
+        for field in schema:
+            value = str(values.get(field["key"], "") or "").strip()
+            if not value:
+                continue
+            value = "".join(ch for ch in value if ch >= " " and ch != chr(127))[:500]
+            page = merged[int(field["page"])]
+            page_rect = page.rect
+            anchor_x = float(field["x"]) * page_rect.width
+            anchor_y = float(field["y"]) * page_rect.height
+            font_size = float(field.get("font_size", 10))
+            # HTML text layout handles Hebrew shaping and right-to-left direction.
+            text_rect = fitz.Rect(max(0, anchor_x - page_rect.width * 0.45), anchor_y,
+                                  anchor_x, min(page_rect.height, anchor_y + max(28, font_size * 3)))
+            safe_value = html.escape(value)
+            html_text = '<div dir="rtl" style="font-family:sans-serif;font-size:' + str(font_size) + 'pt;line-height:1.2;text-align:right;color:#000">' + safe_value + '</div>'
+            page.insert_htmlbox(text_rect, html_text, overlay=True)
         attachment = fitz.open(stream=cert_pdf, filetype="pdf")
         merged.insert_pdf(attachment)
         attachment.close()
