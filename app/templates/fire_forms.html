@@ -41,7 +41,7 @@
 </div>
 <script>
 let selectedTemplateId = null;
-const csrfToken = () => document.cookie.split('; ').find(x => x.startsWith('erp_csrf_token='))?.split('=').slice(1).join('=') || '';
+async function csrfToken(){ const r=await fetch('/api/auth/me'); if(!r.ok) throw new Error('פג תוקף החיבור'); const u=await r.json(); if(!u?.csrf_token) throw new Error('לא ניתן לאמת את הבקשה'); return u.csrf_token; }
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 document.getElementById('ffFiles').addEventListener('change', e => {
   const files = [...e.target.files];
@@ -63,7 +63,7 @@ async function loadTemplates(){
 }
 async function deleteTemplate(id){
   if(!confirm('למחוק את הטופס מהמאגר?')) return;
-  const res=await fetch('/api/fire-form-templates/'+id,{method:'DELETE',headers:{'X-CSRF-Token':decodeURIComponent(csrfToken())}});
+  const res=await fetch('/api/fire-form-templates/'+id,{method:'DELETE',headers:{'X-CSRF-Token':await csrfToken()}});
   if(!res.ok){alert('מחיקת הטופס נכשלה');return;}
   loadTemplates();
 }
