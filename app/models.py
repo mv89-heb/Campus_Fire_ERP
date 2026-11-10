@@ -278,3 +278,18 @@ class AuditLog(db.Model):
     ip_address = db.Column(db.String(64), nullable=True)
     user_agent = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class FireFormTemplate(db.Model):
+    """Reusable official fire-safety form template; never stores professional credentials."""
+    __tablename__ = 'fire_form_templates'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(180), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    storage_path = db.Column(db.String(500), nullable=False, unique=True)
+    file_hash = db.Column(db.String(64), nullable=False, unique=True)
+    page_count = db.Column(db.Integer, nullable=False, default=1)
+    file_size = db.Column(db.Integer, nullable=False)
+    active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    uploaded_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

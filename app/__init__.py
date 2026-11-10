@@ -1,14 +1,25 @@
 import hmac
+import io
 import os
 from urllib.parse import urlparse
 
-from flask import Flask, jsonify, request, session
+from flask import Flask, Request, jsonify, request, session
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from .extensions import db, migrate, limiter
 from .config import Config
 from .services.permissions import can_write
 from .services.security_policy import validate_password
+
+
+
+class InMemoryCertificateRequest(Request):
+    """Keep one-time certificate uploads in memory instead of Werkzeug's disk spool."""
+    def _get_file_stream(self, total_content_length, content_type, filename=None, content_length=None):
+        path = self.environ.get("PATH_INFO", "")
+        if path.startswith("/api/fire-form-templates/") and path.endswith("/print-package"):
+            return io.BytesIO()
+        return super()._get_file_stream(total_content_length, content_type, filename, content_length)
 
 
 PUBLIC_EXACT_PATHS = {
@@ -194,6 +205,7 @@ def _install_api_error_handlers(app):
 
 def create_app(config_class=Config):
     app = Flask(__name__)
+    app.request_class = InMemoryCertificateRequest
     app.config.from_object(config_class)
     config_class.validate()
 
@@ -212,7 +224,7 @@ def create_app(config_class=Config):
         Zone, SystemRequirement, Document,
         Site, Building, Floor, Area,
         Supplier, Equipment, Task, Audit, Deficiency,
-        DocumentHistory, User, Notification, AuditLog,
+        DocumentHistory, User, Notification, AuditLog, FireFormTemplate,
     )
 
     with app.app_context():
@@ -234,6 +246,8 @@ def create_app(config_class=Config):
     app.register_blueprint(sites_bp)
     from .api.permits_routes import permits_bp
     app.register_blueprint(permits_bp)
+    from .api.fire_forms_routes import fire_forms_bp
+    app.register_blueprint(fire_forms_bp)
     from .api.suppliers_routes import suppliers_bp
     app.register_blueprint(suppliers_bp)
     from .api.equipment_routes import equipment_bp
