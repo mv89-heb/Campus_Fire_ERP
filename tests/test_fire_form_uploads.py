@@ -7,6 +7,15 @@ from app.api.fire_forms_routes import _as_pdf
 
 
 class FireFormUploadValidationTests(unittest.TestCase):
+    def setUp(self):
+        self.app = Flask(__name__)
+        self.app.config['MAX_PDF_BYTES'] = 10 * 1024 * 1024
+        self.context = self.app.app_context()
+        self.context.push()
+
+    def tearDown(self):
+        self.context.pop()
+
     def test_accepts_valid_pdf_and_preserves_page_count(self):
         doc = fitz.open()
         doc.new_page()
