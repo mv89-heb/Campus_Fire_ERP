@@ -362,7 +362,7 @@ document.getElementById('ffPrintForm').addEventListener('submit',async e=>{
   finally{button.disabled=false;}
 });
 loadTemplates().then(()=>{
-  const scanKey='fire_forms_auto_map_scan_v1';
+  const scanKey='fire_forms_auto_map_scan_v2';
   // Only a fully successful scan is remembered. Interrupted or partially failed
   // scans are retried on the next page visit; already-mapped forms are preserved.
   const scanState=sessionStorage.getItem(scanKey);
