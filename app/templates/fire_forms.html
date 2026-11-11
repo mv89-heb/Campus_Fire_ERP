@@ -176,7 +176,7 @@ async function loadMapPage(){
   const image=document.getElementById('ffMapImage');
   image.onload=()=>{document.getElementById('ffMapStage').style.width='100%';};
   image.src='/api/fire-form-templates/'+mappingTemplateId+'/pages/'+page+'.png';
-  selectedMapPoint=null;editingMapFieldIndex=null;
+  selectedMapPoint=null;
   document.getElementById('ffMapMarker').hidden=true;
   document.getElementById('ffMapPosition').textContent='לחץ על נקודת ההדפסה בטופס.';
 }
