@@ -200,7 +200,7 @@ function renderPrintPreview(){
         const right=Math.max(0,Math.min(100,(1-Number(field.x||0))*100));
         const top=Math.max(0,Math.min(100,Number(field.y||0)*100));
         const size=Math.max(5,Math.min(24,Number(field.font_size||10)));
-        const style='right:'+right+'%;top:'+top+'%;font-size:clamp(8px,'+(size/595*96*100)+'cqw,18px)';
+        const style='right:'+right+'%;top:'+top+'%;font-size:clamp(8px,'+(size/595*96)+'cqw,18px)';
         return '<div class="ff-print-value" style="'+style+'">'+escapeHtml(values[field.key])+'</div>';
       }).join('');
       return '<div class="ff-print-page"><img alt="עמוד '+(page+1)+' של '+escapeHtml(item.title)+'" loading="lazy" src="/api/fire-form-templates/'+item.id+'/pages/'+page+'.png">'+overlays+'</div>';
