@@ -238,7 +238,16 @@ function currentPrintValues(){
 function syncPreviewField(key,value){
   const source=document.querySelector('#ffPrintValues [data-fire-field="'+CSS.escape(key)+'"]');
   if(source && source.value!==value)source.value=value;
-  renderPrintPreview();
+  // Update matching preview editors in place. Re-rendering on every keystroke
+  // would replace the focused input and make multi-character editing impossible.
+  document.querySelectorAll('[data-preview-field]').forEach(input=>{
+    if(input.dataset.previewField===key && input.value!==value)input.value=value;
+  });
+}
+function hasMappedFireCoordinates(field){
+  if(field.x===null||field.x===undefined||field.y===null||field.y===undefined)return false;
+  const x=Number(field.x),y=Number(field.y);
+  return Number.isFinite(x)&&Number.isFinite(y)&&x>=0&&x<=1&&y>=0&&y<=1;
 }
 function renderPrintPreview(){
   const target=document.getElementById('ffPrintPreview');
@@ -249,9 +258,9 @@ function renderPrintPreview(){
     const fields=item.fields_schema||[];
     const pages=Array.from({length:Number(item.page_count||1)},(_,page)=>({page,fields:fields.filter(field=>Number(field.page)===page)}));
     return '<section><div class="ff-preview-title">'+escapeHtml(item.title)+'</div>'+pages.map(({page,fields})=>{
-      const overlays=fields.map(field=>{
-        const right=Math.max(0,Math.min(100,(1-Number(field.x||0))*100));
-        const top=Math.max(0,Math.min(100,Number(field.y||0)*100));
+      const overlays=fields.filter(hasMappedFireCoordinates).map(field=>{
+        const right=(1-Number(field.x))*100;
+        const top=Number(field.y)*100;
         const size=Math.max(5,Math.min(24,Number(field.font_size||10)));
         const style='right:'+right+'%;top:'+top+'%;font-size:clamp(8px,'+(size/595*96)+'cqw,18px)';
         return '<input class="ff-print-editor" type="text" maxlength="500" aria-label="'+escapeHtml(field.label)+'" title="'+escapeHtml(field.label)+'" placeholder="'+escapeHtml(field.label)+'" data-preview-field="'+escapeHtml(field.key)+'" style="'+style+'" value="'+escapeHtml(values[field.key]||'')+'">';
