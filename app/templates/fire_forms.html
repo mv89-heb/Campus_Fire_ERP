@@ -34,7 +34,8 @@
 .ff-template-state.needs{background:rgba(227,179,65,.12);color:var(--text)}
 .ff-mapping-layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:18px;align-items:start}
 .ff-mapping-layout>div{min-width:0}
-#ffMapImage{width:100%;height:auto;max-height:75vh;object-fit:contain;background:#fff;cursor:crosshair;box-shadow:0 2px 12px rgba(15,23,42,.12)}
+#ffMapImage{display:block;width:100%;height:auto;max-height:none;object-fit:initial;background:#fff;cursor:crosshair;box-shadow:0 2px 12px rgba(15,23,42,.12)}
+.ff-map-stage{position:relative;width:100%;margin-top:10px;background:#fff;overflow:visible}.ff-map-marker{position:absolute;z-index:4;width:18px;height:18px;border:3px solid #dc2626;border-radius:50%;background:rgba(255,255,255,.55);transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 0 2px #fff}.ff-map-marker:after{content:'';position:absolute;left:50%;top:-9px;width:2px;height:30px;background:#dc2626;transform:translateX(-50%)}.ff-map-marker:before{content:'';position:absolute;top:50%;left:-9px;width:30px;height:2px;background:#dc2626;transform:translateY(-50%)}.ff-map-field-action{font-size:.82rem;padding:5px 8px}.ff-map-help{padding:10px;border-radius:8px;background:var(--bg-hover);margin:10px 0}
 #ffPrintCard [type=file]{margin:8px 0 14px}
 @media(max-width:760px){.ff-steps{grid-template-columns:1fr}.ff-print-values,.ff-mapping-layout{grid-template-columns:1fr}.ff-row{align-items:flex-start}.ff-row>div:last-child{width:100%}.ff-row>div:last-child>*{flex:1 1 auto}.fire-forms{padding:4px 10px 32px}.ff-card{padding:14px}}
 
@@ -75,7 +76,7 @@
     <div class="ff-title"><h2 id="ffMappingTitle">הגדרת שדות למילוי</h2><button class="ff-btn secondary" type="button" onclick="closeMapping()">סגירה</button></div>
     <p class="ff-muted">בחר עמוד, לחץ על המקום שבו יודפס הערך, והגדר שם שדה. נשמרים רק שמות השדות והמיקומים, לא הערכים שתמלא בהמשך.</p>
     <div class="ff-mapping-layout">
-      <div><label for="ffMapPage">עמוד</label><select class="ff-input" id="ffMapPage"></select><img id="ffMapImage" class="ff-preview" alt="תצוגת הטופס" style="margin-top:10px"><div id="ffMapPosition" class="ff-muted">לחץ על נקודת ההדפסה בטופס.</div></div>
+      <div><label for="ffMapPage">עמוד</label><select class="ff-input" id="ffMapPage"></select><div class="ff-map-help ff-muted">לחץ על המקום שבו אמור להסתיים הטקסט בצד ימין. המערכת תיישר את הערך לימין ותפרוס אותו שמאלה. כדי להזיז שדה קיים, לחץ על „הזזת מיקום” לידו ואז בחר נקודה חדשה.</div><div class="ff-map-stage" id="ffMapStage"><img id="ffMapImage" class="ff-preview" alt="תצוגת הטופס"><span id="ffMapMarker" class="ff-map-marker" hidden></span></div><div id="ffMapPosition" class="ff-muted" aria-live="polite">לחץ על נקודת ההדפסה בטופס.</div></div>
       <div><label for="ffMapLabel">שם השדה</label><input class="ff-input" id="ffMapLabel" placeholder="שם המוסד">
         <label for="ffMapKey">מזהה באנגלית</label><input class="ff-input" id="ffMapKey" placeholder="institution_name">
         <label for="ffMapFont">גודל גופן</label><input class="ff-input" id="ffMapFont" type="number" min="5" max="24" value="10">
@@ -152,7 +153,7 @@ async function deleteTemplate(id){
   loadTemplates();
 }
 
-let mappingTemplateId=null, mappedFields=[], selectedMapPoint=null;
+let mappingTemplateId=null, mappedFields=[], selectedMapPoint=null, editingMapFieldIndex=null;
 async function openMapping(id){
   mappingTemplateId=id;
   const item=fireTemplates.find(x=>x.id===id);
@@ -163,7 +164,7 @@ async function openMapping(id){
   const select=document.getElementById('ffMapPage');
   select.innerHTML=Array.from({length:data.page_count},(_,i)=>'<option value="'+i+'">עמוד '+(i+1)+'</option>').join('');
   select.onchange=loadMapPage;
-  document.getElementById('ffMapImage').onclick=mapImageClick;
+  document.getElementById('ffMapStage').onclick=mapImageClick;
   document.getElementById('ffMappingCard').hidden=false;
   renderMappedFields();await loadMapPage();
   document.getElementById('ffMappingCard').scrollIntoView({behavior:'smooth'});
@@ -172,14 +173,29 @@ function closeMapping(){mappingTemplateId=null;document.getElementById('ffMappin
 async function loadMapPage(){
   if(!mappingTemplateId)return;
   const page=document.getElementById('ffMapPage').value||0;
-  document.getElementById('ffMapImage').src='/api/fire-form-templates/'+mappingTemplateId+'/pages/'+page+'.png';
+  const image=document.getElementById('ffMapImage');
+  image.onload=()=>{document.getElementById('ffMapStage').style.width='100%';};
+  image.src='/api/fire-form-templates/'+mappingTemplateId+'/pages/'+page+'.png';
   selectedMapPoint=null;
+  document.getElementById('ffMapMarker').hidden=true;
   document.getElementById('ffMapPosition').textContent='לחץ על נקודת ההדפסה בטופס.';
 }
 function mapImageClick(event){
-  const rect=event.currentTarget.getBoundingClientRect();
-  selectedMapPoint={x:(event.clientX-rect.left)/rect.width,y:(event.clientY-rect.top)/rect.height,page:Number(document.getElementById('ffMapPage').value)};
-  document.getElementById('ffMapPosition').textContent='נבחר מיקום: '+Math.round(selectedMapPoint.x*100)+'%, '+Math.round(selectedMapPoint.y*100)+'%';
+  const image=document.getElementById('ffMapImage');
+  const rect=image.getBoundingClientRect();
+  if(!image.naturalWidth||!image.naturalHeight)return;
+  const x=Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width));
+  const y=Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height));
+  selectedMapPoint={x,y,page:Number(document.getElementById('ffMapPage').value)};
+  const marker=document.getElementById('ffMapMarker');
+  marker.style.left=(x*100)+'%';marker.style.top=(y*100)+'%';marker.hidden=false;
+  document.getElementById('ffMapPosition').textContent='נבחר מיקום: '+Math.round(x*100)+'% לרוחב, '+Math.round(y*100)+'% לגובה';
+  if(editingMapFieldIndex!==null){
+    const field=mappedFields[editingMapFieldIndex];
+    if(field){field.x=x;field.y=y;field.page=selectedMapPoint.page;}
+    editingMapFieldIndex=null;selectedMapPoint=null;marker.hidden=true;renderMappedFields();
+    document.getElementById('ffMapPosition').textContent='מיקום השדה עודכן. לחץ על „שמירת מיפוי” כדי לשמור.';
+  }
 }
 function addMappedField(){
   if(!selectedMapPoint){alert('יש ללחוץ תחילה על המיקום בטופס');return;}
@@ -187,14 +203,25 @@ function addMappedField(){
   const key=document.getElementById('ffMapKey').value.trim();
   const font_size=Number(document.getElementById('ffMapFont').value||10);
   if(!label||!key){alert('יש למלא שם שדה ומזהה באנגלית');return;}
+  if(!/^[a-z][a-z0-9_]{0,59}$/.test(key)){alert('המזהה חייב להתחיל באות אנגלית ולהכיל רק אותיות קטנות, מספרים וקו תחתון');return;}
+  if(!Number.isFinite(font_size)||font_size<5||font_size>24){alert('גודל הגופן חייב להיות בין 5 ל־24');return;}
   if(mappedFields.some(f=>f.key===key)){alert('מזהה השדה כבר קיים');return;}
   mappedFields.push({...selectedMapPoint,label,key,font_size});
   document.getElementById('ffMapLabel').value='';document.getElementById('ffMapKey').value='';
-  selectedMapPoint=null;renderMappedFields();
+  selectedMapPoint=null;document.getElementById('ffMapMarker').hidden=true;renderMappedFields();
 }
 function renderMappedFields(){
   const target=document.getElementById('ffMappedFields');
-  target.innerHTML=mappedFields.length?mappedFields.map((f,i)=>'<div class="ff-field-row"><span><b>'+escapeHtml(f.label)+'</b> · '+escapeHtml(f.key)+' · עמוד '+(f.page+1)+'</span><button class="ff-btn secondary" type="button" onclick="removeMappedField('+i+')">הסרה</button></div>').join(''):'אין שדות מוגדרים.';
+  target.innerHTML=mappedFields.length?mappedFields.map((f,i)=>'<div class="ff-field-row"><span><b>'+escapeHtml(f.label)+'</b> · '+escapeHtml(f.key)+' · עמוד '+(Number(f.page)+1)+' · X '+Math.round(Number(f.x)*100)+'% / Y '+Math.round(Number(f.y)*100)+'%</span><span><button class="ff-btn secondary ff-map-field-action" type="button" onclick="startMoveMappedField('+i+')">הזזת מיקום</button> <button class="ff-btn secondary ff-map-field-action" type="button" onclick="removeMappedField('+i+')">הסרה</button></span></div>').join(''):'אין שדות מוגדרים.';
+}
+function startMoveMappedField(index){
+  const field=mappedFields[index];if(!field)return;
+  editingMapFieldIndex=index;
+  document.getElementById('ffMapPage').value=String(field.page);
+  loadMapPage().then(()=>{
+    document.getElementById('ffMapPosition').textContent='בחר נקודה חדשה עבור „'+field.label+'”.';
+    document.getElementById('ffMapPosition').scrollIntoView({block:'nearest'});
+  });
 }
 function removeMappedField(index){mappedFields.splice(index,1);renderMappedFields();}
 async function saveMapping(){

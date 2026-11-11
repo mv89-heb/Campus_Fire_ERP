@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import fitz
 from flask import Flask
 
-from app.api.fire_forms_routes import _as_pdf, _overlay_mapped_values, _suggest_fields_for_pdf, fire_forms_bp
+from app.api.fire_forms_routes import _as_pdf, _has_valid_fire_form_mapping, _overlay_mapped_values, _suggest_fields_for_pdf, fire_forms_bp
 
 
 class FireFormUploadValidationTests(unittest.TestCase):
@@ -49,6 +49,24 @@ class FireFormUploadValidationTests(unittest.TestCase):
             if rule.rule.endswith("/pages/<int:page_number>.png")
         ]
         self.assertEqual(len(routes), 1)
+
+    def test_print_mapping_requires_a_valid_coordinate_field(self):
+        valid = SimpleNamespace(page_count=2, fields_schema=json.dumps([{
+            "key": "institution_name", "label": "שם המוסד", "page": 1,
+            "x": 0.72, "y": 0.34, "font_size": 10,
+        }], ensure_ascii=False))
+        invalid = SimpleNamespace(page_count=2, fields_schema=json.dumps([{
+            "key": "institution_name", "label": "שם המוסד", "page": 2,
+            "x": 0.72, "y": 0.34, "font_size": 10,
+        }], ensure_ascii=False))
+        self.assertTrue(_has_valid_fire_form_mapping(valid))
+        self.assertFalse(_has_valid_fire_form_mapping(invalid))
+
+    def test_print_mapping_rejects_empty_or_malformed_schema(self):
+        empty = SimpleNamespace(page_count=1, fields_schema="[]")
+        malformed = SimpleNamespace(page_count=1, fields_schema="{")
+        self.assertFalse(_has_valid_fire_form_mapping(empty))
+        self.assertFalse(_has_valid_fire_form_mapping(malformed))
 
     def test_mapped_hebrew_values_overlay_without_persisting_them(self):
         document = fitz.open()
