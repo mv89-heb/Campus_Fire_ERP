@@ -1,7 +1,7 @@
 {% extends "_shell.html" %}
 {% block title %}מאגר טפסי כיבוי והדפסה{% endblock %}
 {% block extra_style %}
-.fire-forms{max-width:1100px;margin:0 auto}.ff-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin:0 0 16px}.ff-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.ff-muted{color:var(--text-muted);font-size:.9rem;line-height:1.6}.ff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}.ff-input{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border-mid);border-radius:8px;background:var(--bg);color:var(--text)}.ff-btn{padding:10px 15px;border:0;border-radius:8px;background:var(--accent);color:#111;font-weight:700;cursor:pointer}.ff-btn.secondary{background:var(--bg-hover);color:var(--text);border:1px solid var(--border)}.ff-btn:disabled{opacity:.5;cursor:not-allowed}.ff-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}.ff-row:last-child{border-bottom:0}.ff-status{min-height:22px;margin-top:10px}.ff-list{margin-top:10px}.ff-warning{border-right:4px solid var(--warning);padding:10px 12px;background:rgba(227,179,65,.08);border-radius:6px}.ff-preview{max-width:100%;height:auto;border:1px solid var(--border);cursor:crosshair;display:block}.ff-print-preview{display:grid;gap:18px;margin-top:16px}.ff-print-page{position:relative;container-type:inline-size;max-width:900px;border:1px solid var(--border);background:#fff}.ff-print-page img{display:block;width:100%;height:auto}.ff-print-value{position:absolute;right:0;width:45%;text-align:right;direction:rtl;color:#000;font-weight:700;line-height:1.2;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none;font-size:clamp(8px,1.68cqw,18px)}.ff-preview-title{font-weight:700;margin:8px 0}.ff-field-row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.fire-forms{max-width:1100px;margin:0 auto}.ff-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin:0 0 16px}.ff-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.ff-muted{color:var(--text-muted);font-size:.9rem;line-height:1.6}.ff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}.ff-input{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border-mid);border-radius:8px;background:var(--bg);color:var(--text)}.ff-btn{padding:10px 15px;border:0;border-radius:8px;background:var(--accent);color:#111;font-weight:700;cursor:pointer}.ff-btn.secondary{background:var(--bg-hover);color:var(--text);border:1px solid var(--border)}.ff-btn:disabled{opacity:.5;cursor:not-allowed}.ff-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}.ff-row:last-child{border-bottom:0}.ff-status{min-height:22px;margin-top:10px}.ff-list{margin-top:10px}.ff-warning{border-right:4px solid var(--warning);padding:10px 12px;background:rgba(227,179,65,.08);border-radius:6px}.ff-preview{max-width:100%;height:auto;border:1px solid var(--border);cursor:crosshair;display:block}.ff-print-preview{display:grid;gap:18px;margin-top:16px}.ff-print-page{position:relative;container-type:inline-size;max-width:900px;border:1px solid var(--border);background:#fff}.ff-print-page img{display:block;width:100%;height:auto}.ff-print-value{position:absolute;right:0;width:45%;text-align:right;direction:rtl;color:#000;font-weight:700;line-height:1.2;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none;font-size:clamp(8px,1.68cqw,18px)}.ff-print-editor{position:absolute;right:0;width:45%;min-height:1.5em;box-sizing:border-box;border:1px dashed #64748b;background:rgba(255,255,255,.78);color:#000;text-align:right;direction:rtl;font-weight:700;line-height:1.2;padding:1px 3px;font-size:clamp(8px,1.68cqw,18px);z-index:2}.ff-print-editor:focus{outline:2px solid #2563eb;background:#fff}.ff-print-editor::placeholder{color:#64748b;font-weight:400}.ff-preview-title{font-weight:700;margin:8px 0}.ff-field-row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid var(--border);flex-wrap:wrap}
 {% endblock %}
 {% block content %}
 <div class="fire-forms">
@@ -176,16 +176,62 @@ function openBatchPrint(ids=null){
   selected.forEach(item=>(item.fields_schema||[]).forEach(field=>{if(!fieldMap.has(field.key))fieldMap.set(field.key,field);}));
   const fields=[...fieldMap.values()];
   document.getElementById('ffPrintTitle').textContent='מילוי והדפסת '+selected.length+' טפסים בחבילה אחת';
-  document.getElementById('ffPrintValues').innerHTML=fields.length?fields.map(field=>'<label>'+escapeHtml(field.label)+'<input class="ff-input" data-fire-field="'+escapeHtml(field.key)+'" maxlength="500"></label>').join(''):'<p class="ff-muted">לטפסים שנבחרו עדיין לא הוגדרו שדות. ניתן להגדירם תחילה דרך „הגדרת שדות”.</p>';
-  document.getElementById('ffPrintValues').querySelectorAll('[data-fire-field]').forEach(input=>input.addEventListener('input',renderPrintPreview));
+  document.getElementById('ffPrintValues').innerHTML=fields.length?fields.map(field=>'<label>'+escapeHtml(field.label)+'<input class="ff-input" data-fire-field="'+escapeHtml(field.key)+'" maxlength="500" value="'+escapeHtml(defaultFireFieldValue(field))+'"></label>').join(''):'<p class="ff-muted">לטפסים שנבחרו עדיין לא הוגדרו שדות. ניתן להגדירם תחילה דרך „הגדרת שדות”.</p>';
+  document.getElementById('ffPrintValues').querySelectorAll('[data-fire-field]').forEach(input=>input.addEventListener('input',()=>syncPreviewField(input.dataset.fireField,input.value)));
   renderPrintPreview();
   document.getElementById('ffPrintCard').hidden=false;
   document.getElementById('ffPrintCard').scrollIntoView({behavior:'smooth'});
+}
+const FIRE_ORG_DEFAULTS = {
+  institution_name: 'ישיבת אוהבי ירושלים',
+  business_name: 'ישיבת אוהבי ירושלים',
+  business_id: '580246817',
+  institution_id: '580246817',
+  business_number: '580246817',
+  address: 'רחוב רש"י 21 – ישיבה ראשית, בית שמש',
+  street: 'רחוב רש"י',
+  house_number: '21',
+  city: 'בית שמש',
+  owner_name: 'אלי אשכנזי',
+  contact_name: 'אלי אשכנזי',
+  contact_person: 'אלי אשכנזי',
+  contact_role: 'איש קשר',
+  contact_phone: '054-2424401',
+  phone: '054-2424401',
+  contact_email: 'elia@reshit.co.il',
+  email: 'elia@reshit.co.il'
+};
+function normalizeFireLabel(value){
+  return String(value||'').toLowerCase().replace(/[\\s_\\-–—:：.,/\\\\()]+/g,'').replace(/[״׳"]/g,'');
+}
+function defaultFireFieldValue(field){
+  const key=normalizeFireLabel(field.key), label=normalizeFireLabel(field.label);
+  const aliases=[
+    [['institutionname','businessname','nameofbusiness','שםהעסק','שםהמוסד','שםהנכס'], 'ישיבת אוהבי ירושלים'],
+    [['businessid','institutionid','businessnumber','companynumber','מספרזהות','מהותעסק','חפ','חפמס','מספרעוסק','מספרתאגיד'], '580246817'],
+    [['city','יישוב','ישוב'], 'בית שמש'],
+    [['address','fulladdress','כתובת','כתובתעסק','כתובתהמוסד','כתובתנכס'], 'רחוב רש"י 21 – ישיבה ראשית, בית שמש'],
+    [['street','רחוב'], 'רחוב רש"י'],
+    [['housenumber','buildingnumber','מסבית','מספרבית'], '21'],
+    [['ownername','contactname','contactperson','fullname','שםמלא','שםאישקשר','אישקשר'], 'אלי אשכנזי'],
+    [['contactrole','role','תפקיד'], 'איש קשר'],
+    [['contactphone','phone','mobile','טלפון','מסנייד','טלפוןנייד'], '054-2424401'],
+    [['contactemail','email','emailaddress','דואל','כתובתדואראלקטרוני','דואראלקטרוני'], 'elia@reshit.co.il']
+  ];
+  for(const [tokens,value] of aliases){
+    if(tokens.some(token=>key.includes(normalizeFireLabel(token))||label.includes(normalizeFireLabel(token)))) return value;
+  }
+  return '';
 }
 function currentPrintValues(){
   const values={};
   document.querySelectorAll('#ffPrintValues [data-fire-field]').forEach(input=>values[input.dataset.fireField]=input.value);
   return values;
+}
+function syncPreviewField(key,value){
+  const source=document.querySelector('#ffPrintValues [data-fire-field="'+CSS.escape(key)+'"]');
+  if(source && source.value!==value)source.value=value;
+  renderPrintPreview();
 }
 function renderPrintPreview(){
   const target=document.getElementById('ffPrintPreview');
@@ -196,16 +242,17 @@ function renderPrintPreview(){
     const fields=item.fields_schema||[];
     const pages=Array.from({length:Number(item.page_count||1)},(_,page)=>({page,fields:fields.filter(field=>Number(field.page)===page)}));
     return '<section><div class="ff-preview-title">'+escapeHtml(item.title)+'</div>'+pages.map(({page,fields})=>{
-      const overlays=fields.filter(field=>String(values[field.key]||'').trim()).map(field=>{
+      const overlays=fields.map(field=>{
         const right=Math.max(0,Math.min(100,(1-Number(field.x||0))*100));
         const top=Math.max(0,Math.min(100,Number(field.y||0)*100));
         const size=Math.max(5,Math.min(24,Number(field.font_size||10)));
         const style='right:'+right+'%;top:'+top+'%;font-size:clamp(8px,'+(size/595*96)+'cqw,18px)';
-        return '<div class="ff-print-value" style="'+style+'">'+escapeHtml(values[field.key])+'</div>';
+        return '<input class="ff-print-editor" type="text" maxlength="500" aria-label="'+escapeHtml(field.label)+'" title="'+escapeHtml(field.label)+'" placeholder="'+escapeHtml(field.label)+'" data-preview-field="'+escapeHtml(field.key)+'" style="'+style+'" value="'+escapeHtml(values[field.key]||'')+'">';
       }).join('');
       return '<div class="ff-print-page"><img alt="עמוד '+(page+1)+' של '+escapeHtml(item.title)+'" loading="lazy" src="/api/fire-form-templates/'+item.id+'/pages/'+page+'.png">'+overlays+'</div>';
     }).join('')+'</section>';
   }).join('');
+  target.querySelectorAll('[data-preview-field]').forEach(input=>input.addEventListener('input',()=>syncPreviewField(input.dataset.previewField,input.value)));
 }
 function openPrint(id){openBatchPrint([id]);}
 function closePrint(){selectedTemplateIds=[];document.getElementById('ffPrintCard').hidden=true;document.getElementById('ffPrintForm').reset();}
