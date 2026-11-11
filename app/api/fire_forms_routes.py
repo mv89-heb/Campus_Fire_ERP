@@ -445,6 +445,32 @@ def auto_map_all_fire_form_templates():
     })
 
 
+def _has_valid_fire_form_mapping(item):
+    """Require at least one structurally valid mapped field before generating a print PDF."""
+    try:
+        fields = json.loads(item.fields_schema or "[]")
+    except (TypeError, ValueError):
+        return False
+    if not isinstance(fields, list):
+        return False
+    for field in fields:
+        if not isinstance(field, dict):
+            continue
+        try:
+            page = int(field.get("page", -1))
+            x, y = float(field.get("x")), float(field.get("y"))
+            font_size = float(field.get("font_size", 10))
+        except (TypeError, ValueError):
+            continue
+        if (str(field.get("key") or "").strip()
+                and str(field.get("label") or "").strip()
+                and 0 <= page < item.page_count
+                and 0 <= x <= 1 and 0 <= y <= 1
+                and 5 <= font_size <= 24):
+            return True
+    return False
+
+
 def _overlay_mapped_values(document, item, values):
     """Overlay transient values onto one PDF using its saved field coordinates."""
     schema = json.loads(item.fields_schema or "[]")
@@ -492,6 +518,17 @@ def create_fire_forms_batch_print_package():
     }
     if len(templates_by_id) != len(ids):
         return jsonify({"error": "אחד מהטפסים שנבחרו אינו זמין"}), 404
+
+    unmapped = [
+        {"id": item.id, "title": item.title}
+        for item in templates_by_id.values()
+        if not _has_valid_fire_form_mapping(item)
+    ]
+    if unmapped:
+        return jsonify({
+            "error": "לא ניתן להפיק PDF: יש טפסים ללא מיפוי שדות תקין",
+            "unmapped_templates": unmapped,
+        }), 409
 
     cert_bytes = certificate.read(MAX_CERTIFICATE_BYTES + 1)
     if not cert_bytes or len(cert_bytes) > MAX_CERTIFICATE_BYTES:
@@ -541,6 +578,8 @@ def create_fire_form_print_package(template_id):
     item = db.session.get(FireFormTemplate, template_id)
     if not item or not item.active:
         return jsonify({"error": "הטופס לא נמצא"}), 404
+    if not _has_valid_fire_form_mapping(item):
+        return jsonify({"error": "לא ניתן להפיק PDF: לטופס עדיין לא הוגדר מיפוי שדות תקין"}), 409
 
     certificate = request.files.get("certificate")
     if certificate is None or not certificate.filename:
