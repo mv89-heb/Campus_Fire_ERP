@@ -205,23 +205,29 @@ function normalizeFireLabel(value){
   return String(value||'').toLowerCase().replace(/[\s_\-–—:：.,/\\()]+/g,'').replace(/[״׳"]/g,'');
 }
 function defaultFireFieldValue(field){
-  const key=normalizeFireLabel(field.key), label=normalizeFireLabel(field.label);
-  if(/דוא|email/.test(key+' '+label)) return 'elia@reshit.co.il';
-  const aliases=[
-    [['institutionname','businessname','nameofbusiness','שםהעסק','שםהמוסד','שםהנכס'], 'ישיבת אוהבי ירושלים'],
-    [['businessid','institutionid','businessnumber','companynumber','מספרזהות','חפ','חפמס','מספרעוסק','מספרתאגיד'], '580246817'],
-    [['city','יישוב','ישוב'], 'בית שמש'],
-    [['address','fulladdress','כתובת','כתובתעסק','כתובתהמוסד','כתובתנכס'], 'רחוב רש"י 21 – ישיבה ראשית, בית שמש'],
-    [['street','רחוב'], 'רחוב רש"י'],
-    [['housenumber','buildingnumber','מסבית','מספרבית'], '21'],
-    [['ownername','contactname','contactperson','fullname','שםמלא','שםאישקשר','אישקשר'], 'אלי אשכנזי'],
-    [['contactrole','role','תפקיד'], 'איש קשר'],
-    [['contactphone','phone','mobile','טלפון','מסנייד','טלפוןנייד'], '054-2424401'],
-    [['contactemail','email','emailaddress','דואל','כתובתדואראלקטרוני','דואראלקטרוני'], 'elia@reshit.co.il']
-  ];
-  for(const [tokens,value] of aliases){
-    if(tokens.some(token=>key.includes(normalizeFireLabel(token))||label.includes(normalizeFireLabel(token)))) return value;
-  }
+  const key=normalizeFireLabel(field.key);
+  const exact={
+    institutionname:'ישיבת אוהבי ירושלים',
+    businessname:'ישיבת אוהבי ירושלים',
+    businessid:'580246817',
+    institutionid:'580246817',
+    businessnumber:'580246817',
+    city:'בית שמש',
+    address:'רחוב רש"י 21 – ישיבה ראשית, בית שמש',
+    street:'רחוב רש"י',
+    housenumber:'21',
+    contactname:'אלי אשכנזי',
+    contactperson:'אלי אשכנזי',
+    contactrole:'איש קשר',
+    contactphone:'054-2424401',
+    contactemail:'elia@reshit.co.il'
+  };
+  if(exact[key])return exact[key];
+  // Only explicit contact fields are prefilled; never copy contact details into inspector/technician fields.
+  const label=normalizeFireLabel(field.label);
+  if(key.startsWith('contact') && /name|person|שם/.test(key+' '+label))return 'אלי אשכנזי';
+  if(key.startsWith('contact') && /phone|mobile|טלפון|נייד/.test(key+' '+label))return '054-2424401';
+  if(key.startsWith('contact') && /email|דואל|דואר/.test(key+' '+label))return 'elia@reshit.co.il';
   return '';
 }
 function currentPrintValues(){
