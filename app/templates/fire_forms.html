@@ -202,13 +202,14 @@ const FIRE_ORG_DEFAULTS = {
   email: 'elia@reshit.co.il'
 };
 function normalizeFireLabel(value){
-  return String(value||'').toLowerCase().replace(/[\\s_\\-–—:：.,/\\\\()]+/g,'').replace(/[״׳"]/g,'');
+  return String(value||'').toLowerCase().replace(/[\s_\-–—:：.,/\\()]+/g,'').replace(/[״׳"]/g,'');
 }
 function defaultFireFieldValue(field){
   const key=normalizeFireLabel(field.key), label=normalizeFireLabel(field.label);
+  if(/דוא|email/.test(key+' '+label)) return 'elia@reshit.co.il';
   const aliases=[
     [['institutionname','businessname','nameofbusiness','שםהעסק','שםהמוסד','שםהנכס'], 'ישיבת אוהבי ירושלים'],
-    [['businessid','institutionid','businessnumber','companynumber','מספרזהות','מהותעסק','חפ','חפמס','מספרעוסק','מספרתאגיד'], '580246817'],
+    [['businessid','institutionid','businessnumber','companynumber','מספרזהות','חפ','חפמס','מספרעוסק','מספרתאגיד'], '580246817'],
     [['city','יישוב','ישוב'], 'בית שמש'],
     [['address','fulladdress','כתובת','כתובתעסק','כתובתהמוסד','כתובתנכס'], 'רחוב רש"י 21 – ישיבה ראשית, בית שמש'],
     [['street','רחוב'], 'רחוב רש"י'],
