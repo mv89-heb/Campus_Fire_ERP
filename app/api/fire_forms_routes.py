@@ -462,7 +462,7 @@ def _overlay_mapped_values(document, item, values):
         text_rect = fitz.Rect(max(0, anchor_x - page_rect.width * 0.45), text_top,
                               anchor_x, min(page_rect.height, text_top + max(28, font_size * 3)))
         safe_value = html.escape(value)
-        html_text = '<div dir="rtl" style="font-family:sans-serif;font-size:' + str(font_size) + 'pt;line-height:1.2;text-align:right;color:#000">' + safe_value + '</div>'
+        html_text = '<div dir="rtl" style="font-family:sans-serif;font-size:' + str(font_size) + 'pt;line-height:1.2;text-align:right;color:#000;font-weight:700">' + safe_value + '</div>'
         page.insert_htmlbox(text_rect, html_text, overlay=True)
 
 

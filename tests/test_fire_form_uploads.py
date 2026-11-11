@@ -66,6 +66,11 @@ class FireFormUploadValidationTests(unittest.TestCase):
         document.close()
         self.assertTrue(output.startswith(b"%PDF-"))
         self.assertGreater(len(output), 500)
+        rendered = fitz.open(stream=output, filetype='pdf')
+        try:
+            self.assertIn('ישיבת אוהבי ירושלים', rendered[0].get_text())
+        finally:
+            rendered.close()
 
     def test_auto_mapping_requires_a_matching_writable_rule(self):
         document = fitz.open()

@@ -1,7 +1,7 @@
 {% extends "_shell.html" %}
 {% block title %}מאגר טפסי כיבוי והדפסה{% endblock %}
 {% block extra_style %}
-.fire-forms{max-width:1100px;margin:0 auto}.ff-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin:0 0 16px}.ff-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.ff-muted{color:var(--text-muted);font-size:.9rem;line-height:1.6}.ff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}.ff-input{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border-mid);border-radius:8px;background:var(--bg);color:var(--text)}.ff-btn{padding:10px 15px;border:0;border-radius:8px;background:var(--accent);color:#111;font-weight:700;cursor:pointer}.ff-btn.secondary{background:var(--bg-hover);color:var(--text);border:1px solid var(--border)}.ff-btn:disabled{opacity:.5;cursor:not-allowed}.ff-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}.ff-row:last-child{border-bottom:0}.ff-status{min-height:22px;margin-top:10px}.ff-list{margin-top:10px}.ff-warning{border-right:4px solid var(--warning);padding:10px 12px;background:rgba(227,179,65,.08);border-radius:6px}.ff-preview{max-width:100%;height:auto;border:1px solid var(--border);cursor:crosshair;display:block}.ff-field-row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.fire-forms{max-width:1100px;margin:0 auto}.ff-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin:0 0 16px}.ff-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.ff-muted{color:var(--text-muted);font-size:.9rem;line-height:1.6}.ff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}.ff-input{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border-mid);border-radius:8px;background:var(--bg);color:var(--text)}.ff-btn{padding:10px 15px;border:0;border-radius:8px;background:var(--accent);color:#111;font-weight:700;cursor:pointer}.ff-btn.secondary{background:var(--bg-hover);color:var(--text);border:1px solid var(--border)}.ff-btn:disabled{opacity:.5;cursor:not-allowed}.ff-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}.ff-row:last-child{border-bottom:0}.ff-status{min-height:22px;margin-top:10px}.ff-list{margin-top:10px}.ff-warning{border-right:4px solid var(--warning);padding:10px 12px;background:rgba(227,179,65,.08);border-radius:6px}.ff-preview{max-width:100%;height:auto;border:1px solid var(--border);cursor:crosshair;display:block}.ff-print-preview{display:grid;gap:18px;margin-top:16px}.ff-print-page{position:relative;container-type:inline-size;max-width:900px;border:1px solid var(--border);background:#fff}.ff-print-page img{display:block;width:100%;height:auto}.ff-print-value{position:absolute;right:0;width:45%;text-align:right;direction:rtl;color:#000;font-weight:700;line-height:1.2;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none;font-size:clamp(8px,1.68cqw,18px)}.ff-preview-title{font-weight:700;margin:8px 0}.ff-field-row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid var(--border);flex-wrap:wrap}
 {% endblock %}
 {% block content %}
 <div class="fire-forms">
@@ -50,6 +50,7 @@
     <div class="ff-warning ff-muted">המערכת ממלאת את השדות שהוגדרו במיפוי על גבי עותק זמני של הטופס. תאריך וחתימת בעל המקצוע נשארים למילוי ידני. תעודת ההסמכה מצורפת להדפסה בלבד ואינה נשמרת.</div>
     <form id="ffPrintForm">
       <div id="ffPrintValues" class="ff-grid"></div>
+      <h3>תצוגה מקדימה של הטפסים הממולאים</h3><p class="ff-muted">הנתונים מוצגים על גבי הטופס המקורי במיקומי השדות שהוגדרו. התצוגה אינה שומרת את ערכי המילוי.</p><div id="ffPrintPreview" class="ff-print-preview"></div>
       <label for="ffCertificate">תעודה / רישיון (PDF או תמונת PNG/JPG, עד 12MB)</label>
       <input class="ff-input" id="ffCertificate" name="certificate" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" required>
       <div id="ffCertificateName" class="ff-muted"></div>
@@ -176,8 +177,35 @@ function openBatchPrint(ids=null){
   const fields=[...fieldMap.values()];
   document.getElementById('ffPrintTitle').textContent='מילוי והדפסת '+selected.length+' טפסים בחבילה אחת';
   document.getElementById('ffPrintValues').innerHTML=fields.length?fields.map(field=>'<label>'+escapeHtml(field.label)+'<input class="ff-input" data-fire-field="'+escapeHtml(field.key)+'" maxlength="500"></label>').join(''):'<p class="ff-muted">לטפסים שנבחרו עדיין לא הוגדרו שדות. ניתן להגדירם תחילה דרך „הגדרת שדות”.</p>';
+  document.getElementById('ffPrintValues').querySelectorAll('[data-fire-field]').forEach(input=>input.addEventListener('input',renderPrintPreview));
+  renderPrintPreview();
   document.getElementById('ffPrintCard').hidden=false;
   document.getElementById('ffPrintCard').scrollIntoView({behavior:'smooth'});
+}
+function currentPrintValues(){
+  const values={};
+  document.querySelectorAll('#ffPrintValues [data-fire-field]').forEach(input=>values[input.dataset.fireField]=input.value);
+  return values;
+}
+function renderPrintPreview(){
+  const target=document.getElementById('ffPrintPreview');
+  if(!target)return;
+  const values=currentPrintValues();
+  const selected=fireTemplates.filter(item=>selectedTemplateIds.includes(item.id));
+  target.innerHTML=selected.map(item=>{
+    const fields=item.fields_schema||[];
+    const pages=Array.from({length:Number(item.page_count||1)},(_,page)=>({page,fields:fields.filter(field=>Number(field.page)===page)}));
+    return '<section><div class="ff-preview-title">'+escapeHtml(item.title)+'</div>'+pages.map(({page,fields})=>{
+      const overlays=fields.filter(field=>String(values[field.key]||'').trim()).map(field=>{
+        const right=Math.max(0,Math.min(100,(1-Number(field.x||0))*100));
+        const top=Math.max(0,Math.min(100,Number(field.y||0)*100));
+        const size=Math.max(5,Math.min(24,Number(field.font_size||10)));
+        const style='right:'+right+'%;top:'+top+'%;font-size:clamp(8px,'+(size/595*96)+'cqw,18px)';
+        return '<div class="ff-print-value" style="'+style+'">'+escapeHtml(values[field.key])+'</div>';
+      }).join('');
+      return '<div class="ff-print-page"><img alt="עמוד '+(page+1)+' של '+escapeHtml(item.title)+'" loading="lazy" src="/api/fire-form-templates/'+item.id+'/pages/'+page+'.png">'+overlays+'</div>';
+    }).join('')+'</section>';
+  }).join('');
 }
 function openPrint(id){openBatchPrint([id]);}
 function closePrint(){selectedTemplateIds=[];document.getElementById('ffPrintCard').hidden=true;document.getElementById('ffPrintForm').reset();}
