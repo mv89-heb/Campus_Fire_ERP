@@ -2,11 +2,53 @@
 {% block title %}מאגר טפסי כיבוי והדפסה{% endblock %}
 {% block extra_style %}
 .fire-forms{max-width:1100px;margin:0 auto}.ff-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin:0 0 16px}.ff-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.ff-muted{color:var(--text-muted);font-size:.9rem;line-height:1.6}.ff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}.ff-input{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border-mid);border-radius:8px;background:var(--bg);color:var(--text)}.ff-btn{padding:10px 15px;border:0;border-radius:8px;background:var(--accent);color:#111;font-weight:700;cursor:pointer}.ff-btn.secondary{background:var(--bg-hover);color:var(--text);border:1px solid var(--border)}.ff-btn:disabled{opacity:.5;cursor:not-allowed}.ff-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}.ff-row:last-child{border-bottom:0}.ff-status{min-height:22px;margin-top:10px}.ff-list{margin-top:10px}.ff-warning{border-right:4px solid var(--warning);padding:10px 12px;background:rgba(227,179,65,.08);border-radius:6px}.ff-preview{max-width:100%;height:auto;border:1px solid var(--border);cursor:crosshair;display:block}.ff-print-preview{display:grid;gap:18px;margin-top:16px}.ff-print-page{position:relative;container-type:inline-size;max-width:900px;border:1px solid var(--border);background:#fff}.ff-print-page img{display:block;width:100%;height:auto}.ff-print-value{position:absolute;right:0;width:45%;text-align:right;direction:rtl;color:#000;font-weight:700;line-height:1.2;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none;font-size:clamp(8px,1.68cqw,18px)}.ff-print-editor{position:absolute;right:0;width:45%;min-height:1.5em;box-sizing:border-box;border:1px dashed #64748b;background:rgba(255,255,255,.78);color:#000;text-align:right;direction:rtl;font-weight:700;line-height:1.2;padding:1px 3px;font-size:clamp(8px,1.68cqw,18px);z-index:2}.ff-print-editor:focus{outline:2px solid #2563eb;background:#fff}.ff-print-editor::placeholder{color:#64748b;font-weight:400}.ff-preview-title{font-weight:700;margin:8px 0}.ff-field-row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+/* Fire forms workflow: clear hierarchy, compact list, predictable editing */
+.fire-forms{max-width:1240px;padding:8px 16px 48px}
+.ff-intro{background:linear-gradient(135deg,rgba(37,99,235,.09),rgba(14,165,233,.04));border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin:12px 0 18px}
+.ff-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 18px}
+.ff-step{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-card);min-width:0}
+.ff-step-num{display:grid;place-items:center;flex:0 0 30px;height:30px;border-radius:50%;background:var(--accent);color:#111;font-weight:800}
+.ff-step b{display:block}.ff-step small{display:block;color:var(--text-muted);line-height:1.4;margin-top:2px}
+.ff-card{padding:20px;margin-bottom:18px;box-shadow:0 2px 12px rgba(15,23,42,.035)}
+.ff-card h2{margin:0 0 8px;font-size:1.18rem}
+.ff-card .ff-title{margin-bottom:8px}
+.ff-muted{line-height:1.65}
+.ff-row{padding:14px 4px;gap:14px}
+.ff-row>div:first-child{flex:1;min-width:240px}
+.ff-row>div:first-child b{font-size:1rem}
+.ff-row>div:last-child{justify-content:flex-start}
+.ff-btn{min-height:40px;padding:9px 14px;white-space:nowrap}
+.ff-btn.secondary{background:var(--bg-hover)}
+.ff-status{line-height:1.6;overflow-wrap:anywhere}
+.ff-print-values{display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:18px;align-items:start}
+.ff-print-fields{display:grid;grid-template-columns:1fr;gap:10px;align-content:start}
+.ff-print-fields label{display:grid;gap:5px;font-weight:650}
+.ff-print-fields .ff-input{min-height:42px}
+.ff-preview-pane{min-width:0}
+.ff-print-preview{gap:22px;margin-top:10px}
+.ff-print-page{width:100%;overflow:hidden;box-shadow:0 3px 14px rgba(15,23,42,.12)}
+.ff-print-editor{min-height:30px;max-height:3.6em;resize:vertical;pointer-events:auto;cursor:text}
+.ff-print-editor:focus{z-index:5}
+.ff-empty-fields{padding:16px;border:1px dashed var(--warning);border-radius:10px;background:rgba(227,179,65,.08)}
+.ff-template-state{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;padding:3px 8px;border-radius:999px;background:var(--bg-hover);margin-top:5px}
+.ff-template-state.needs{background:rgba(227,179,65,.12);color:var(--text)}
+.ff-mapping-layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:18px;align-items:start}
+.ff-mapping-layout>div{min-width:0}
+#ffMapImage{width:100%;height:auto;max-height:75vh;object-fit:contain;background:#fff;cursor:crosshair;box-shadow:0 2px 12px rgba(15,23,42,.12)}
+#ffPrintCard [type=file]{margin:8px 0 14px}
+@media(max-width:760px){.ff-steps{grid-template-columns:1fr}.ff-print-values,.ff-mapping-layout{grid-template-columns:1fr}.ff-row{align-items:flex-start}.ff-row>div:last-child{width:100%}.ff-row>div:last-child>*{flex:1 1 auto}.fire-forms{padding:4px 10px 32px}.ff-card{padding:14px}}
+
 {% endblock %}
 {% block content %}
 <div class="fire-forms">
   <div class="ff-title"><h1>📄 מאגר טפסי כיבוי והדפסה</h1><a class="ff-btn secondary" href="/">חזרה לאישורים</a></div>
   <p class="ff-muted">מעלים כאן את הטפסים הרשמיים פעם אחת. הקבצים נשמרים במאגר המערכת וניתן להשתמש בהם שוב להפקת חבילות הדפסה.</p>
+  <div class="ff-intro"><b>כך מפיקים טופס תקין:</b> בוחרים טופס, מוודאים שהשדות ממופים למקומם בטופס, מזינים ערכים ובודקים בתצוגה המקדימה לפני ההדפסה. ערכי המילוי ותעודת בעל המקצוע אינם נשמרים.</div>
+  <div class="ff-steps" aria-label="שלבי העבודה">
+    <div class="ff-step"><span class="ff-step-num">1</span><div><b>בחירת טפסים</b><small>בחר טופס אחד או חבילה</small></div></div>
+    <div class="ff-step"><span class="ff-step-num">2</span><div><b>מיפוי שדות</b><small>בדוק שלכל שדה יש מיקום מדויק</small></div></div>
+    <div class="ff-step"><span class="ff-step-num">3</span><div><b>מילוי והדפסה</b><small>ערוך, בדוק והפק PDF</small></div></div>
+  </div>
 
   <section class="ff-card">
     <h2>העלאה מרוכזת של טפסים</h2>
@@ -23,7 +65,7 @@
   <section class="ff-card">
     <div class="ff-title"><h2>הטפסים השמורים</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ff-btn" type="button" onclick="openBatchPrint()">מילוי והדפסת טפסים נבחרים</button><button class="ff-btn secondary" type="button" onclick="selectAllTemplates(true)">בחירת הכול</button><button class="ff-btn secondary" type="button" onclick="selectAllTemplates(false)">ביטול בחירה</button><button class="ff-btn secondary" type="button" onclick="loadTemplates()">רענון</button></div></div>
     <p class="ff-muted">סמן טופס אחד או יותר כדי להפיק חבילת PDF אחת. פרטי המילוי מוזנים פעם אחת ומשולבים בכל הטפסים שבהם הוגדר אותו שדה.</p>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0"><button class="ff-btn" id="ffAutoMapButton" type="button" onclick="autoMapAllTemplates()">סריקה ומיפוי אוטומטי לכל 24 הטפסים</button><span class="ff-muted">המערכת תשמור מיקום רק כשנמצאו תווית וקו מילוי תואמים. טופס שלא זוהה יישאר ללא מיפוי שגוי.</span></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0"><button class="ff-btn" id="ffAutoMapButton" type="button" onclick="autoMapAllTemplates()">סריקה / ניסיון מיפוי נוסף</button><span class="ff-muted">הסריקה אינה מנחשת מיקומים. כל טופס שלא זוהו בו שדות יסומן לבדיקה ידנית, ולא ייחשב כמוכן למילוי.</span></div>
     <div id="ffAutoMapStatus" class="ff-status" role="status" aria-live="polite"></div>
     <div id="ffTemplateList" class="ff-list">טוען...</div>
   </section>
@@ -32,7 +74,7 @@
   <section class="ff-card" id="ffMappingCard" hidden>
     <div class="ff-title"><h2 id="ffMappingTitle">הגדרת שדות למילוי</h2><button class="ff-btn secondary" type="button" onclick="closeMapping()">סגירה</button></div>
     <p class="ff-muted">בחר עמוד, לחץ על המקום שבו יודפס הערך, והגדר שם שדה. נשמרים רק שמות השדות והמיקומים, לא הערכים שתמלא בהמשך.</p>
-    <div class="ff-grid">
+    <div class="ff-mapping-layout">
       <div><label for="ffMapPage">עמוד</label><select class="ff-input" id="ffMapPage"></select><img id="ffMapImage" class="ff-preview" alt="תצוגת הטופס" style="margin-top:10px"><div id="ffMapPosition" class="ff-muted">לחץ על נקודת ההדפסה בטופס.</div></div>
       <div><label for="ffMapLabel">שם השדה</label><input class="ff-input" id="ffMapLabel" placeholder="שם המוסד">
         <label for="ffMapKey">מזהה באנגלית</label><input class="ff-input" id="ffMapKey" placeholder="institution_name">
@@ -49,8 +91,7 @@
     <p class="ff-muted">בחר/י תעודת הסמכה או רישיון של בעל המקצוע. הקובץ מצורף אוטומטית כעמוד האחרון בחבילת ההדפסה ואינו נשמר במאגר הטפסים.</p>
     <div class="ff-warning ff-muted">המערכת ממלאת את השדות שהוגדרו במיפוי על גבי עותק זמני של הטופס. תאריך וחתימת בעל המקצוע נשארים למילוי ידני. תעודת ההסמכה מצורפת להדפסה בלבד ואינה נשמרת.</div>
     <form id="ffPrintForm">
-      <div id="ffPrintValues" class="ff-grid"></div>
-      <h3>תצוגה מקדימה של הטפסים הממולאים</h3><p class="ff-muted">הנתונים מוצגים על גבי הטופס המקורי במיקומי השדות שהוגדרו. התצוגה אינה שומרת את ערכי המילוי.</p><div id="ffPrintPreview" class="ff-print-preview"></div>
+      <div class="ff-print-values"><div><h3>פרטי המילוי</h3><p class="ff-muted">הזן ערכים כאן או ישירות על גבי הטופס בתצוגה. שני המקומות מסונכרנים.</p><div id="ffPrintValues" class="ff-print-fields"></div></div><div class="ff-preview-pane"><h3>תצוגה מקדימה חיה</h3><p class="ff-muted">אפשר ללחוץ בתוך שדה על גבי הטופס ולערוך אותו. בדוק את המיקום והטקסט לפני הפקת ה־PDF.</p><div id="ffPrintPreview" class="ff-print-preview"></div></div></div>
       <label for="ffCertificate">תעודה / רישיון (PDF או תמונת PNG/JPG, עד 12MB)</label>
       <input class="ff-input" id="ffCertificate" name="certificate" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" required>
       <div id="ffCertificateName" class="ff-muted"></div>
@@ -100,7 +141,7 @@ async function autoMapAllTemplates(askFirst=true){
     }).join('');
     status.innerHTML='<b>הסריקה הסתיימה:</b> '+data.mapped+' מופו אוטומטית, '+data.kept_existing+' עם מיפוי קיים, '+data.manual_review+' לבדיקה ידנית, '+data.errors+' שגיאות.'+details;
     await loadTemplates();
-    return Number(data.errors||0)===0;
+    return Number(data.errors||0)===0 && Number(data.manual_review||0)===0;
   }catch(err){status.textContent=err.message;return false;}
   finally{button.disabled=false;}
 }
@@ -175,6 +216,15 @@ function openBatchPrint(ids=null){
   const fieldMap=new Map();
   selected.forEach(item=>(item.fields_schema||[]).forEach(field=>{if(!fieldMap.has(field.key))fieldMap.set(field.key,field);}));
   const fields=[...fieldMap.values()];
+  const missing=selected.filter(item=>!(item.fields_schema||[]).some(field=>hasMappedFireCoordinates(field)));
+  if(missing.length){
+    const names=missing.map(item=>item.title).join(' · ');
+    const status=document.getElementById('ffAutoMapStatus');
+    status.innerHTML='<div class="ff-empty-fields"><b>אי אפשר להתחיל מילוי עדיין.</b><br>לטפסים הבאים אין שדות ממופים עם מיקום תקין: '+escapeHtml(names)+'.<br>לחץ על „הגדרת שדות” ליד כל טופס, או נסה סריקה נוספת. לא נייצר מסמך שנראה כאילו מולא כאשר אין בו שדות.</div>';
+    document.getElementById('ffAutoMapStatus').scrollIntoView({behavior:'smooth',block:'center'});
+    return;
+  }
+  if(!fields.length){alert('לא נמצאו שדות ממופים בטפסים שנבחרו.');return;}
   document.getElementById('ffPrintTitle').textContent='מילוי והדפסת '+selected.length+' טפסים בחבילה אחת';
   document.getElementById('ffPrintValues').innerHTML=fields.length?fields.map(field=>'<label>'+escapeHtml(field.label)+'<input class="ff-input" data-fire-field="'+escapeHtml(field.key)+'" maxlength="500" value="'+escapeHtml(defaultFireFieldValue(field))+'"></label>').join(''):'<p class="ff-muted">לטפסים שנבחרו עדיין לא הוגדרו שדות. ניתן להגדירם תחילה דרך „הגדרת שדות”.</p>';
   document.getElementById('ffPrintValues').querySelectorAll('[data-fire-field]').forEach(input=>input.addEventListener('input',()=>syncPreviewField(input.dataset.fireField,input.value)));
@@ -315,11 +365,11 @@ loadTemplates().then(()=>{
   const scanKey='fire_forms_auto_map_scan_v1';
   // Only a fully successful scan is remembered. Interrupted or partially failed
   // scans are retried on the next page visit; already-mapped forms are preserved.
-  if(sessionStorage.getItem(scanKey)!=='done'){
+  const scanState=sessionStorage.getItem(scanKey);
+  if(!scanState || scanState==='running'){
     sessionStorage.setItem(scanKey,'running');
     autoMapAllTemplates(false).then(success=>{
-      if(success)sessionStorage.setItem(scanKey,'done');
-      else sessionStorage.removeItem(scanKey);
+      sessionStorage.setItem(scanKey,success?'done':'partial');
     });
   }
 });
