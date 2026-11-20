@@ -2,7 +2,7 @@
 import secrets
 from functools import wraps
 
-from flask import Blueprint, jsonify, request, session, render_template
+from flask import Blueprint, jsonify, request, session, render_template, redirect
 
 from app.extensions import db
 from app.models import User
@@ -66,6 +66,9 @@ def admin_required(view_func):
 
 @auth_bp.route('/login')
 def login_page():
+    # Authenticated users must never see the pre-login intro or login screen again.
+    if _current_user():
+        return redirect('/')
     return render_template('login.html')
 
 
