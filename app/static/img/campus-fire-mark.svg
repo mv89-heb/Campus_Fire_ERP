@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+<title id="title">Campus Fire ERP</title>
+<defs><linearGradient id="shield" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#35d0c5"/><stop offset="1" stop-color="#138d91"/></linearGradient></defs>
+<path d="M64 7 108 24v34c0 30-18 49-44 63C38 107 20 88 20 58V24L64 7Z" fill="#142b40" stroke="url(#shield)" stroke-width="5" stroke-linejoin="round"/>
+<path d="M39 75V51l25-15 25 15v24" fill="none" stroke="#f4f7f8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M49 75V59h30v16" fill="none" stroke="#f4f7f8" stroke-width="5" stroke-linejoin="round"/>
+<path d="M64 17c-2 11-13 16-13 28 0 8 5 13 13 13s13-5 13-13c0-7-5-12-7-18-1 5-4 7-6 9 1-8 0-13 0-19Z" fill="#d6b46a" stroke="#142b40" stroke-width="2" stroke-linejoin="round"/>
+<path d="M58 75v-9h12v9" fill="#22b8b0"/>
+</svg>
