@@ -17,6 +17,12 @@ The migration is additive and idempotent, including recovery from a partially in
 
 The existing user identity table remains global in this foundation release. The current login flow remains attached to the legacy organization. The migration does not create a public sign-up flow or expose organization creation.
 
+## Database connection roles
+
+The Neon role `campus_fire_runtime` has been provisioned with read/write access and verified with `rolsuper=false` and `rolbypassrls=false`. Render now uses that role for `DATABASE_URL` through the pooler. `MIGRATION_DATABASE_URL` uses the direct `neondb_owner` connection for Alembic only. The migration runner logs only the database host and revision, never connection credentials.
+
+Release 0017 adds forced RLS policies for all 16 tenant-owned tables. The transaction-local settings `app.current_organization_id` and `app.allowed_document_id` are reapplied at every transaction boundary. Signed document links receive access only to their exact document ID; they do not receive a general tenant context.
+
 ## Security boundary and release gate
 
 This is a foundation, not a declaration that the product is already ready for external multi-tenant customers. Before enabling customer onboarding, the next release must complete:
@@ -31,4 +37,4 @@ Do not enable public registration or create customer tenants until that release 
 
 ## Current infrastructure constraints
 
-The deployed web service is on Render's free plan and uses one instance. Its rate limiter currently falls back to process-local memory because no shared Redis endpoint is configured. The application database is the Neon `campus-fire-erp` project on the free tier. The current database connection role is `neondb_owner` and has `BYPASSRLS=true`; therefore PostgreSQL row-level security policies would not constrain this connection. Before onboarding external tenants, use a separate least-privilege runtime role without `BYPASSRLS` for application traffic and a direct owner connection in `MIGRATION_DATABASE_URL` for Alembic. Enable and force RLS on tenant-owned tables, bind the organization ID with transaction-local `set_config`, verify storage object policies, and update Render connection strings through reviewed secret changes. These constraints are acceptable for controlled pilot development, but not a claim of production-grade high availability, contractual backups, or horizontal scaling. No paid services are introduced by this release.
+The deployed web service is on Render's free plan and uses one instance. Its rate limiter currently falls back to process-local memory because no shared Redis endpoint is configured. The application database is the Neon `campus-fire-erp` project on the free tier. The current database connection role is `neondb_owner` and has `BYPASSRLS=true`; therefore PostgreSQL row-level security policies would not constrain this connection. Before onboarding external tenants, verify RLS policies and transaction-local context in production, verify Supabase Storage object policies and tenant-specific upload paths, complete the raw-SQL/background-job review, and test every API blueprint for cross-tenant ID access. These constraints are acceptable for controlled pilot development, but not a claim of production-grade high availability, contractual backups, or horizontal scaling. No paid services are introduced by this release.
