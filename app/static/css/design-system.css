@@ -909,3 +909,23 @@ button, a, input, select, textarea, [tabindex]:not([tabindex="-1"]) {
     transition-duration: .01ms !important;
   }
 }
+
+/* Module layouts: prevent desktop-only workspaces from overflowing on phones. */
+@media (max-width: 900px) {
+  .ai-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .doc-list-card {
+    position: static !important;
+    top: auto !important;
+    max-height: min(42vh, 360px) !important;
+  }
+  .reports-hero { align-items: flex-start !important; flex-direction: column; }
+  .reports-actions { width: 100%; flex-wrap: wrap; }
+  .reports-actions > * { flex: 1 1 auto; }
+  .ff-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)) !important; }
+}
+@media (max-width: 560px) {
+  .ff-card { padding: 13px !important; }
+  .ai-grid { gap: 12px !important; }
+  .doc-list-card { max-height: 34vh !important; }
+  .reports-page { padding-inline: 0 !important; }
+}
