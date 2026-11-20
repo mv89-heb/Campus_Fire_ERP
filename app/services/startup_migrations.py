@@ -24,10 +24,39 @@ def validate_direct_migration_url(database_url):
     return parsed.hostname
 
 
+def verify_migration_connection_owner():
+    """Ensure the migration connection is actually the owner of application tables."""
+    if db.engine.url.get_backend_name() != "postgresql":
+        return None
+    row = db.session.execute(
+        text(
+            "SELECT current_user, pg_get_userbyid(c.relowner) "
+            "FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+            "WHERE n.nspname='public' AND c.relname='zones'"
+        )
+    ).first()
+    if not row:
+        raise RuntimeError("Could not verify ownership of public.zones for Alembic")
+    current_role, table_owner = row
+    if current_role != table_owner:
+        raise RuntimeError(
+            f"ALEMBIC_DATABASE_URL must use the table owner; "
+            f"connected role {current_role!r} does not own public.zones"
+        )
+    return current_role
+
+
 def apply_startup_migrations(runtime_app, migration_app):
     """Apply migrations with the migration app, then report its resulting revision."""
     try:
         with migration_app.app_context():
+            migration_role = verify_migration_connection_owner()
+            if migration_role:
+                runtime_app.logger.info(
+                    "[startup-migration-connection] role=%s host=%s",
+                    migration_role,
+                    db.engine.url.host or "unknown",
+                )
             migration_result = migration_app.test_cli_runner().invoke(args=["db", "upgrade"])
             if migration_result.exit_code != 0:
                 details = (migration_result.output or "").strip()
