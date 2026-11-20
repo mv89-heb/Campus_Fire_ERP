@@ -8,7 +8,7 @@ class Organization(db.Model):
     __tablename__ = 'organizations'
     id = db.Column(db.String(36), primary_key=True)
     name = db.Column(db.String(180), nullable=False)
-    slug = db.Column(db.String(80), nullable=False, unique=True, index=True)
+    slug = db.Column(db.String(80), nullable=False, unique=True)
     status = db.Column(db.String(20), nullable=False, default='active')
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     memberships = db.relationship('OrganizationMembership', back_populates='organization', cascade='all, delete-orphan', passive_deletes=True)
