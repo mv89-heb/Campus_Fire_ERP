@@ -114,14 +114,25 @@ def _install_security_guards(app):
         if not session.get('user_id'):
             return jsonify({'error': 'נדרשת התחברות'}), 401
 
-        from app.models import User
+        from app.models import User, OrganizationMembership, LEGACY_ORGANIZATION_ID
         user = db.session.get(User, session.get('user_id'))
         if not user or not user.active:
             session.clear()
             return jsonify({'error': 'החשבון אינו פעיל או אינו קיים'}), 401
 
+        organization_id = session.get('organization_id') or LEGACY_ORGANIZATION_ID
+        membership = OrganizationMembership.query.filter_by(
+            organization_id=organization_id,
+            user_id=user.id,
+            status='active',
+        ).first()
+        if not membership:
+            session.clear()
+            return jsonify({'error': 'אין למשתמש חברות פעילה בארגון'}), 403
+
+        session['organization_id'] = membership.organization_id
         session['username'] = user.username
-        session['role'] = user.role
+        session['role'] = membership.role
 
         if request.method in WRITE_METHODS:
             if not _csrf_valid():
