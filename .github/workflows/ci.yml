@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, hardening/security-data-integrity]
+    branches: [main, hardening/security-data-integrity, feat/brand-system-premium-redesign-2026-11-20]
   pull_request:
     branches: [main]
 
