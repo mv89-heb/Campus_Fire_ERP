@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from app import create_app
@@ -51,6 +52,12 @@ class DirectMigrationConnectionTests(unittest.TestCase):
 
         self.assertEqual(migration_app.config["SQLALCHEMY_DATABASE_URI"], owner_url)
         self.assertEqual(runtime_app.config["SQLALCHEMY_DATABASE_URI"], runtime_url)
+
+
+    def test_production_requires_a_dedicated_migration_url(self):
+        source = (Path(__file__).resolve().parents[1] / "run.py").read_text(encoding="utf-8")
+        self.assertIn('os.environ.get("ALEMBIC_DATABASE_URL", "")', source)
+        self.assertIn("ALEMBIC_DATABASE_URL must be configured for production", source)
 
     def test_accepts_direct_neon_postgres_endpoint(self):
         host = validate_direct_migration_url(

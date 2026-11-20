@@ -12,7 +12,14 @@ app = create_app()
 
 # Keep application traffic on DATABASE_URL. Alembic can use a separate,
 # direct owner connection so the runtime role does not need schema privileges.
-migration_database_url = normalize_migration_database_url(os.environ.get("MIGRATION_DATABASE_URL", ""))
+migration_database_url = normalize_migration_database_url(
+    os.environ.get("ALEMBIC_DATABASE_URL", "")
+    or os.environ.get("MIGRATION_DATABASE_URL", "")
+)
+if app.config.get("IS_PRODUCTION") and not migration_database_url:
+    raise RuntimeError(
+        "ALEMBIC_DATABASE_URL must be configured for production schema migrations"
+    )
 if migration_database_url:
     validate_direct_migration_url(migration_database_url)
 
