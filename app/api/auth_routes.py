@@ -8,6 +8,8 @@ from app.extensions import db
 from app.models import User, OrganizationMembership, LEGACY_ORGANIZATION_ID
 from app.services import auth_service as svc
 from app.services.auth_service import AuthServiceError
+from app.services.tenant_context import resolve_membership
+from flask import current_app
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -30,11 +32,11 @@ def _current_user():
         session.clear()
         return None
     organization_id = session.get('organization_id') or LEGACY_ORGANIZATION_ID
-    membership = OrganizationMembership.query.filter_by(
-        organization_id=organization_id,
-        user_id=user.id,
-        status='active',
-    ).first()
+    membership = resolve_membership(
+        user,
+        organization_id,
+        allow_legacy_bootstrap=not current_app.config.get('IS_PRODUCTION', False),
+    )
     if not membership:
         session.clear()
         return None
@@ -96,20 +98,13 @@ def users_page():
 def api_login():
     data = _json_body()
     user = svc.authenticate(data.get('username'), data.get('password'))
-    membership = OrganizationMembership.query.filter_by(
-        organization_id=LEGACY_ORGANIZATION_ID,
-        user_id=user.id,
-        status='active',
-    ).first()
+    membership = resolve_membership(
+        user,
+        LEGACY_ORGANIZATION_ID,
+        allow_legacy_bootstrap=not current_app.config.get('IS_PRODUCTION', False),
+    )
     if not membership:
-        membership = OrganizationMembership(
-            organization_id=LEGACY_ORGANIZATION_ID,
-            user_id=user.id,
-            role=user.role,
-            status='active',
-        )
-        db.session.add(membership)
-        db.session.commit()
+        return jsonify({'error': 'למשתמש אין חברות פעילה בארגון'}), 403
 
     # Rotate the Flask session on successful authentication to reduce session-fixation risk.
     session.clear()
