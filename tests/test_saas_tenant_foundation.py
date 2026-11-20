@@ -15,7 +15,10 @@ from app.models import (
     Site,
     Building,
 )
-from app.services.tenant_context import TENANT_MODELS, TenantAccessError
+from app.services.tenant_context import (
+    TENANT_MODELS, TenantAccessError, bind_organization, bind_document_access,
+    document_access_token_valid,
+)
 
 
 OTHER_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000002"
@@ -154,6 +157,44 @@ class SaaSTenantFoundationTests(unittest.TestCase):
 
         response = client.get(f"/api/documents/{document_id}/file")
         self.assertEqual(response.status_code, 404)
+
+
+    def test_postgres_tenant_context_helpers_bind_one_organization_or_one_document(self):
+        with self.app.app_context():
+            bind_organization(db.session, LEGACY_ORGANIZATION_ID)
+            self.assertEqual(db.session.info.get("organization_id"), LEGACY_ORGANIZATION_ID)
+            self.assertNotIn("allowed_document_id", db.session.info)
+
+            bind_document_access(db.session, 123)
+            self.assertNotIn("organization_id", db.session.info)
+            self.assertEqual(db.session.info.get("allowed_document_id"), "123")
+            db.session.remove()
+
+    def test_signed_document_token_is_scoped_to_its_document_id(self):
+        from itsdangerous import URLSafeTimedSerializer
+
+        secret = "signed-document-test-secret"
+        serializer = URLSafeTimedSerializer(
+            secret,
+            salt="campus-fire-document-access-v1",
+        )
+        token = serializer.dumps({"doc_id": 123})
+        self.assertTrue(document_access_token_valid(token, 123, secret))
+        self.assertFalse(document_access_token_valid(token, 124, secret))
+        self.assertFalse(document_access_token_valid("invalid-token", 123, secret))
+
+    def test_forced_rls_migration_protects_all_tenant_tables(self):
+        migration = (
+            Path(__file__).resolve().parents[1]
+            / "migrations" / "versions" / "0017_force_tenant_rls.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("ENABLE ROW LEVEL SECURITY", migration)
+        self.assertIn("FORCE ROW LEVEL SECURITY", migration)
+        self.assertIn("campus_fire_runtime", migration)
+        self.assertIn("app.current_organization_id", migration)
+        self.assertIn("app.allowed_document_id", migration)
+        for model in TENANT_MODELS:
+            self.assertIn(f'"{model.__tablename__}"', migration)
 
     def test_legacy_data_migration_is_additive_and_backfills_all_business_tables(self):
         migration = (

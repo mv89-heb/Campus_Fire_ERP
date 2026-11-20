@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, current_app, render_template, send_file, redirect, session
 from app.extensions import db
-from app.models import Zone, SystemRequirement, Document, User
+from app.models import Zone, SystemRequirement, Document, User, LEGACY_ORGANIZATION_ID
 from app.services import gemini_document_service as ai_svc
 from app.services import document_link_service as link_svc
 from app.services.dms_service import DMSService
@@ -10,32 +10,18 @@ from app.services.document_date_policy_service import (
     apply_document_policy, calculate_document_status, reconcile_audit_summary, STATUS_LABELS, today_israel, document_dates,
 )
 from app.services.audit_log_service import log as audit_log
+from app.services.tenant_context import bind_organization, document_access_token_valid
 from app.utils.security import validate_and_save_pdf
 from datetime import date, datetime, timedelta, timezone
 import io
 import platform
 import os
 import tempfile
-from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 main_bp = Blueprint('main', __name__)
 OUTLOOK_ENABLED = platform.system() == 'Windows'
-DOCUMENT_TOKEN_SALT = 'campus-fire-document-access-v1'
-DOCUMENT_TOKEN_MAX_AGE = 300
-
-
-def _document_token_serializer():
-    return URLSafeTimedSerializer(current_app.config['SECRET_KEY'], salt=DOCUMENT_TOKEN_SALT)
-
-
 def _document_token_valid(token, doc_id):
-    if not token:
-        return False
-    try:
-        payload = _document_token_serializer().loads(token, max_age=DOCUMENT_TOKEN_MAX_AGE)
-        return int(payload.get('doc_id')) == int(doc_id)
-    except (BadSignature, SignatureExpired, TypeError, ValueError, AttributeError):
-        return False
+    return document_access_token_valid(token, doc_id, current_app.config.get('SECRET_KEY'))
 
 
 def _document_access_allowed(doc_id):
@@ -753,6 +739,7 @@ def system_health():
         except Exception:
             current_app.logger.exception('Health check Alembic revision probe failed')
             result['schema_revision_ready'] = not result['schema_revision_required']
+        bind_organization(db.session, LEGACY_ORGANIZATION_ID)
         zone_count = Zone.query.count()
         result['db_connected'] = True
         result['zones_seeded'] = zone_count > 0
