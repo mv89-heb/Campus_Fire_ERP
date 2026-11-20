@@ -10,7 +10,7 @@ from .extensions import db, migrate, limiter
 from .config import Config
 from .services.permissions import can_write
 from .services.security_policy import validate_password
-from .services.tenant_context import install_tenant_guards, TenantAccessError
+from .services.tenant_context import install_tenant_guards, TenantAccessError, resolve_membership
 
 
 
@@ -107,11 +107,11 @@ def _install_security_guards(app):
                     session.clear()
                     return jsonify({'error': 'החשבון אינו פעיל או אינו קיים'}), 401
                 organization_id = session.get('organization_id') or LEGACY_ORGANIZATION_ID
-                membership = OrganizationMembership.query.filter_by(
-                    organization_id=organization_id,
-                    user_id=user.id,
-                    status='active',
-                ).first()
+                membership = resolve_membership(
+                    user,
+                    organization_id,
+                    allow_legacy_bootstrap=not app.config.get('IS_PRODUCTION', False),
+                )
                 if not membership:
                     session.clear()
                     return jsonify({'error': 'אין למשתמש חברות פעילה בארגון'}), 403
@@ -144,11 +144,11 @@ def _install_security_guards(app):
             return jsonify({'error': 'החשבון אינו פעיל או אינו קיים'}), 401
 
         organization_id = session.get('organization_id') or LEGACY_ORGANIZATION_ID
-        membership = OrganizationMembership.query.filter_by(
-            organization_id=organization_id,
-            user_id=user.id,
-            status='active',
-        ).first()
+        membership = resolve_membership(
+            user,
+            organization_id,
+            allow_legacy_bootstrap=not app.config.get('IS_PRODUCTION', False),
+        )
         if not membership:
             session.clear()
             return jsonify({'error': 'אין למשתמש חברות פעילה בארגון'}), 403
