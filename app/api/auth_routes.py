@@ -8,7 +8,7 @@ from app.extensions import db
 from app.models import User, OrganizationMembership, LEGACY_ORGANIZATION_ID
 from app.services import auth_service as svc
 from app.services.auth_service import AuthServiceError
-from app.services.tenant_context import resolve_membership
+from app.services.tenant_context import resolve_membership, bind_organization
 from flask import current_app
 
 auth_bp = Blueprint('auth', __name__)
@@ -41,7 +41,7 @@ def _current_user():
         session.clear()
         return None
     session['organization_id'] = membership.organization_id
-    db.session.info['organization_id'] = membership.organization_id
+    bind_organization(db.session, membership.organization_id)
     session['role'] = membership.role
     return user
 
@@ -112,7 +112,7 @@ def api_login():
     session['user_id'] = user.id
     session['username'] = user.username
     session['organization_id'] = membership.organization_id
-    db.session.info['organization_id'] = membership.organization_id
+    bind_organization(db.session, membership.organization_id)
     session['role'] = membership.role
     session['csrf_token'] = secrets.token_urlsafe(32)
 
