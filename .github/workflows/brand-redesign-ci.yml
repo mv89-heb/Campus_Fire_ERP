@@ -1,0 +1,45 @@
+name: Campus Fire brand redesign CI
+
+on:
+  push:
+    branches:
+      - main
+      - feat/brand-system-premium-redesign-2026-11-20
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "requirements.txt"
+      - ".github/workflows/brand-redesign-ci.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "requirements.txt"
+      - ".github/workflows/brand-redesign-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile application and tests
+        run: python -m compileall -q app tests
+      - name: Run complete test suite
+        run: python -m unittest discover -s tests -p "test_*.py" -v
