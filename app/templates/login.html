@@ -170,7 +170,7 @@ const Login = (() => {
         const res = await fetch('/api/users', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password}) });
         await json(res);
         const loginRes = await fetch('/api/auth/login', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password}) });
-        await json(loginRes); window.location.href = '/';
+        await json(loginRes); window.location.replace('/');
       } catch (e) { errEl.innerText = e.message || 'לא ניתן ליצור את המנהל הראשי'; }
       finally { busy = false; btn.disabled = false; }
     }
