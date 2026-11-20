@@ -37,7 +37,7 @@ body { min-height:100vh; display:flex; align-items:center; justify-content:cente
 @keyframes splash-line { to{transform:scaleX(1)} }
 @media(max-width:520px){.login-card{max-width:100%;}.login-splash-skip{left:50%;transform:translateX(-50%);white-space:nowrap;}}
 @media(prefers-reduced-motion:reduce){.login-splash-inner,.login-splash-mark,.login-splash-ring,.login-splash-title,.login-splash-subtitle,.login-splash-line{animation:none!important;opacity:1;transform:none}.login-splash{transition:none}}
-.login-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-8); width: 100%; max-width: 420px; }
+.login-card { background: var(--color-surface); border: 1px solid var(--color-border); width: 100%; }
 .login-title { font-size: var(--text-lg); font-weight: 700; margin-bottom: 6px; text-align: center; }
 .login-subtitle { font-size: var(--text-sm); color: var(--color-text-muted); text-align: center; margin-bottom: var(--space-6); }
 .error-msg { color: var(--color-danger); font-size: var(--text-sm); text-align: center; min-height: 18px; margin-bottom: 8px; }
