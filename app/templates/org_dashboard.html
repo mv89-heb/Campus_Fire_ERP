@@ -1,5 +1,5 @@
 {% extends "_shell.html" %}
-{% block title %}דשבורד ארגוני | בטיחות אש Enterprise{% endblock %}
+{% block title %}לוח בקרה ארגוני | Campus Fire ERP{% endblock %}
 
 {% block extra_style %}
 .page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
@@ -45,6 +45,85 @@ tr:last-child td { border-bottom: none; }
 
 .btn { padding: 10px 16px; border-radius: var(--radius); font-size: 0.9rem; font-weight: 600; border: 1px solid var(--border-mid); background: var(--bg-hover); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration:none; }
 .btn:hover { background: rgba(255,255,255,0.05); }
+
+/* Dashboard presentation refinement */
+.page-title-row {
+  padding: 4px 0 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+.page-title-row h1 { font-weight: 800; letter-spacing: -.025em; }
+.kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.kpi-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 108px;
+  padding: 16px;
+  overflow: hidden;
+  text-align: right;
+  background: linear-gradient(145deg, var(--color-surface), var(--color-surface-hover));
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.kpi-card:hover { transform: translateY(-2px); border-color: var(--color-border-strong); box-shadow: var(--shadow-md); }
+.kpi-card::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 3px;
+  background: var(--color-primary);
+  opacity: .7;
+}
+.kpi-card.good::after { background: var(--color-success); }
+.kpi-card.warn::after { background: var(--color-warning); }
+.kpi-card.bad::after { background: var(--color-danger); }
+.kpi-value { font-size: clamp(1.55rem, 2.4vw, 2rem); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.kpi-label { font-size: .78rem; line-height: 1.4; }
+#actionCenter .kpi-card { min-height: 90px; }
+#actionCenter .kpi-card .kpi-value { font-size: 1.35rem; }
+.card {
+  padding: clamp(14px, 1.6vw, 20px);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+  font-weight: 750;
+}
+.grid-2 { gap: 14px; }
+.bar-chart {
+  min-height: 154px;
+  padding: 14px 4px 4px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--color-surface-hover), transparent);
+}
+.bar { background: linear-gradient(180deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 60%, var(--color-accent-gold))); }
+table { border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; }
+th { background: var(--color-surface-raised); }
+td { vertical-align: middle; }
+.retry-btn { min-height: 38px; }
+@media (min-width: 768px) {
+  .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  .kpi-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .kpi-grid { gap: 8px; }
+  .kpi-card { min-height: 92px; padding: 12px; }
+  .kpi-value { font-size: 1.45rem; }
+  .grid-2 { gap: 10px; }
+  .bar-chart { gap: 6px; overflow: hidden; }
+  .bar-label { font-size: .65rem; overflow-wrap: anywhere; }
+}
+
 {% endblock %}
 
 {% block content %}
