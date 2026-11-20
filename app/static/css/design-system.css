@@ -13,28 +13,29 @@
 
 :root, :root[data-theme="dark"] {
   /* ---------- Color: Surface & Text (Dark - רך, לא שחור-שחור) ---------- */
-  --color-bg:            #171a1f;
-  --color-surface:       #1e222a;
-  --color-surface-hover: #262b35;
-  --color-surface-raised:#2c313c;
-  --color-border:        rgba(255,255,255,0.08);
-  --color-border-strong: rgba(255,255,255,0.14);
-  --color-text:          #e8e6e3;
-  --color-text-muted:    #9a9691;
-  --color-text-faint:    #5c5850;
+  --color-bg:            #101c2c;
+  --color-surface:       #17283a;
+  --color-surface-hover: #20364b;
+  --color-surface-raised:#294158;
+  --color-border:        rgba(201,220,232,0.10);
+  --color-border-strong: rgba(201,220,232,0.19);
+  --color-text:          #edf4f7;
+  --color-text-muted:    #a9bdca;
+  --color-text-faint:    #718999;
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
 
   /* ---------- Color: Brand & Semantic Status (זהה בשני המצבים) ---------- */
-  --color-primary:       #f78166;   /* אקצנט טרה-קוטה - קיים כבר בכל המערכת */
-  --color-primary-hover: #ff9e85;
-  --color-primary-ink:   #1a0f0b;   /* טקסט על גבי --color-primary */
+  --color-primary:       #22b8b0;   /* Campus Fire turquoise */
+  --color-primary-hover: #42d1c8;
+  --color-primary-ink:   #09232d;   /* high contrast on turquoise */
   --color-success:       #3fb950;
   --color-warning:       #e3b341;
   --color-danger:        #f85149;
   --color-info:          #58a6ff;
-  --color-neutral:       #9a9691;
+  --color-neutral:       #9aabb5;
+  --color-accent-gold:    #d6b46a;
 
   --tint-success: rgba(63,185,80,0.15);
   --tint-warning: rgba(227,179,65,0.15);
@@ -46,28 +47,29 @@
 
 :root[data-theme="light"] {
   /* ---------- Color: Surface & Text (Light - לבן חם, לא לבן קליני) ---------- */
-  --color-bg:            #f7f5f2;
+  --color-bg:            #f4f6f8;
   --color-surface:       #ffffff;
-  --color-surface-hover: #f0ede8;
+  --color-surface-hover: #eaf0f3;
   --color-surface-raised:#ffffff;
-  --color-border:        rgba(35,32,28,0.09);
-  --color-border-strong: rgba(35,32,28,0.16);
-  --color-text:          #23201c;
-  --color-text-muted:    #6b665f;
-  --color-text-faint:    #a39d94;
+  --color-border:        rgba(16,28,44,0.09);
+  --color-border-strong: rgba(16,28,44,0.17);
+  --color-text:          #17283a;
+  --color-text-muted:    #5d7180;
+  --color-text-faint:    #91a2ad;
   --shadow-sm: 0 1px 2px rgba(35,32,28,0.06);
   --shadow-md: 0 4px 12px rgba(35,32,28,0.10);
   --shadow-lg: 0 8px 24px rgba(35,32,28,0.14);
 
   /* אותם צבעי מותג/סטטוס - שומר על זהות ויזואלית אחידה בין שני המצבים */
-  --color-primary:       #e8734f;   /* מעט יותר כהה מהגרסה הכהה, לניגודיות טובה על רקע בהיר */
-  --color-primary-hover: #d4623f;
+  --color-primary:       #087f82;   /* accessible turquoise for light surfaces */
+  --color-primary-hover: #06696d;
   --color-primary-ink:   #ffffff;
   --color-success:       #1a7f37;
   --color-warning:       #9a6700;
   --color-danger:        #cf222e;
   --color-info:          #0969da;
-  --color-neutral:       #6b665f;
+  --color-neutral:       #5d7180;
+  --color-accent-gold:    #b18a3c;
 
   --tint-success: rgba(26,127,55,0.10);
   --tint-warning: rgba(154,103,0,0.10);
@@ -731,4 +733,66 @@ table td,
   table td {
     padding: 8px 6px;
   }
+}
+
+
+/* ============================================================================
+   CAMPUS FIRE BRAND LAYER — premium adaptive identity
+   ============================================================================ */
+.ds-header {
+  min-height: 62px;
+  height: 62px;
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  backdrop-filter: blur(16px);
+  border-bottom-color: var(--color-border-strong);
+}
+.ds-header-brand { gap: 10px; letter-spacing: .015em; }
+.ds-brand-mark { width: 34px; height: 34px; object-fit: contain; }
+.ds-sidebar {
+  background: var(--color-surface);
+  border-left-color: var(--color-border);
+  padding: 14px 12px;
+}
+.ds-sidebar-brand {
+  display:flex; align-items:center; gap:11px;
+  padding:12px 10px 18px; margin:0 2px 16px;
+  border-bottom:1px solid var(--color-border);
+}
+.ds-sidebar-brand img { width:42px; height:42px; flex:0 0 42px; }
+.ds-sidebar-brand div { display:flex; flex-direction:column; min-width:0; gap:2px; }
+.ds-sidebar-brand strong { font-size:.9rem; letter-spacing:.01em; }
+.ds-sidebar-brand span { color:var(--color-text-muted); font-size:.68rem; white-space:nowrap; }
+.ds-sidebar-group-label { color:var(--color-text-faint); font-weight:700; letter-spacing:.055em; }
+.ds-sidebar-link {
+  border-radius:10px;
+  margin:2px 0;
+  min-height:40px;
+  transition:background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+.ds-sidebar-link:hover { background:var(--color-surface-hover); transform:translateX(-2px); }
+.ds-sidebar-link.active {
+  background:var(--tint-primary);
+  color:var(--color-primary);
+  font-weight:700;
+  box-shadow:inset -3px 0 0 var(--color-primary);
+}
+.ds-card,.card,.report-card,.task-card,.eq-card,.supplier-card,.site-block,.audit-block {
+  border-radius:14px;
+  border-color:var(--color-border);
+}
+.ds-btn-primary,.btn-primary {
+  background:var(--color-primary);
+  color:var(--color-primary-ink);
+  font-weight:700;
+}
+.ds-btn-primary:hover,.btn-primary:hover { background:var(--color-primary-hover); }
+.ds-header-search input,.ds-input,.ds-select,.ds-textarea {
+  border-radius:10px;
+}
+.ds-table th { background:var(--color-surface-raised); }
+.ds-kpi-card { border-radius:14px; }
+@media (max-width:760px) {
+  .ds-header { min-height:56px; height:56px; }
+  .ds-brand-mark { width:30px; height:30px; }
+  .ds-sidebar-brand { padding-top:8px; }
 }
