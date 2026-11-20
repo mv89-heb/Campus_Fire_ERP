@@ -54,6 +54,16 @@ class DirectMigrationConnectionTests(unittest.TestCase):
         self.assertEqual(runtime_app.config["SQLALCHEMY_DATABASE_URI"], runtime_url)
 
 
+
+    def test_alembic_env_uses_active_flask_app_without_creating_runtime_app(self):
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "migrations" / "env.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("current_app._get_current_object()", source)
+        self.assertIn('app.config["SQLALCHEMY_DATABASE_URI"]', source)
+        self.assertNotIn("create_app()", source)
+
     def test_production_requires_a_dedicated_migration_url(self):
         source = (Path(__file__).resolve().parents[1] / "run.py").read_text(encoding="utf-8")
         self.assertIn('os.environ.get("ALEMBIC_DATABASE_URL", "")', source)
