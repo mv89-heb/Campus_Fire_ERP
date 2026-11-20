@@ -10,7 +10,10 @@ from .extensions import db, migrate, limiter
 from .config import Config
 from .services.permissions import can_write
 from .services.security_policy import validate_password
-from .services.tenant_context import install_tenant_guards, TenantAccessError, resolve_membership
+from .services.tenant_context import (
+    install_tenant_guards, TenantAccessError, resolve_membership,
+    bind_organization, bind_document_access, document_access_token_valid,
+)
 
 
 
@@ -118,7 +121,24 @@ def _install_security_guards(app):
                 session['organization_id'] = membership.organization_id
                 session['username'] = user.username
                 session['role'] = membership.role
-                db.session.info['organization_id'] = membership.organization_id
+                bind_organization(db.session, membership.organization_id)
+            else:
+                document_id = (request.view_args or {}).get('doc_id')
+                if document_id is None:
+                    try:
+                        document_id = int(path.strip('/').split('/')[2])
+                    except (ValueError, IndexError):
+                        document_id = None
+                token = (
+                    request.args.get('access_token')
+                    or request.headers.get('X-Document-Access-Token')
+                    or (request.cookies.get(f'doc_access_{int(document_id)}') if document_id is not None else None)
+                )
+                if (
+                    document_id is not None
+                    and document_access_token_valid(token, document_id, app.config.get('SECRET_KEY'))
+                ):
+                    bind_document_access(db.session, document_id)
             return None
 
         if path == '/api/auth/logout':
@@ -154,7 +174,7 @@ def _install_security_guards(app):
             return jsonify({'error': 'אין למשתמש חברות פעילה בארגון'}), 403
 
         session['organization_id'] = membership.organization_id
-        db.session.info['organization_id'] = membership.organization_id
+        bind_organization(db.session, membership.organization_id)
         session['username'] = user.username
         session['role'] = membership.role
 
