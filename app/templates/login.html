@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>התחברות | בטיחות אש Enterprise</title>
+<title>התחברות | Campus Fire ERP</title>
 <script>
   (function () {
     var saved = localStorage.getItem('erp-theme') || 'dark';
@@ -12,7 +12,31 @@
 </script>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
 <style>
-body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: var(--space-5); }
+body { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:clamp(16px,4vw,36px); overflow-x:hidden; background:radial-gradient(ellipse at 50% 8%, rgba(34,184,176,.12), transparent 48%),var(--color-bg); }
+.login-stage { width:100%; display:flex; align-items:center; justify-content:center; min-height:calc(100vh - 32px); position:relative; }
+.login-card { position:relative; overflow:hidden; box-shadow:var(--shadow-lg),0 24px 70px rgba(0,0,0,.18); border-radius:22px; max-width:460px; padding:clamp(26px,5vw,42px); }
+.login-card:before { content:""; position:absolute; inset:0 0 auto; height:3px; background:linear-gradient(90deg,#22B8B0,#D6B46A); }
+.login-brand { display:flex; flex-direction:column; align-items:center; gap:10px; margin-bottom:24px; }
+.login-brand img { width:76px; height:76px; filter:drop-shadow(0 8px 16px rgba(34,184,176,.16)); }
+.login-brand-name { font-size:1.2rem; font-weight:800; letter-spacing:.02em; text-align:center; }
+.login-brand-tagline { color:var(--color-text-muted); font-size:.82rem; text-align:center; }
+.login-theme-toggle { position:absolute; top:14px; left:14px; width:38px; height:38px; border:1px solid var(--color-border); border-radius:12px; background:var(--color-surface-hover); color:var(--color-text); cursor:pointer; }
+.login-splash { position:fixed; inset:0; z-index:99999; display:grid; place-items:center; overflow:hidden; background:radial-gradient(ellipse at 50% 42%,#1d3850 0%,#101c2c 48%,#09131f 100%); color:#f4f6f8; transition:opacity .65s ease,visibility .65s ease; }
+.login-splash.is-leaving { opacity:0; visibility:hidden; pointer-events:none; }
+.login-splash-inner { position:relative; display:flex; flex-direction:column; align-items:center; gap:18px; padding:24px; text-align:center; animation:splash-arrive .9s cubic-bezier(.2,.8,.2,1) both; }
+.login-splash-mark { width:clamp(112px,22vw,160px); height:auto; filter:drop-shadow(0 12px 30px rgba(34,184,176,.2)); animation:splash-float 2.8s ease-in-out .7s infinite; }
+.login-splash-ring { position:absolute; width:clamp(180px,36vw,260px); aspect-ratio:1; border:1px solid rgba(34,184,176,.38); border-radius:50%; animation:splash-ring 2.8s ease-out .2s both; }
+.login-splash-title { font-size:clamp(1.55rem,4vw,2.35rem); font-weight:800; letter-spacing:.04em; opacity:0; animation:splash-title .8s ease 1s forwards; }
+.login-splash-subtitle { color:#b8c9d5; font-size:clamp(.85rem,2vw,1rem); opacity:0; animation:splash-title .8s ease 1.35s forwards; }
+.login-splash-line { width:92px; height:2px; margin-top:4px; background:linear-gradient(90deg,transparent,#22B8B0,#D6B46A,transparent); transform:scaleX(0); transform-origin:center; animation:splash-line .9s ease 1.45s forwards; }
+.login-splash-skip { position:absolute; bottom:max(24px,env(safe-area-inset-bottom)); left:24px; border:1px solid rgba(255,255,255,.22); color:#dbe6ec; background:rgba(255,255,255,.06); border-radius:999px; padding:8px 14px; font:inherit; cursor:pointer; }
+@keyframes splash-arrive { from{opacity:0;transform:translateY(18px) scale(.94)} to{opacity:1;transform:translateY(0) scale(1)} }
+@keyframes splash-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+@keyframes splash-ring { 0%{transform:scale(.72);opacity:0} 35%{opacity:.8} 100%{transform:scale(1.2);opacity:0} }
+@keyframes splash-title { to{opacity:1;transform:translateY(0)} from{opacity:0;transform:translateY(8px)} }
+@keyframes splash-line { to{transform:scaleX(1)} }
+@media(max-width:520px){.login-card{max-width:100%;}.login-splash-skip{left:50%;transform:translateX(-50%);white-space:nowrap;}}
+@media(prefers-reduced-motion:reduce){.login-splash-inner,.login-splash-mark,.login-splash-ring,.login-splash-title,.login-splash-subtitle,.login-splash-line{animation:none!important;opacity:1;transform:none}.login-splash{transition:none}}
 .login-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-8); width: 100%; max-width: 420px; }
 .login-title { font-size: var(--text-lg); font-weight: 700; margin-bottom: 6px; text-align: center; }
 .login-subtitle { font-size: var(--text-sm); color: var(--color-text-muted); text-align: center; margin-bottom: var(--space-6); }
@@ -25,9 +49,26 @@ body { min-height: 100vh; display: flex; align-items: center; justify-content: c
 </style>
 </head>
 <body>
+<div class="login-splash" id="loginSplash" aria-label="פתיח Campus Fire ERP" role="status">
+  <div class="login-splash-inner">
+    <div class="login-splash-ring" aria-hidden="true"></div>
+    <img class="login-splash-mark" src="{{ url_for('static', filename='img/campus-fire-mark.svg') }}" alt="">
+    <div class="login-splash-title">Campus Fire ERP</div>
+    <div class="login-splash-subtitle">מערכת ניהול בטיחות אש וציות</div>
+    <div class="login-splash-line" aria-hidden="true"></div>
+  </div>
+  <button class="login-splash-skip" type="button" onclick="finishIntro()">דילוג לפתיחת המערכת</button>
+</div>
+<div class="login-stage">
 <div class="login-card">
-  <div class="login-title">🛡️ בטיחות אש Enterprise</div>
-  <div class="login-subtitle" id="loginSubtitle">התחברות למערכת</div>
+  <button class="login-theme-toggle" type="button" onclick="toggleLoginTheme()" aria-label="החלפת מצב תצוגה">◐</button>
+  <div class="login-brand">
+    <img src="{{ url_for('static', filename='img/campus-fire-mark.svg') }}" alt="סמל Campus Fire ERP">
+    <div class="login-brand-name">Campus Fire ERP</div>
+    <div class="login-brand-tagline">מערכת ניהול בטיחות אש וציות</div>
+  </div>
+  <div class="login-title">ברוכים הבאים</div>
+  <div class="login-subtitle" id="loginSubtitle">התחברות מאובטחת למערכת</div>
 
   <div id="loginForm">
     <div class="ds-field"><input class="ds-input" type="text" id="username" placeholder="שם משתמש" autocomplete="username"></div>
@@ -49,7 +90,29 @@ body { min-height: 100vh; display: flex; align-items: center; justify-content: c
     </div>
   </div>
 </div>
+</div>
 <script>
+function finishIntro() {
+  const splash = document.getElementById('loginSplash');
+  if (!splash || splash.classList.contains('is-leaving')) return;
+  try { sessionStorage.setItem('campus-fire-intro-seen', '1'); } catch (_) {}
+  splash.classList.add('is-leaving');
+  window.setTimeout(() => splash.remove(), 700);
+}
+function toggleLoginTheme() {
+  const root = document.documentElement;
+  const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  root.setAttribute('data-theme', next);
+  try { localStorage.setItem('erp-theme', next); } catch (_) {}
+}
+(function startIntro() {
+  let alreadySeen = false;
+  try { alreadySeen = sessionStorage.getItem('campus-fire-intro-seen') === '1'; } catch (_) {}
+  if (alreadySeen) { document.getElementById('loginSplash')?.remove(); return; }
+  const splash = document.getElementById('loginSplash');
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.setTimeout(finishIntro, reduced ? 1800 : 4700);
+})();
 const Login = (() => {
   let busy = false;
   const json = async (res) => {
@@ -87,7 +150,7 @@ const Login = (() => {
       busy = true; btn.disabled = true;
       try {
         const res = await fetch('/api/auth/login', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password}) });
-        await json(res); window.location.href = '/';
+        await json(res); window.location.replace('/');
       } catch (e) { errEl.innerText = e.message || 'שגיאה בהתחברות'; }
       finally { busy = false; btn.disabled = false; }
     },
