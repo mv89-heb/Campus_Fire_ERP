@@ -10,6 +10,7 @@ from .extensions import db, migrate, limiter
 from .config import Config
 from .services.permissions import can_write
 from .services.security_policy import validate_password
+from .services.tenant_context import install_tenant_guards, TenantAccessError
 
 
 
@@ -131,6 +132,7 @@ def _install_security_guards(app):
             return jsonify({'error': 'אין למשתמש חברות פעילה בארגון'}), 403
 
         session['organization_id'] = membership.organization_id
+        db.session.info['organization_id'] = membership.organization_id
         session['username'] = user.username
         session['role'] = membership.role
 
@@ -198,6 +200,17 @@ def _install_api_error_handlers(app):
             }), 413
         return exc
 
+    @app.errorhandler(TenantAccessError)
+    def handle_tenant_access_error(exc):
+        db.session.rollback()
+        if request.path.startswith('/api/'):
+            return jsonify({
+                'success': False,
+                'error': 'הפעולה נחסמה: אין גישה לנתונים של ארגון אחר',
+                'http_status': 403,
+            }), 403
+        return 'Forbidden', 403
+
     @app.errorhandler(Exception)
     def handle_unexpected_exception(exc):
         app.logger.exception('Unhandled application exception on %s %s', request.method, request.path)
@@ -221,6 +234,7 @@ def create_app(config_class=Config):
     config_class.validate()
 
     db.init_app(app)
+    install_tenant_guards()
     migrate.init_app(app, db)
     limiter.init_app(app)
     _install_security_headers(app)
