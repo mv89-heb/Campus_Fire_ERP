@@ -4,8 +4,9 @@ from unittest.mock import patch
 
 from sqlalchemy import text
 
-from app import create_app
+from app import create_app, seed_data
 from app.extensions import db
+from app.models import Organization, LEGACY_ORGANIZATION_ID
 
 
 class ProductionHealthConfig:
@@ -41,6 +42,18 @@ class SystemHealthTests(unittest.TestCase):
         self.app = create_app(ProductionHealthConfig)
         self.app.config.update(TESTING=True)
         with self.app.app_context():
+            # Production startup no longer calls create_all(); tests must create
+            # their isolated schema explicitly, just as Alembic does in deploys.
+            db.create_all()
+            if not db.session.get(Organization, LEGACY_ORGANIZATION_ID):
+                db.session.add(Organization(
+                    id=LEGACY_ORGANIZATION_ID,
+                    name='Health test organization',
+                    slug='health-test-organization',
+                    status='active',
+                ))
+                db.session.commit()
+            seed_data()
             db.session.execute(text(
                 "CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)"
             ))
