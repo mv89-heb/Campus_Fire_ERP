@@ -23,7 +23,7 @@
 <div class="ds-shell">
   <header class="ds-header" role="banner">
     <button class="ds-btn ds-btn-icon ds-header-hamburger" onclick="Shell.toggleSidebar()" aria-label="פתח/סגור תפריט ניווט" aria-expanded="false" aria-controls="shellSidebar">☰</button>
-    <div class="ds-header-brand">🛡️ בטיחות אש</div>
+    <div class="ds-header-brand"><img class="ds-brand-mark" src="{{ url_for('static', filename='img/campus-fire-mark.svg') }}" alt=""><span>Campus Fire ERP</span></div>
     <div class="ds-header-search">
       <label for="shellGlobalSearch" class="sr-only">חיפוש גלובלי בכל המערכת</label>
       <input type="text" id="shellGlobalSearch" placeholder="🔎 חיפוש גלובלי בכל המערכת..." oninput="Shell.onSearchInput(this.value)" role="searchbox" aria-autocomplete="list">
@@ -52,6 +52,10 @@
 
   <div class="ds-body">
     <nav class="ds-sidebar" id="shellSidebar" role="navigation" aria-label="ניווט ראשי">
+      <div class="ds-sidebar-brand">
+        <img src="{{ url_for('static', filename='img/campus-fire-mark.svg') }}" alt="">
+        <div><strong>Campus Fire ERP</strong><span>בטיחות אש · ציות · תפעול</span></div>
+      </div>
       <div class="ds-sidebar-group">
         <a class="ds-sidebar-link {{ 'active' if active_nav == 'dashboard' else '' }}" href="/org-dashboard">🏠 <span>לוח בקרה</span></a>
       </div>
