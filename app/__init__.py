@@ -225,6 +225,7 @@ def create_app(config_class=Config):
         Site, Building, Floor, Area,
         Supplier, Equipment, Task, Audit, Deficiency,
         DocumentHistory, User, Notification, AuditLog, FireFormTemplate,
+        Organization, OrganizationMembership, LEGACY_ORGANIZATION_ID,
     )
 
     with app.app_context():
@@ -232,6 +233,28 @@ def create_app(config_class=Config):
         if auto_create_db:
             try:
                 db.create_all()
+                legacy_org = db.session.get(Organization, LEGACY_ORGANIZATION_ID)
+                if not legacy_org:
+                    db.session.add(Organization(
+                        id=LEGACY_ORGANIZATION_ID,
+                        name='הארגון הקיים',
+                        slug='legacy-organization',
+                        status='active',
+                    ))
+                    db.session.flush()
+                for existing_user in User.query.all():
+                    membership = OrganizationMembership.query.filter_by(
+                        organization_id=LEGACY_ORGANIZATION_ID,
+                        user_id=existing_user.id,
+                    ).first()
+                    if not membership:
+                        db.session.add(OrganizationMembership(
+                            organization_id=LEGACY_ORGANIZATION_ID,
+                            user_id=existing_user.id,
+                            role=existing_user.role,
+                            status='active',
+                        ))
+                db.session.commit()
                 seed_data()
             except Exception as e:
                 app.logger.error(
