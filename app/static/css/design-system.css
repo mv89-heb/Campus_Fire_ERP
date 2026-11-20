@@ -796,3 +796,136 @@ table td,
   .ds-brand-mark { width:30px; height:30px; }
   .ds-sidebar-brand { padding-top:8px; }
 }
+
+
+/* ============================================================================
+   PRODUCT-WIDE UI FINISH — consistent surfaces, controls and responsive data
+   Applied as a presentation layer; no markup, route or workflow changes.
+   ============================================================================ */
+:root {
+  color-scheme: dark;
+}
+:root[data-theme="light"] { color-scheme: light; }
+html { scroll-behavior: smooth; }
+body {
+  color: var(--color-text);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  line-height: var(--line-height-base);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; }
+button, a, input, select, textarea, [tabindex]:not([tabindex="-1"]) {
+  -webkit-tap-highlight-color: transparent;
+}
+:where(button, a, input, select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+::selection { background: var(--tint-primary); color: var(--color-text); }
+.ds-main > * { max-width: var(--page-max-width); }
+.ds-main > .page-title-row,
+.ds-main > .page-header,
+.ds-main > .workspace-header { margin-bottom: var(--section-gap); }
+.ds-main h1, .ds-main h2, .ds-main h3 { text-wrap: balance; }
+.ds-main h1 { color: var(--color-text); }
+.ds-main p { line-height: 1.65; }
+.ds-main :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  accent-color: var(--color-primary);
+}
+.ds-main :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):disabled {
+  opacity: .62; cursor: not-allowed;
+}
+.ds-main :where(table) { color: var(--color-text); }
+.ds-main :where(th) {
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border-strong);
+  white-space: nowrap;
+}
+.ds-main :where(td) { border-bottom-color: var(--color-border); }
+.ds-main :where(tbody tr:hover td) { background: var(--color-surface-hover); }
+.ds-main :where(.card, .ds-card, .report-card, .task-card, .eq-card, .supplier-card, .site-block, .audit-block) {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+.ds-main :where(.btn, .ds-btn) { min-height: 40px; }
+.ds-main :where(.btn-primary, .ds-btn-primary) {
+  background: var(--color-primary);
+  color: var(--color-primary-ink);
+  border-color: transparent;
+}
+.ds-main :where(.btn-primary, .ds-btn-primary):hover {
+  background: var(--color-primary-hover);
+}
+.ds-main :where(.btn-danger, .ds-btn-danger) {
+  background: var(--tint-danger);
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 24%, transparent);
+}
+.ds-main :where(.pill, .badge, .ds-badge) { padding: 4px 9px; }
+.ds-main :where(.modal, .ds-modal, [role="dialog"]) {
+  color: var(--color-text);
+}
+.ds-main :where(.table-wrapper, .ds-table-wrapper) {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.ds-main :where(.table-wrapper table, .ds-table-wrapper table) { margin: 0; }
+.ds-main :where(img, canvas, svg, video) { max-width: 100%; }
+@media (max-width: 900px) {
+  .ds-main { min-width: 0; }
+  .ds-main :where(.grid-2, .grid-3, .kpi-grid, .stats-grid) {
+    min-width: 0;
+  }
+  .ds-main :where(.table-wrapper, .ds-table-wrapper) {
+    margin-inline: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+@media (max-width: 560px) {
+  .ds-header { padding-inline: 10px; gap: 8px; }
+  .ds-header-brand { font-size: .88rem; }
+  .ds-header-actions { gap: 4px; }
+  .ds-main { overflow-x: clip; }
+  .ds-main :where(.btn, .ds-btn) { min-height: 42px; }
+  .ds-main :where(.filters-row, .filter-bar) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ds-main :where(.filters-row > *, .filter-bar > *) { min-width: 0; width: 100%; }
+  .ds-main :where(.filters-row .search, .filter-bar .search) { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* Module layouts: prevent desktop-only workspaces from overflowing on phones. */
+@media (max-width: 900px) {
+  .ai-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .doc-list-card {
+    position: static !important;
+    top: auto !important;
+    max-height: min(42vh, 360px) !important;
+  }
+  .reports-hero { align-items: flex-start !important; flex-direction: column; }
+  .reports-actions { width: 100%; flex-wrap: wrap; }
+  .reports-actions > * { flex: 1 1 auto; }
+  .ff-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)) !important; }
+}
+@media (max-width: 560px) {
+  .ff-card { padding: 13px !important; }
+  .ai-grid { gap: 12px !important; }
+  .doc-list-card { max-height: 34vh !important; }
+  .reports-page { padding-inline: 0 !important; }
+}
