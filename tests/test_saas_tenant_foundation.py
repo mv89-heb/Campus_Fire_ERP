@@ -8,6 +8,9 @@ from app.extensions import db
 from app.models import (
     LEGACY_ORGANIZATION_ID,
     Organization,
+    OrganizationMembership,
+    User,
+    Document,
     Site,
     Building,
 )
@@ -93,6 +96,47 @@ class SaaSTenantFoundationTests(unittest.TestCase):
             db.session.rollback()
             db.session.remove()
 
+
+    def test_authenticated_document_download_cannot_cross_organizations(self):
+        with self.app.app_context():
+            user = User(
+                username="tenant-boundary-user",
+                password_hash="not-used-by-this-test",
+                role="admin",
+                active=True,
+            )
+            db.session.add(user)
+            db.session.flush()
+            db.session.add(OrganizationMembership(
+                organization_id=LEGACY_ORGANIZATION_ID,
+                user_id=user.id,
+                role="admin",
+                status="active",
+            ))
+
+            db.session.info["organization_id"] = OTHER_ORGANIZATION_ID
+            document = Document(
+                file_name="other-tenant.pdf",
+                file_path="other-tenant/private.pdf",
+                file_hash="tenant-boundary-document-hash",
+                status="active",
+            )
+            db.session.add(document)
+            db.session.commit()
+            user_id = user.id
+            document_id = document.id
+            db.session.remove()
+
+        client = self.app.test_client()
+        with client.session_transaction() as browser_session:
+            browser_session["user_id"] = user_id
+            browser_session["organization_id"] = LEGACY_ORGANIZATION_ID
+            browser_session["role"] = "admin"
+            browser_session["csrf_token"] = "tenant-boundary-csrf"
+
+        response = client.get(f"/api/documents/{document_id}/file")
+        self.assertEqual(response.status_code, 404)
+
     def test_legacy_data_migration_is_additive_and_backfills_all_business_tables(self):
         migration = (
             Path(__file__).resolve().parents[1]
@@ -102,7 +146,7 @@ class SaaSTenantFoundationTests(unittest.TestCase):
         self.assertIn("LEGACY_ORGANIZATION_ID", migration)
         for model in TENANT_MODELS:
             self.assertIn(f'"{model.__tablename__}"', migration)
-        self.assertNotIn("DROP TABLE", migration.upper().split("def downgrade")[0])
+        self.assertNotIn("DROP TABLE", migration.upper().split("DEF DOWNGRADE")[0])
 
 
 if __name__ == "__main__":
