@@ -4,8 +4,9 @@ All business-table ORM reads and bulk writes are constrained to the organization
 bound to the current SQLAlchemy session. Cross-organization references and
 attempts to move rows between organizations are rejected before flush.
 """
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.orm import Session, with_loader_criteria
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 from app.models import (
     Zone, SystemRequirement, Document, Site, Building, Floor, Area,
@@ -20,6 +21,59 @@ TENANT_MODELS = (
     Notification, AuditLog, FireFormTemplate,
 )
 TENANT_MODELS_BY_TABLE = {model.__tablename__: model for model in TENANT_MODELS}
+DOCUMENT_TOKEN_SALT = "campus-fire-document-access-v1"
+DOCUMENT_TOKEN_MAX_AGE = 300
+
+
+def document_access_token_valid(token, document_id, secret_key):
+    if not token or not secret_key:
+        return False
+    try:
+        serializer = URLSafeTimedSerializer(secret_key, salt=DOCUMENT_TOKEN_SALT)
+        payload = serializer.loads(token, max_age=DOCUMENT_TOKEN_MAX_AGE)
+        return int(payload.get("doc_id")) == int(document_id)
+    except (BadSignature, SignatureExpired, TypeError, ValueError, AttributeError):
+        return False
+
+
+def _set_postgres_tenant_settings(connection, organization_id=None, document_id=None):
+    if connection.dialect.name != "postgresql":
+        return
+    connection.execute(
+        text(
+            "SELECT set_config('app.current_organization_id', :organization_id, true), "
+            "set_config('app.allowed_document_id', :document_id, true)"
+        ),
+        {
+            "organization_id": str(organization_id or ""),
+            "document_id": str(document_id or ""),
+        },
+    )
+
+
+def _restore_postgres_tenant_settings(session, transaction, connection):
+    _set_postgres_tenant_settings(
+        connection,
+        session.info.get("organization_id"),
+        session.info.get("allowed_document_id"),
+    )
+
+
+def bind_organization(session, organization_id):
+    """Bind ORM and PostgreSQL RLS to the active organization for this request."""
+    organization_id = str(organization_id)
+    session.info["organization_id"] = organization_id
+    session.info.pop("allowed_document_id", None)
+    if session.in_transaction():
+        _set_postgres_tenant_settings(session.connection(), organization_id, None)
+
+
+def bind_document_access(session, document_id):
+    """Allow one signed-link document read without opening the tenant's other rows."""
+    session.info.pop("organization_id", None)
+    session.info["allowed_document_id"] = str(int(document_id))
+    if session.in_transaction():
+        _set_postgres_tenant_settings(session.connection(), None, document_id)
 
 
 class TenantAccessError(Exception):
@@ -115,6 +169,8 @@ def install_tenant_guards():
         event.listen(Session, "do_orm_execute", _apply_organization_scope)
     if not event.contains(Session, "before_flush", _assign_and_validate_organization):
         event.listen(Session, "before_flush", _assign_and_validate_organization)
+    if not event.contains(Session, "after_begin", _restore_postgres_tenant_settings):
+        event.listen(Session, "after_begin", _restore_postgres_tenant_settings)
 
 
 def resolve_membership(user, organization_id=None, allow_legacy_bootstrap=False):
