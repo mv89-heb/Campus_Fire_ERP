@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, with_loader_criteria
 
 from app.models import (
     Zone, SystemRequirement, Document, Site, Building, Floor, Area,
+    OrganizationMembership, LEGACY_ORGANIZATION_ID,
     Supplier, Equipment, Task, Audit, Deficiency, DocumentHistory,
     Notification, AuditLog, FireFormTemplate,
 )
@@ -114,3 +115,37 @@ def install_tenant_guards():
         event.listen(Session, "do_orm_execute", _apply_organization_scope)
     if not event.contains(Session, "before_flush", _assign_and_validate_organization):
         event.listen(Session, "before_flush", _assign_and_validate_organization)
+
+
+def resolve_membership(user, organization_id=None, allow_legacy_bootstrap=False):
+    """Resolve the active membership; only non-production may repair legacy test/dev accounts."""
+    organization_id = organization_id or LEGACY_ORGANIZATION_ID
+    membership = OrganizationMembership.query.filter_by(
+        organization_id=organization_id,
+        user_id=user.id,
+        status="active",
+    ).first()
+
+    if membership is None:
+        if not allow_legacy_bootstrap or organization_id != LEGACY_ORGANIZATION_ID:
+            return None
+        membership = OrganizationMembership(
+            organization_id=LEGACY_ORGANIZATION_ID,
+            user_id=user.id,
+            role=user.role,
+            status="active",
+        )
+        from app.extensions import db
+        db.session.add(membership)
+        db.session.flush()
+        return membership
+
+    # User.role remains the legacy single-organization source of truth while
+    # customer switching is disabled. Never overwrite per-org roles once a
+    # user belongs to more than one organization.
+    membership_count = OrganizationMembership.query.filter_by(user_id=user.id).count()
+    if membership_count == 1 and membership.role != user.role:
+        membership.role = user.role
+        from app.extensions import db
+        db.session.flush()
+    return membership
