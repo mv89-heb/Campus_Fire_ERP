@@ -4,6 +4,7 @@ from app import create_app
 from app.config import Config
 from app.services.startup_migrations import (
     apply_startup_migrations,
+    normalize_migration_database_url,
     validate_direct_migration_url,
 )
 
@@ -11,7 +12,7 @@ app = create_app()
 
 # Keep application traffic on DATABASE_URL. Alembic can use a separate,
 # direct owner connection so the runtime role does not need schema privileges.
-migration_database_url = os.environ.get("MIGRATION_DATABASE_URL", "").strip()
+migration_database_url = normalize_migration_database_url(os.environ.get("MIGRATION_DATABASE_URL", ""))
 if migration_database_url:
     validate_direct_migration_url(migration_database_url)
 
