@@ -8,7 +8,7 @@ The ORM layer applies organization filters to business-table reads and bulk ORM 
 
 ## Existing production data
 
-The migration is additive:
+The migration is additive and idempotent, including recovery from a partially initialized test/development database:
 - Creates `organizations` and `organization_memberships`.
 - Creates one legacy organization.
 - Creates one membership for each existing user, preserving the user's current role.
