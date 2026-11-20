@@ -34,8 +34,16 @@ class DirectMigrationConnectionTests(unittest.TestCase):
             AUTO_CREATE_DB = False
             REQUIRE_SUPABASE_STORAGE = False
 
-        class RuntimeConfig(MigrationConfig):
+        class RuntimeConfig(Config):
+            TESTING = True
+            DEBUG = False
+            IS_RENDER = False
+            IS_PRODUCTION = True
+            SECRET_KEY = "runtime-config-test-secret"
             DATABASE_URL = runtime_url
+            SQLALCHEMY_DATABASE_URI = runtime_url
+            AUTO_CREATE_DB = False
+            REQUIRE_SUPABASE_STORAGE = False
 
         with patch("app.extensions.db.create_all"):
             migration_app = create_app(MigrationConfig)
