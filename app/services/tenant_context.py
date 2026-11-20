@@ -59,8 +59,17 @@ def _restore_postgres_tenant_settings(session, transaction, connection):
     )
 
 
+def _unwrap_scoped_session(session):
+    # Flask-SQLAlchemy exposes a scoped_session proxy; event/session APIs live
+    # on the concrete Session returned by calling that proxy.
+    if not hasattr(session, "in_transaction") and callable(session):
+        return session()
+    return session
+
+
 def bind_organization(session, organization_id):
     """Bind ORM and PostgreSQL RLS to the active organization for this request."""
+    session = _unwrap_scoped_session(session)
     organization_id = str(organization_id)
     session.info["organization_id"] = organization_id
     session.info.pop("allowed_document_id", None)
@@ -70,6 +79,7 @@ def bind_organization(session, organization_id):
 
 def bind_document_access(session, document_id):
     """Allow one signed-link document read without opening the tenant's other rows."""
+    session = _unwrap_scoped_session(session)
     session.info.pop("organization_id", None)
     session.info["allowed_document_id"] = str(int(document_id))
     if session.in_transaction():
