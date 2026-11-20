@@ -39,6 +39,7 @@ def _current_user():
         session.clear()
         return None
     session['organization_id'] = membership.organization_id
+    db.session.info['organization_id'] = membership.organization_id
     session['role'] = membership.role
     return user
 
@@ -116,6 +117,7 @@ def api_login():
     session['user_id'] = user.id
     session['username'] = user.username
     session['organization_id'] = membership.organization_id
+    db.session.info['organization_id'] = membership.organization_id
     session['role'] = membership.role
     session['csrf_token'] = secrets.token_urlsafe(32)
 
