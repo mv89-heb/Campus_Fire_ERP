@@ -1,64 +1,37 @@
 import os
 
 from app import create_app
-from app.extensions import db
-from sqlalchemy import text
+from app.config import Config
+from app.services.startup_migrations import (
+    apply_startup_migrations,
+    validate_direct_migration_url,
+)
 
 app = create_app()
 
+# Keep application traffic on DATABASE_URL. Alembic can use a separate,
+# direct owner connection so the runtime role does not need schema privileges.
+migration_database_url = os.environ.get("MIGRATION_DATABASE_URL", "").strip()
+if migration_database_url:
+    validate_direct_migration_url(migration_database_url)
 
-# Render starts this module with `gunicorn run:app`. Apply all pending
-# Alembic migrations before serving traffic. Do this unconditionally rather
-# than relying on FLASK_ENV being set correctly, because production database
-# schema must always match the SQLAlchemy models shipped with the release.
-try:
-    # Invoke the registered Flask-Migrate CLI command through Flask's runner.
-    # This follows the exact same code path exercised by `flask db upgrade`
-    # in CI, and surfaces Alembic output in Render startup logs.
-    with app.app_context():
-        migration_result = app.test_cli_runner().invoke(args=['db', 'upgrade'])
+    class MigrationConfig(Config):
+        SQLALCHEMY_DATABASE_URI = migration_database_url
+        AUTO_CREATE_DB = False
+        IS_PRODUCTION = True
 
-        # Check the migration result before querying alembic_version. If the
-        # migration failed before creating/updating that table, querying it
-        # first would mask the original Alembic error with a secondary error.
-        if migration_result.exit_code != 0:
-            details = (migration_result.output or '').strip()
-            if migration_result.exception is not None:
-                exception = migration_result.exception
-                exception_detail = f'{type(exception).__name__}: {exception}'
-                details = f'{details}\n{exception_detail}'.strip()
-                if migration_result.exc_info:
-                    app.logger.error(
-                        'Alembic CLI traceback during startup migration',
-                        exc_info=migration_result.exc_info,
-                    )
-            raise RuntimeError(
-                'Alembic startup migration failed: '
-                + (details or 'no diagnostic output or exception details')
-            )
+    migration_app = create_app(MigrationConfig)
+else:
+    # Backward-compatible fallback until MIGRATION_DATABASE_URL is configured.
+    migration_app = app
 
-        database_backend = db.engine.url.get_backend_name()
-        database_host = db.engine.url.host or 'local'
-        schema_revision = db.session.execute(
-            text('SELECT version_num FROM alembic_version')
-        ).scalar()
-
-    print(
-        '[startup-migration] '
-        f'backend={database_backend} host={database_host} '
-        f'revision={schema_revision} '
-        f'output={(migration_result.output or "database already at migration head").strip()}',
-        flush=True,
-    )
-except Exception:
-    app.logger.exception('Database migration failed during startup')
-    raise
+apply_startup_migrations(app, migration_app)
 
 
-if __name__ == '__main__':
-    is_production = os.environ.get('FLASK_ENV', os.environ.get('ENV', 'development')).lower() in {'production', 'prod'}
+if __name__ == "__main__":
+    is_production = os.environ.get("FLASK_ENV", os.environ.get("ENV", "development")).lower() in {"production", "prod"}
     app.run(
-        host=os.environ.get('HOST', '0.0.0.0'),
-        port=int(os.environ.get('PORT', '5000')),
+        host=os.environ.get("HOST", "0.0.0.0"),
+        port=int(os.environ.get("PORT", "5000")),
         debug=not is_production,
     )
