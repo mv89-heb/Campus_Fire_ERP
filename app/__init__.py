@@ -137,7 +137,7 @@ def _install_security_guards(app):
         if request.method in WRITE_METHODS:
             if not _csrf_valid():
                 return jsonify({'error': 'CSRF token חסר או לא תקין'}), 403
-            if not can_write(user.role, path):
+            if not can_write(membership.role, path):
                 return jsonify({'error': 'אין הרשאה לבצע פעולה זו עבור התפקיד הנוכחי'}), 403
 
         if not _same_origin_allowed(app):
