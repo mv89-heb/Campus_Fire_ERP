@@ -6,6 +6,14 @@ from sqlalchemy import text
 from app.extensions import db
 
 
+def normalize_migration_database_url(database_url):
+    """Select the installed psycopg2 driver for plain PostgreSQL URLs."""
+    database_url = str(database_url or "").strip()
+    if database_url.startswith("postgresql://"):
+        return "postgresql+psycopg2://" + database_url[len("postgresql://"):]
+    return database_url
+
+
 def validate_direct_migration_url(database_url):
     """Require a direct Postgres endpoint for migration work; never log the URL."""
     parsed = urlparse(str(database_url or "").strip())
