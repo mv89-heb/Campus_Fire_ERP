@@ -3,9 +3,10 @@ Service Layer עבור תשתית משתמשים ואימות.
 Session-based auth פשוט (ללא JWT/OAuth) בהתאם לאופי האפליקציה הקיימת.
 """
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask import session
 
 from app.extensions import db
-from app.models import User
+from app.models import User, OrganizationMembership, LEGACY_ORGANIZATION_ID
 from app.services import audit_log_service as alog
 from datetime import datetime
 
@@ -43,19 +44,43 @@ def require_role(user_id, allowed_roles):
         raise AuthServiceError("המשתמש לא נמצא")
     if not user.active:
         raise AuthServiceError("חשבון המשתמש אינו פעיל")
-    if user.role not in allowed_roles:
+    membership = OrganizationMembership.query.filter_by(
+        organization_id=session.get('organization_id') or LEGACY_ORGANIZATION_ID,
+        user_id=user.id,
+        status='active',
+    ).first()
+    role = membership.role if membership else user.role
+    if role not in allowed_roles:
         raise AuthServiceError(f"הפעולה דורשת אחד מהתפקידים: {', '.join(allowed_roles)}")
     return user
 
 
 def list_users():
-    return User.query.order_by(User.username).all()
+    organization_id = session.get('organization_id') or LEGACY_ORGANIZATION_ID
+    return (
+        User.query.join(OrganizationMembership, OrganizationMembership.user_id == User.id)
+        .filter(
+            OrganizationMembership.organization_id == organization_id,
+            OrganizationMembership.status == 'active',
+        )
+        .order_by(User.username)
+        .all()
+    )
 
 
 def get_user_or_404(user_id):
-    user = db.session.get(User, user_id)
+    organization_id = session.get('organization_id') or LEGACY_ORGANIZATION_ID
+    user = (
+        User.query.join(OrganizationMembership, OrganizationMembership.user_id == User.id)
+        .filter(
+            User.id == user_id,
+            OrganizationMembership.organization_id == organization_id,
+            OrganizationMembership.status == 'active',
+        )
+        .first()
+    )
     if not user:
-        raise AuthServiceError(f"משתמש {user_id} לא נמצא")
+        raise AuthServiceError(f"משתמש {user_id} לא נמצא בארגון הנוכחי")
     return user
 
 
@@ -77,6 +102,13 @@ def create_user(data):
     )
     db.session.add(user)
     db.session.flush()
+    organization_id = session.get('organization_id') or LEGACY_ORGANIZATION_ID
+    db.session.add(OrganizationMembership(
+        organization_id=organization_id,
+        user_id=user.id,
+        role=role,
+        status='active',
+    ))
     alog.log('create', 'user', user.id, entity_label=user.username, new_value={'role': role})
     db.session.commit()
     return user
@@ -92,6 +124,13 @@ def update_user(user_id, data):
         if data['role'] not in VALID_ROLES:
             raise AuthServiceError(f"תפקיד לא תקין: {data['role']}")
         user.role = data['role']
+        organization_id = session.get('organization_id') or LEGACY_ORGANIZATION_ID
+        membership = OrganizationMembership.query.filter_by(
+            organization_id=organization_id,
+            user_id=user.id,
+        ).first()
+        if membership:
+            membership.role = data['role']
     if 'active' in data:
         user.active = bool(data['active'])
     if data.get('password'):
@@ -127,7 +166,16 @@ def has_any_users():
 def serialize_user(user, include_sensitive=False):
     data = {
         "id": user.id, "username": user.username, "email": user.email,
-        "full_name": user.full_name, "role": user.role, "active": user.active,
+        "full_name": user.full_name,
+        "role": (
+            OrganizationMembership.query.filter_by(
+                organization_id=session.get('organization_id') or LEGACY_ORGANIZATION_ID,
+                user_id=user.id,
+                status='active',
+            ).with_entities(OrganizationMembership.role).scalar()
+            or user.role
+        ),
+        "active": user.active,
         "last_login": user.last_login.isoformat() if user.last_login else None,
     }
     return data

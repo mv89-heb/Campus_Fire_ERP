@@ -5,9 +5,11 @@ from functools import wraps
 from flask import Blueprint, jsonify, request, session, render_template, redirect
 
 from app.extensions import db
-from app.models import User
+from app.models import User, OrganizationMembership, LEGACY_ORGANIZATION_ID
 from app.services import auth_service as svc
 from app.services.auth_service import AuthServiceError
+from app.services.tenant_context import resolve_membership
+from flask import current_app
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -29,6 +31,18 @@ def _current_user():
     if not user or not user.active:
         session.clear()
         return None
+    organization_id = session.get('organization_id') or LEGACY_ORGANIZATION_ID
+    membership = resolve_membership(
+        user,
+        organization_id,
+        allow_legacy_bootstrap=not current_app.config.get('IS_PRODUCTION', False),
+    )
+    if not membership:
+        session.clear()
+        return None
+    session['organization_id'] = membership.organization_id
+    db.session.info['organization_id'] = membership.organization_id
+    session['role'] = membership.role
     return user
 
 
@@ -56,7 +70,7 @@ def admin_required(view_func):
         user = _current_user()
         if not user:
             return jsonify({'error': 'נדרשת התחברות'}), 401
-        if user.role not in ('admin', 'super_admin'):
+        if session.get('role') not in ('admin', 'super_admin'):
             return jsonify({'error': 'הפעולה דורשת הרשאת מנהל (Admin)'}), 403
         return view_func(*args, **kwargs)
     return wrapped
@@ -84,17 +98,29 @@ def users_page():
 def api_login():
     data = _json_body()
     user = svc.authenticate(data.get('username'), data.get('password'))
+    membership = resolve_membership(
+        user,
+        LEGACY_ORGANIZATION_ID,
+        allow_legacy_bootstrap=not current_app.config.get('IS_PRODUCTION', False),
+    )
+    if not membership:
+        return jsonify({'error': 'למשתמש אין חברות פעילה בארגון'}), 403
 
     # Rotate the Flask session on successful authentication to reduce session-fixation risk.
     session.clear()
     session.permanent = True
     session['user_id'] = user.id
     session['username'] = user.username
-    session['role'] = user.role
+    session['organization_id'] = membership.organization_id
+    db.session.info['organization_id'] = membership.organization_id
+    session['role'] = membership.role
     session['csrf_token'] = secrets.token_urlsafe(32)
 
     response = svc.serialize_user(user)
     response['csrf_token'] = session['csrf_token']
+    response['organization_id'] = membership.organization_id
+    response['organization_name'] = membership.organization.name if membership.organization else None
+    response['role'] = membership.role
     return jsonify(response)
 
 
@@ -111,6 +137,14 @@ def api_me():
         return jsonify(None)
     response = svc.serialize_user(user)
     response['csrf_token'] = _ensure_csrf_token()
+    response['organization_id'] = session.get('organization_id')
+    membership = OrganizationMembership.query.filter_by(
+        organization_id=session.get('organization_id'),
+        user_id=user.id,
+        status='active',
+    ).first()
+    response['organization_name'] = membership.organization.name if membership and membership.organization else None
+    response['role'] = membership.role if membership else user.role
     return jsonify(response)
 
 
@@ -132,7 +166,7 @@ def api_create_user():
     # The global security guard permits this endpoint only for first-time bootstrap.
     # Once an account exists, user creation requires an admin/super-admin session.
     current = _current_user()
-    if svc.has_any_users() and (not current or current.role not in ('admin', 'super_admin')):
+    if svc.has_any_users() and (not current or session.get('role') not in ('admin', 'super_admin')):
         return jsonify({'error': 'יצירת משתמש דורשת הרשאת מנהל'}), 403
 
     data = _json_body()

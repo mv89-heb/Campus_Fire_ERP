@@ -30,7 +30,7 @@ def _user():
 
 def _admin():
     user = _user()
-    if user.role not in {"admin", "super_admin"}:
+    if session.get("role") not in {"admin", "super_admin"}:
         abort(403)
     return user
 

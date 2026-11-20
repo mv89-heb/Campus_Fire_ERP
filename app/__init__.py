@@ -10,6 +10,7 @@ from .extensions import db, migrate, limiter
 from .config import Config
 from .services.permissions import can_write
 from .services.security_policy import validate_password
+from .services.tenant_context import install_tenant_guards, TenantAccessError, resolve_membership
 
 
 
@@ -96,6 +97,28 @@ def _install_security_guards(app):
             return None
 
         if path.startswith('/api/documents/') and path.endswith('/file') and request.method == 'GET':
+            # Signed document tokens may authorize a narrowly scoped public read.
+            # An authenticated browser session must still be bound to its tenant
+            # before the document ORM lookup is allowed to run.
+            if session.get('user_id'):
+                from app.models import User, OrganizationMembership, LEGACY_ORGANIZATION_ID
+                user = db.session.get(User, session.get('user_id'))
+                if not user or not user.active:
+                    session.clear()
+                    return jsonify({'error': 'החשבון אינו פעיל או אינו קיים'}), 401
+                organization_id = session.get('organization_id') or LEGACY_ORGANIZATION_ID
+                membership = resolve_membership(
+                    user,
+                    organization_id,
+                    allow_legacy_bootstrap=not app.config.get('IS_PRODUCTION', False),
+                )
+                if not membership:
+                    session.clear()
+                    return jsonify({'error': 'אין למשתמש חברות פעילה בארגון'}), 403
+                session['organization_id'] = membership.organization_id
+                session['username'] = user.username
+                session['role'] = membership.role
+                db.session.info['organization_id'] = membership.organization_id
             return None
 
         if path == '/api/auth/logout':
@@ -114,19 +137,31 @@ def _install_security_guards(app):
         if not session.get('user_id'):
             return jsonify({'error': 'נדרשת התחברות'}), 401
 
-        from app.models import User
+        from app.models import User, OrganizationMembership, LEGACY_ORGANIZATION_ID
         user = db.session.get(User, session.get('user_id'))
         if not user or not user.active:
             session.clear()
             return jsonify({'error': 'החשבון אינו פעיל או אינו קיים'}), 401
 
+        organization_id = session.get('organization_id') or LEGACY_ORGANIZATION_ID
+        membership = resolve_membership(
+            user,
+            organization_id,
+            allow_legacy_bootstrap=not app.config.get('IS_PRODUCTION', False),
+        )
+        if not membership:
+            session.clear()
+            return jsonify({'error': 'אין למשתמש חברות פעילה בארגון'}), 403
+
+        session['organization_id'] = membership.organization_id
+        db.session.info['organization_id'] = membership.organization_id
         session['username'] = user.username
-        session['role'] = user.role
+        session['role'] = membership.role
 
         if request.method in WRITE_METHODS:
             if not _csrf_valid():
                 return jsonify({'error': 'CSRF token חסר או לא תקין'}), 403
-            if not can_write(user.role, path):
+            if not can_write(membership.role, path):
                 return jsonify({'error': 'אין הרשאה לבצע פעולה זו עבור התפקיד הנוכחי'}), 403
 
         if not _same_origin_allowed(app):
@@ -187,6 +222,17 @@ def _install_api_error_handlers(app):
             }), 413
         return exc
 
+    @app.errorhandler(TenantAccessError)
+    def handle_tenant_access_error(exc):
+        db.session.rollback()
+        if request.path.startswith('/api/'):
+            return jsonify({
+                'success': False,
+                'error': 'הפעולה נחסמה: אין גישה לנתונים של ארגון אחר',
+                'http_status': 403,
+            }), 403
+        return 'Forbidden', 403
+
     @app.errorhandler(Exception)
     def handle_unexpected_exception(exc):
         app.logger.exception('Unhandled application exception on %s %s', request.method, request.path)
@@ -210,6 +256,7 @@ def create_app(config_class=Config):
     config_class.validate()
 
     db.init_app(app)
+    install_tenant_guards()
     migrate.init_app(app, db)
     limiter.init_app(app)
     _install_security_headers(app)
@@ -225,6 +272,7 @@ def create_app(config_class=Config):
         Site, Building, Floor, Area,
         Supplier, Equipment, Task, Audit, Deficiency,
         DocumentHistory, User, Notification, AuditLog, FireFormTemplate,
+        Organization, OrganizationMembership, LEGACY_ORGANIZATION_ID,
     )
 
     with app.app_context():
@@ -232,6 +280,28 @@ def create_app(config_class=Config):
         if auto_create_db:
             try:
                 db.create_all()
+                legacy_org = db.session.get(Organization, LEGACY_ORGANIZATION_ID)
+                if not legacy_org:
+                    db.session.add(Organization(
+                        id=LEGACY_ORGANIZATION_ID,
+                        name='הארגון הקיים',
+                        slug='legacy-organization',
+                        status='active',
+                    ))
+                    db.session.flush()
+                for existing_user in User.query.all():
+                    membership = OrganizationMembership.query.filter_by(
+                        organization_id=LEGACY_ORGANIZATION_ID,
+                        user_id=existing_user.id,
+                    ).first()
+                    if not membership:
+                        db.session.add(OrganizationMembership(
+                            organization_id=LEGACY_ORGANIZATION_ID,
+                            user_id=existing_user.id,
+                            role=existing_user.role,
+                            status='active',
+                        ))
+                db.session.commit()
                 seed_data()
             except Exception as e:
                 app.logger.error(
