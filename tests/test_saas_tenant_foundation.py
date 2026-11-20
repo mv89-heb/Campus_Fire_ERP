@@ -1,6 +1,7 @@
 """Regression tests for organization membership and tenant isolation."""
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from app import create_app
 from app.config import Config
@@ -49,6 +50,23 @@ class SaaSTenantFoundationTests(unittest.TestCase):
     def tearDownClass(cls):
         with cls.app.app_context():
             db.session.remove()
+
+
+    def test_production_never_runs_create_all_even_if_legacy_flag_is_enabled(self):
+        class ProductionConfig(Config):
+            TESTING = True
+            DEBUG = False
+            IS_RENDER = False
+            IS_PRODUCTION = True
+            SECRET_KEY = "production-startup-test-secret"
+            SQLALCHEMY_DATABASE_URI = "sqlite://"
+            AUTO_CREATE_DB = True
+            REQUIRE_SUPABASE_STORAGE = False
+
+        with patch("app.extensions.db.create_all") as create_all:
+            app = create_app(ProductionConfig)
+            self.assertTrue(app.config["IS_PRODUCTION"])
+            create_all.assert_not_called()
 
     def test_every_business_model_is_organization_scoped(self):
         self.assertEqual(len(TENANT_MODELS), 16)

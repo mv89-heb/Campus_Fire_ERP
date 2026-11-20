@@ -276,7 +276,13 @@ def create_app(config_class=Config):
     )
 
     with app.app_context():
-        auto_create_db = app.config.get('AUTO_CREATE_DB', not app.config.get('IS_PRODUCTION', False))
+        # Production schema changes are applied only by the explicit Alembic
+        # startup step in run.py. Never run create_all() before that migration,
+        # even if an old Render environment variable still enables it.
+        auto_create_db = (
+            app.config.get('AUTO_CREATE_DB', not app.config.get('IS_PRODUCTION', False))
+            and not app.config.get('IS_PRODUCTION', False)
+        )
         if auto_create_db:
             try:
                 db.create_all()
