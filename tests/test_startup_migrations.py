@@ -55,6 +55,15 @@ class DirectMigrationConnectionTests(unittest.TestCase):
 
 
 
+
+    def test_startup_migration_uses_flask_migrate_api_instead_of_cli_runner(self):
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "app" / "services" / "startup_migrations.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("flask_migrate_upgrade()", source)
+        self.assertNotIn("test_cli_runner", source)
+
     def test_alembic_env_uses_active_flask_app_without_creating_runtime_app(self):
         source = (
             Path(__file__).resolve().parents[1]
