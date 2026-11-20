@@ -26,8 +26,6 @@ def upgrade():
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("slug", name="uq_organizations_slug"),
     )
-    op.create_index("ix_organizations_slug", "organizations", ["slug"], unique=True)
-
     op.create_table(
         "organization_memberships",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
@@ -103,5 +101,4 @@ def downgrade():
     op.drop_index("ix_organization_memberships_user_id", table_name="organization_memberships")
     op.drop_index("ix_organization_memberships_organization_id", table_name="organization_memberships")
     op.drop_table("organization_memberships")
-    op.drop_index("ix_organizations_slug", table_name="organizations")
     op.drop_table("organizations")
