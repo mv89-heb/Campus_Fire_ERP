@@ -17,6 +17,9 @@ if migration_database_url:
     validate_direct_migration_url(migration_database_url)
 
     class MigrationConfig(Config):
+        # create_app() intentionally prefers DATABASE_URL; override both keys
+        # so the dedicated owner connection is not replaced by the runtime role.
+        DATABASE_URL = migration_database_url
         SQLALCHEMY_DATABASE_URI = migration_database_url
         AUTO_CREATE_DB = False
         IS_PRODUCTION = True
