@@ -38,5 +38,20 @@ class BrandIdentityTests(unittest.TestCase):
         self.assertIn('--color-accent-gold:', css)
 
 
+    def test_global_ui_finish_includes_accessibility_and_mobile_workspaces(self):
+        css = (ROOT / "app" / "static" / "css" / "design-system.css").read_text(encoding="utf-8")
+        self.assertIn(":focus-visible", css)
+        self.assertIn("prefers-reduced-motion: reduce", css)
+        self.assertIn(".ai-grid", css)
+        self.assertIn(".doc-list-card", css)
+        self.assertIn(".ff-grid", css)
+
+    def test_dashboard_uses_campus_fire_identity_and_refined_kpis(self):
+        dashboard = (ROOT / "app" / "templates" / "org_dashboard.html").read_text(encoding="utf-8")
+        self.assertIn("לוח בקרה ארגוני | Campus Fire ERP", dashboard)
+        self.assertIn("Dashboard presentation refinement", dashboard)
+        self.assertIn("grid-template-columns: repeat(6, minmax(0, 1fr))", dashboard)
+
+
 if __name__ == "__main__":
     unittest.main()
