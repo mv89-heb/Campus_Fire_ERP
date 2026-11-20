@@ -20,6 +20,12 @@ if config.config_file_name:
 app = current_app._get_current_object()
 target_metadata = db.metadata
 
+app.logger.info(
+    "[alembic-env] role=%s host=%s",
+    db.engine.url.username or "unknown",
+    db.engine.url.host or "unknown",
+)
+
 
 def get_url():
     return app.config["SQLALCHEMY_DATABASE_URI"]
