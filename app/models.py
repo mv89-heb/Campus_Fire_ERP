@@ -1,8 +1,22 @@
 from .extensions import db
 from datetime import datetime
 
+LEGACY_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001"
+
+
+class Organization(db.Model):
+    __tablename__ = 'organizations'
+    id = db.Column(db.String(36), primary_key=True)
+    name = db.Column(db.String(180), nullable=False)
+    slug = db.Column(db.String(80), nullable=False, unique=True, index=True)
+    status = db.Column(db.String(20), nullable=False, default='active')
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    memberships = db.relationship('OrganizationMembership', back_populates='organization', cascade='all, delete-orphan', passive_deletes=True)
+
+
 class Zone(db.Model):
     __tablename__ = 'zones'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     zone_name = db.Column(db.String(100), nullable=False)
     file_number = db.Column(db.String(50), unique=True, nullable=False)
@@ -11,6 +25,7 @@ class Zone(db.Model):
 
 class SystemRequirement(db.Model):
     __tablename__ = 'system_requirements'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     zone_id = db.Column(db.Integer, db.ForeignKey('zones.id'), nullable=False)
     system_name = db.Column(db.String(100), nullable=False)
@@ -19,6 +34,7 @@ class SystemRequirement(db.Model):
 
 class Document(db.Model):
     __tablename__ = 'documents'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     req_id = db.Column(db.Integer, db.ForeignKey('system_requirements.id'), nullable=True)
     zone_id = db.Column(db.Integer, db.ForeignKey('zones.id'), nullable=True)
@@ -94,6 +110,7 @@ class Document(db.Model):
 
 class Site(db.Model):
     __tablename__ = 'sites'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), nullable=False)
     address = db.Column(db.String(255), nullable=True)
@@ -108,6 +125,7 @@ class Site(db.Model):
 
 class Building(db.Model):
     __tablename__ = 'buildings'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     site_id = db.Column(db.Integer, db.ForeignKey('sites.id'), nullable=False)
     name = db.Column(db.String(150), nullable=False)
@@ -117,6 +135,7 @@ class Building(db.Model):
 
 class Floor(db.Model):
     __tablename__ = 'floors'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     building_id = db.Column(db.Integer, db.ForeignKey('buildings.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False)
@@ -126,6 +145,7 @@ class Floor(db.Model):
 
 class Area(db.Model):
     __tablename__ = 'areas'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     floor_id = db.Column(db.Integer, db.ForeignKey('floors.id'), nullable=False)
     zone_id = db.Column(db.Integer, db.ForeignKey('zones.id'), nullable=True)
@@ -135,6 +155,7 @@ class Area(db.Model):
 
 class Supplier(db.Model):
     __tablename__ = 'suppliers'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     company_name = db.Column(db.String(150), nullable=False)
     supplier_number = db.Column(db.String(50), nullable=True)
@@ -159,6 +180,7 @@ class Supplier(db.Model):
 
 class Equipment(db.Model):
     __tablename__ = 'equipment'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     serial_number = db.Column(db.String(100), nullable=True)
     qr_code = db.Column(db.String(150), nullable=True)
@@ -179,6 +201,7 @@ class Equipment(db.Model):
 
 class Task(db.Model):
     __tablename__ = 'tasks'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
@@ -197,6 +220,7 @@ class Task(db.Model):
 
 class Audit(db.Model):
     __tablename__ = 'audits'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     audit_number = db.Column(db.String(50), nullable=True)
     site_id = db.Column(db.Integer, db.ForeignKey('sites.id'), nullable=True)
@@ -217,6 +241,7 @@ class Audit(db.Model):
 
 class Deficiency(db.Model):
     __tablename__ = 'deficiencies'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     audit_id = db.Column(db.Integer, db.ForeignKey('audits.id'), nullable=True)
     title = db.Column(db.String(200), nullable=False)
@@ -232,6 +257,7 @@ class Deficiency(db.Model):
 
 class DocumentHistory(db.Model):
     __tablename__ = 'document_history'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     document_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=False)
     field_name = db.Column(db.String(50), nullable=False)
@@ -250,9 +276,25 @@ class User(db.Model):
     active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
+    memberships = db.relationship('OrganizationMembership', back_populates='user', cascade='all, delete-orphan', passive_deletes=True)
+
+
+class OrganizationMembership(db.Model):
+    __tablename__ = 'organization_memberships'
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    role = db.Column(db.String(30), nullable=False, default='viewer')
+    status = db.Column(db.String(20), nullable=False, default='active')
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    organization = db.relationship('Organization', back_populates='memberships')
+    user = db.relationship('User', back_populates='memberships')
+    __table_args__ = (db.UniqueConstraint('organization_id', 'user_id', name='uq_organization_membership'),)
+
 
 class Notification(db.Model):
     __tablename__ = 'notifications'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     ref_type = db.Column(db.String(30), nullable=False)
     ref_id = db.Column(db.Integer, nullable=False)
@@ -266,6 +308,7 @@ class Notification(db.Model):
 
 class AuditLog(db.Model):
     __tablename__ = 'audit_log'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     username_snapshot = db.Column(db.String(80), nullable=True)
@@ -283,6 +326,7 @@ class AuditLog(db.Model):
 class FireFormTemplate(db.Model):
     """Reusable official fire-safety form template; never stores professional credentials."""
     __tablename__ = 'fire_form_templates'
+    organization_id = db.Column(db.String(36), db.ForeignKey('organizations.id'), nullable=False, default=LEGACY_ORGANIZATION_ID, server_default=LEGACY_ORGANIZATION_ID, index=True)
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(180), nullable=False)
     original_filename = db.Column(db.String(255), nullable=False)
