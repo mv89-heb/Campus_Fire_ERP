@@ -25,14 +25,14 @@ body { min-height:100vh; display:flex; align-items:center; justify-content:cente
 .login-splash.is-leaving { opacity:0; visibility:hidden; pointer-events:none; }
 .login-splash-inner { position:relative; display:flex; flex-direction:column; align-items:center; gap:18px; padding:24px; text-align:center; animation:splash-arrive .9s cubic-bezier(.2,.8,.2,1) both; }
 .login-splash-mark { width:clamp(112px,22vw,160px); height:auto; filter:drop-shadow(0 12px 30px rgba(34,184,176,.2)); animation:splash-float 2.8s ease-in-out .7s infinite; }
-.login-splash-ring { position:absolute; width:clamp(180px,36vw,260px); aspect-ratio:1; border:1px solid rgba(34,184,176,.38); border-radius:50%; animation:splash-ring 2.8s ease-out .2s both; }
+.login-splash-ring { position:absolute; top:50%; left:50%; width:clamp(180px,36vw,260px); aspect-ratio:1; border:1px solid rgba(34,184,176,.38); border-radius:50%; pointer-events:none; animation:splash-ring 2.8s ease-out .2s both; }
 .login-splash-title { font-size:clamp(1.55rem,4vw,2.35rem); font-weight:800; letter-spacing:.04em; opacity:0; animation:splash-title .8s ease 1s forwards; }
 .login-splash-subtitle { color:#b8c9d5; font-size:clamp(.85rem,2vw,1rem); opacity:0; animation:splash-title .8s ease 1.35s forwards; }
 .login-splash-line { width:92px; height:2px; margin-top:4px; background:linear-gradient(90deg,transparent,#22B8B0,#D6B46A,transparent); transform:scaleX(0); transform-origin:center; animation:splash-line .9s ease 1.45s forwards; }
 .login-splash-skip { position:absolute; bottom:max(24px,env(safe-area-inset-bottom)); left:24px; border:1px solid rgba(255,255,255,.22); color:#dbe6ec; background:rgba(255,255,255,.06); border-radius:999px; padding:8px 14px; font:inherit; cursor:pointer; }
 @keyframes splash-arrive { from{opacity:0;transform:translateY(18px) scale(.94)} to{opacity:1;transform:translateY(0) scale(1)} }
 @keyframes splash-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
-@keyframes splash-ring { 0%{transform:scale(.72);opacity:0} 35%{opacity:.8} 100%{transform:scale(1.2);opacity:0} }
+@keyframes splash-ring { 0%{transform:translate(-50%,-50%) scale(.72);opacity:0} 35%{opacity:.8} 100%{transform:translate(-50%,-50%) scale(1.2);opacity:0} }
 @keyframes splash-title { to{opacity:1;transform:translateY(0)} from{opacity:0;transform:translateY(8px)} }
 @keyframes splash-line { to{transform:scaleX(1)} }
 @media(max-width:520px){.login-card{max-width:100%;}.login-splash-skip{left:50%;transform:translateX(-50%);white-space:nowrap;}}
