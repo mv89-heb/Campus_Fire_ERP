@@ -3,9 +3,10 @@ Service Layer עבור תשתית משתמשים ואימות.
 Session-based auth פשוט (ללא JWT/OAuth) בהתאם לאופי האפליקציה הקיימת.
 """
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask import session
 
 from app.extensions import db
-from app.models import User
+from app.models import User, OrganizationMembership, LEGACY_ORGANIZATION_ID
 from app.services import audit_log_service as alog
 from datetime import datetime
 
@@ -77,6 +78,13 @@ def create_user(data):
     )
     db.session.add(user)
     db.session.flush()
+    organization_id = session.get('organization_id') or LEGACY_ORGANIZATION_ID
+    db.session.add(OrganizationMembership(
+        organization_id=organization_id,
+        user_id=user.id,
+        role=role,
+        status='active',
+    ))
     alog.log('create', 'user', user.id, entity_label=user.username, new_value={'role': role})
     db.session.commit()
     return user
@@ -92,6 +100,13 @@ def update_user(user_id, data):
         if data['role'] not in VALID_ROLES:
             raise AuthServiceError(f"תפקיד לא תקין: {data['role']}")
         user.role = data['role']
+        organization_id = session.get('organization_id') or LEGACY_ORGANIZATION_ID
+        membership = OrganizationMembership.query.filter_by(
+            organization_id=organization_id,
+            user_id=user.id,
+        ).first()
+        if membership:
+            membership.role = data['role']
     if 'active' in data:
         user.active = bool(data['active'])
     if data.get('password'):
