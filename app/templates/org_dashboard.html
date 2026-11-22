@@ -124,72 +124,174 @@ td { vertical-align: middle; }
   .bar-label { font-size: .65rem; overflow-wrap: anywhere; }
 }
 
+/* Operational dashboard — decision-first hierarchy and responsive layout */
+.dashboard-page { max-width: 1600px; margin: 0 auto; }
+.dashboard-hero {
+  display:flex; align-items:flex-end; justify-content:space-between; gap:20px;
+  padding: 8px 0 20px; margin-bottom:20px;
+  border-bottom:1px solid var(--color-border);
+}
+.dashboard-kicker {
+  display:flex; align-items:center; gap:7px; color:var(--color-primary);
+  font-size:.72rem; font-weight:800; letter-spacing:.04em; margin-bottom:7px;
+}
+.dashboard-hero h1 { font-size:clamp(1.5rem,2.6vw,2.15rem); font-weight:850; letter-spacing:-.035em; }
+.dashboard-subtitle { color:var(--color-text-muted); font-size:.88rem; margin-top:6px; line-height:1.6; }
+.dashboard-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.dashboard-updated { color:var(--color-text-muted); font-size:.72rem; }
+.dashboard-section-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:20px 0 10px; }
+.dashboard-section-heading h2 { font-size:.98rem; font-weight:800; }
+.dashboard-section-heading p { color:var(--color-text-muted); font-size:.73rem; }
+.dashboard-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr)); gap:10px; }
+.dashboard-kpi-grid .kpi-card { min-height:112px; }
+.dashboard-kpi-grid .kpi-label { max-width:100%; }
+.dashboard-kpi-note { color:var(--color-text-muted); font-size:.66rem; line-height:1.35; margin-top:5px; }
+.kpi-card.neutral::after { background:var(--color-neutral); }
+.dashboard-insight-grid { display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.5fr); gap:14px; margin-top:16px; align-items:stretch; }
+.dashboard-insight-grid .card { margin-bottom:0; min-width:0; }
+.dashboard-card-title { display:flex; align-items:center; gap:9px; }
+.dashboard-card-title .lucide-icon { color:var(--color-primary); }
+.dashboard-integrity-body { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.dashboard-integrity-copy { color:var(--color-text-muted); font-size:.8rem; line-height:1.6; }
+.dashboard-integrity-counts { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+.dashboard-integrity-count { border:1px solid var(--color-border); background:var(--color-bg); border-radius:8px; padding:6px 9px; font-size:.72rem; }
+.dashboard-integrity-action { margin-top:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.dashboard-integrity-warning { color:var(--color-warning); font-size:.72rem; line-height:1.5; }
+.dashboard-action-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:9px; }
+.dashboard-action-link {
+  display:flex; align-items:center; gap:10px; min-width:0; padding:12px;
+  border:1px solid var(--color-border); border-radius:11px;
+  background:var(--color-bg); color:var(--color-text); text-decoration:none;
+  transition:transform .16s ease,border-color .16s ease,background .16s ease;
+}
+.dashboard-action-link:hover { transform:translateY(-1px); border-color:var(--color-border-strong); background:var(--color-surface-hover); }
+.dashboard-action-icon { display:grid; place-items:center; width:34px; height:34px; flex:0 0 34px; border-radius:9px; background:var(--tint-warning); color:var(--color-warning); }
+.dashboard-action-link.bad .dashboard-action-icon { background:var(--tint-danger); color:var(--color-danger); }
+.dashboard-action-copy { min-width:0; }
+.dashboard-action-count { font-size:1.2rem; font-weight:850; line-height:1.1; font-variant-numeric:tabular-nums; }
+.dashboard-action-label { color:var(--color-text-muted); font-size:.72rem; line-height:1.4; margin-top:4px; }
+.dashboard-chart-grid, .dashboard-table-grid { margin-top:14px; }
+.dashboard-table-host { min-width:0; overflow-x:auto; }
+.dashboard-table-host table { min-width:420px; }
+.dashboard-table-host th { white-space:nowrap; }
+.dashboard-date-note { display:inline-flex; margin-inline-start:5px; font-size:.66rem; color:var(--color-warning); }
+.dashboard-empty { display:flex; align-items:center; justify-content:center; gap:8px; min-height:70px; color:var(--color-text-muted); font-size:.82rem; }
+.dashboard-empty .lucide-icon { color:var(--color-success); }
+.dashboard-page .btn { min-height:40px; }
+.dashboard-page .retry-btn { min-height:40px; }
+@media(max-width:900px) {
+  .dashboard-insight-grid { grid-template-columns:1fr; }
+}
+@media(max-width:620px) {
+  .dashboard-hero { align-items:flex-start; flex-direction:column; gap:12px; }
+  .dashboard-actions { width:100%; justify-content:space-between; }
+  .dashboard-section-heading { align-items:flex-start; flex-direction:column; gap:3px; }
+  .dashboard-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .dashboard-kpi-grid .kpi-card { min-height:100px; padding:12px; }
+  .dashboard-action-grid { grid-template-columns:1fr; }
+  .dashboard-table-host table { min-width:390px; }
+}
+
 {% endblock %}
 
 {% block content %}
-<div class="page-title-row">
-  <h1>🏠 דשבורד ארגוני</h1>
-  <button class="btn" onclick="loadDashboard(true)" title="רענון מיידי (עוקף מטמון)">🔄 רענן</button>
-</div>
+<div class="dashboard-page">
+  <header class="dashboard-hero">
+    <div>
+      <div class="dashboard-kicker"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-shield-check"></use></svg> מרכז שליטה תפעולי</div>
+      <h1>תמונת מצב בטיחות</h1>
+      <p class="dashboard-subtitle">מעקב אחר אישורים, ליקויים, ציוד ומשימות — עם דגש על הנושאים שדורשים טיפול.</p>
+    </div>
+    <div class="dashboard-actions">
+      <span id="dashboardLastUpdated" class="dashboard-updated">הנתונים נטענים…</span>
+      <button class="btn" onclick="loadDashboard(true)" title="רענון נתונים מהשרת">
+        <svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-refresh-cw"></use></svg>
+        רענן נתונים
+      </button>
+    </div>
+  </header>
 
-<section aria-label="מדדי מפתח"><div class="kpi-grid" id="kpiGrid">
-  <div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div>
-  <div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div>
-</div></section>
+  <section aria-label="מדדים מרכזיים">
+    <div class="dashboard-section-heading">
+      <h2>מדדים מרכזיים</h2>
+      <p>הנתונים מוצגים לפי המידע הקיים במערכת.</p>
+    </div>
+    <div class="kpi-grid dashboard-kpi-grid" id="kpiGrid">
+      <div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div>
+      <div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div>
+    </div>
+  </section>
 
-<div class="card" id="dataIntegrityCard" style="border-right:4px solid var(--warning);">
-  <div class="card-title">🧹 איכות וסדר הנתונים</div>
-  <div id="dataIntegrityBody" class="empty-state">בודק כפילויות וקשרים...</div>
-</div>
+  <div class="dashboard-insight-grid">
+    <section class="card" id="dataIntegrityCard" aria-labelledby="dataIntegrityTitle">
+      <div class="card-title dashboard-card-title" id="dataIntegrityTitle">
+        <svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-activity"></use></svg>
+        איכות הנתונים
+      </div>
+      <div id="dataIntegrityBody" class="dashboard-integrity-copy">בודק כפילויות וקשרים…</div>
+    </section>
 
-<div class="card" id="actionCenter" style="border-right:4px solid var(--critical);">
-  <div class="card-title">🎯 דורש טיפול עכשיו</div>
-  <div id="actionCenterBody" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
-    <div class="skeleton skeleton-row"></div>
+    <section class="card" id="actionCenter" aria-labelledby="actionCenterTitle">
+      <div class="card-title dashboard-card-title" id="actionCenterTitle">
+        <svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-clock"></use></svg>
+        דורש טיפול עכשיו
+      </div>
+      <div id="actionCenterBody" class="dashboard-action-grid">
+        <div class="skeleton skeleton-row"></div>
+      </div>
+    </section>
   </div>
-</div>
 
-<div class="grid-2">
-  <div class="card">
-    <div class="card-title">📅 אישורים לפי חודש תפוגה</div>
-    <div id="chartByMonth" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+  <div class="dashboard-section-heading">
+    <h2>מגמות וסטטוסים</h2>
+    <p>התפלגות הנתונים לפי סוג.</p>
   </div>
-  <div class="card">
-    <div class="card-title">📊 סטטוס אישורים</div>
-    <div id="chartByStatus" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+  <div class="grid-2 dashboard-chart-grid">
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-calendar-clock"></use></svg> אישורים לפי חודש תפוגה</div>
+      <div id="chartByMonth" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-files"></use></svg> סטטוס אישורים</div>
+      <div id="chartByStatus" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+    </div>
   </div>
-</div>
 
-<div class="grid-2">
-  <div class="card">
-    <div class="card-title">⚠️ ליקויים פתוחים לפי חומרה</div>
-    <div id="chartDeficiencies" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+  <div class="grid-2 dashboard-chart-grid">
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-wrench"></use></svg> ליקויים פתוחים לפי חומרה</div>
+      <div id="chartDeficiencies" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-list-checks"></use></svg> משימות לפי סטטוס</div>
+      <div id="chartTasks" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+    </div>
   </div>
-  <div class="card">
-    <div class="card-title">✅ משימות לפי סטטוס</div>
-    <div id="chartTasks" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
-  </div>
-</div>
 
-<div class="grid-2">
-  <div class="card">
-    <div class="card-title">⏳ אישורים הקרובים לפקיעה</div>
-    <div id="tblExpirations"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+  <div class="dashboard-section-heading">
+    <h2>רשימות עבודה</h2>
+    <p>פריטים נבחרים שמאפשרים מעבר מהיר לטיפול.</p>
   </div>
-  <div class="card">
-    <div class="card-title">🔥 משימות דחופות</div>
-    <div id="tblUrgentTasks"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+  <div class="grid-2 dashboard-table-grid">
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-calendar-clock"></use></svg> אישורים הקרובים לפקיעה</div>
+      <div id="tblExpirations" class="dashboard-table-host"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-clock"></use></svg> משימות דחופות</div>
+      <div id="tblUrgentTasks" class="dashboard-table-host"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+    </div>
   </div>
-</div>
 
-<div class="grid-2">
-  <div class="card">
-    <div class="card-title">🔍 ביקורות השבוע</div>
-    <div id="tblAudits"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
-  </div>
-  <div class="card">
-    <div class="card-title">🧯 ציוד הדורש טיפול</div>
-    <div id="tblEquipment"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+  <div class="grid-2 dashboard-table-grid">
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-clipboard-check"></use></svg> ביקורות השבוע</div>
+      <div id="tblAudits" class="dashboard-table-host"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-fire-extinguisher"></use></svg> ציוד הדורש טיפול</div>
+      <div id="tblEquipment" class="dashboard-table-host"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+    </div>
   </div>
 </div>
 {% endblock %}
