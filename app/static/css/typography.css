@@ -1,0 +1,134 @@
+/* Campus Fire ERP — Unified Hebrew typography
+   One local/system font stack; no remote font downloads or paid dependencies. */
+:root {
+  --font-sans: Arial, "Segoe UI", sans-serif;
+  --font-family-ui: Arial, "Segoe UI", sans-serif;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+  --font-weight-black: 700;
+  --line-height-base: 1.55;
+  --type-body: 1rem;
+  --type-table: .875rem;
+  --type-meta: .8125rem;
+  --type-caption: .75rem;
+  --type-h1: 1.75rem;
+  --type-h2: 1.375rem;
+  --type-h3: 1.125rem;
+  --type-h4: 1rem;
+}
+
+/* Enforce one typeface across page content, controls, generated content and widgets. */
+html, body,
+body *, body *::before, body *::after,
+input, select, textarea, button {
+  font-family: var(--font-family-ui) !important;
+  font-synthesis: none;
+}
+
+html { font-size: 16px; }
+body {
+  font-size: var(--type-body) !important;
+  line-height: var(--line-height-base) !important;
+  font-weight: var(--font-weight-normal);
+  letter-spacing: 0;
+}
+
+.ds-main, .ds-main p, .ds-main li, .ds-main label,
+.ds-main input, .ds-main select, .ds-main textarea,
+.ds-main button, .ds-main a {
+  letter-spacing: 0;
+}
+
+.ds-main h1, .login-card h1,
+.ds-main .fire-hero h1, .ds-main .dashboard-hero h1,
+.ds-main .ff-page-header h1, .ds-main .reports-hero h1 {
+  font-size: var(--type-h1) !important;
+  line-height: 1.3 !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+}
+.ds-main h2 {
+  font-size: var(--type-h2) !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+}
+.ds-main h3 {
+  font-size: var(--type-h3) !important;
+  line-height: 1.4 !important;
+  font-weight: 700 !important;
+}
+.ds-main h4 {
+  font-size: var(--type-h4) !important;
+  line-height: 1.45 !important;
+  font-weight: 700 !important;
+}
+
+.ds-main p, .ds-main li, .ds-main label,
+.ds-main .form-label, .ds-main .ds-label,
+.ds-main .card-description, .ds-main .help-text {
+  font-size: var(--type-body);
+  line-height: 1.55;
+}
+
+.ds-main button, .ds-main .btn, .ds-main .ds-btn,
+.ds-main input, .ds-main select, .ds-main textarea,
+.login-card button, .login-card input, .login-card select {
+  font-size: .9375rem !important;
+  line-height: 1.45 !important;
+  font-weight: 500;
+}
+
+.ds-main table, .ds-main .ds-table,
+.ds-main table td, .ds-main .ds-table td {
+  font-size: var(--type-table) !important;
+  line-height: 1.5 !important;
+}
+.ds-main table th, .ds-main .ds-table th {
+  font-size: var(--type-meta) !important;
+  line-height: 1.4 !important;
+  font-weight: 700 !important;
+}
+.ds-main small, .ds-main .text-xs, .ds-main .text-sm,
+.ds-main .fire-kicker, .ds-main .reports-kicker,
+.ds-main .ff-eyebrow, .ds-main .dashboard-kicker {
+  font-size: var(--type-meta) !important;
+  line-height: 1.45 !important;
+  font-weight: 500;
+}
+.ds-main .badge, .ds-main .pill, .ds-main .ds-badge,
+.ds-main .fire-status, .ds-main .ds-tag {
+  font-size: var(--type-caption) !important;
+  line-height: 1.4 !important;
+  font-weight: 700 !important;
+}
+
+/* Consistent weight ladder: avoid accidental 750/800/850 ultra-bold jumps. */
+.ds-header-brand, .ds-sidebar-brand strong,
+.ds-sidebar-group-label, .ds-sidebar-link,
+.ds-main .card-title, .ds-main .ds-card-title,
+.ds-main .fire-panel-title, .ds-main .dashboard-section-heading h2,
+.ds-main .ff-section-heading h2, .ds-main .reports-section-title {
+  font-weight: 700 !important;
+}
+.ds-main strong, .ds-main b { font-weight: 700; }
+
+/* Keep numeric dashboards legible without changing their alignment. */
+.ds-main .fire-metric-value, .ds-main .kpi-value,
+.ds-main .dashboard-action-count, .ds-main .score-circle {
+  font-weight: 700 !important;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --type-h1: 1.5rem;
+    --type-h2: 1.25rem;
+    --type-h3: 1.0625rem;
+  }
+  .ds-main table, .ds-main .ds-table,
+  .ds-main table td, .ds-main .ds-table td {
+    font-size: .8125rem !important;
+  }
+}
