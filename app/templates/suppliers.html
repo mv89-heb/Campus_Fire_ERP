@@ -154,6 +154,12 @@ const Suppliers = (() => {
   };
 
   const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const icon = (name) => '<svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="/static/img/lucide-sprite.svg#icon-' + name + '"></use></svg>';
+  const dateStateTag = (value) => {
+    const state = fireSafetyDateState(value);
+    return state === 'overdue' ? '<span class="supplier-date-state overdue">באיחור</span>' :
+      state === 'due_soon' ? '<span class="supplier-date-state due-soon">קרוב לתוקף</span>' : '';
+  };
   const statusLabel = { active: 'פעיל', inactive: 'לא פעיל', blocked: 'חסום' };
 
   async function refresh() {
@@ -194,14 +200,14 @@ const Suppliers = (() => {
         </div>
         <span class="pill ${s.status}">${statusLabel[s.status] || s.status}</span>
         ${s.rating ? `<div class="rating-stars">${'★'.repeat(s.rating)}${'☆'.repeat(5-s.rating)}</div>` : ''}
-        ${s.contact_name ? `<div class="supplier-row">👤 ${esc(s.contact_name)}</div>` : ''}
-        ${s.phone ? `<div class="supplier-row">📞 ${esc(s.phone)}</div>` : ''}
-        ${s.email ? `<div class="supplier-row">✉️ ${esc(s.email)}</div>` : ''}
-        ${s.contract_expiry ? `<div class="supplier-row">📄 חוזה עד ${formatDateIL(s.contract_expiry)} ${fireSafetyDateState(s.contract_expiry)==='overdue' ? '🔴' : fireSafetyDateState(s.contract_expiry)==='due_soon' ? '🟠' : ''}</div>` : ''}
-        ${s.insurance_expiry ? `<div class="supplier-row">🛡️ ביטוח עד ${formatDateIL(s.insurance_expiry)} ${fireSafetyDateState(s.insurance_expiry)==='overdue' ? '🔴' : fireSafetyDateState(s.insurance_expiry)==='due_soon' ? '🟠' : ''}</div>` : ''}
+        ${s.contact_name ? `<div class="supplier-row">${icon('user-round')} ${esc(s.contact_name)}</div>` : ''}
+        ${s.phone ? `<div class="supplier-row">${icon('phone')} ${esc(s.phone)}</div>` : ''}
+        ${s.email ? `<div class="supplier-row">${icon('mail')} ${esc(s.email)}</div>` : ''}
+        ${s.contract_expiry ? `<div class="supplier-row">${icon('file-check')} חוזה עד ${formatDateIL(s.contract_expiry)} ${dateStateTag(s.contract_expiry)}</div>` : ''}
+        ${s.insurance_expiry ? `<div class="supplier-row">${icon('shield-check')} ביטוח עד ${formatDateIL(s.insurance_expiry)} ${dateStateTag(s.insurance_expiry)}</div>` : ''}
         <div class="supplier-actions">
-          <button class="btn btn-sm" style="flex:1" onclick="Suppliers.openContext(${s.id})">🔗 קשרים</button><button class="btn btn-sm" onclick="Suppliers.openModal(${s.id})">✏️ עריכה</button>
-          <button class="btn btn-sm btn-danger" onclick="Suppliers.remove(${s.id})">🗑️</button>
+          <button class="btn btn-sm" style="flex:1" onclick="Suppliers.openContext(${s.id})">${icon('map-pin')} קשרים</button><button class="btn btn-sm" onclick="Suppliers.openModal(${s.id})">${icon('file-check')} עריכה</button>
+          <button class="btn btn-sm btn-danger" onclick="Suppliers.remove(${s.id})">${icon('x')}</button>
         </div>
       </div>`).join('');
   }
