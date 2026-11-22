@@ -21,7 +21,7 @@ class FireSafetyWorkPlanImportTests(unittest.TestCase):
             self.assertEqual(importer.normalized_status(source), target)
 
     def test_proposed_dates_are_not_promoted_to_confirmed_deadlines(self):
-        proposed = [row for row in importer.ROWS if len(row) > 12 and row[12] == "proposed"]
+        proposed = [row for row in importer.ROWS if len(row) > 11 and row[11] == "proposed"]
         self.assertEqual(len(proposed), 5)
         for row in proposed:
             self.assertIsNone(importer.confirmed_due_date(row))
