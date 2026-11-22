@@ -10,14 +10,14 @@ ROOT = Path(__file__).resolve().parents[1]
 class UIAssetTests(unittest.TestCase):
     def test_lucide_sprite_is_valid_and_contains_every_shell_icon(self):
         sprite = ROOT / "app/static/img/lucide-sprite.svg"
-        shell = ROOT / "app/templates/_shell.html"
+        templates = [ROOT / "app/templates/_shell.html", ROOT / "app/templates/org_dashboard.html"]
         tree = ET.parse(sprite)
         ids = {
             node.attrib["id"]
             for node in tree.iter()
             if node.tag.rsplit("}", 1)[-1] == "symbol" and "id" in node.attrib
         }
-        referenced = set(re.findall(r"#(icon-[a-z0-9-]+)", shell.read_text(encoding="utf-8")))
+        referenced = set().union(*(set(re.findall(r"#(icon-[a-z0-9-]+)", template.read_text(encoding="utf-8"))) for template in templates))
         self.assertTrue(referenced, "The shared shell should use local Lucide symbols")
         self.assertFalse(referenced - ids, f"Missing local icon symbols: {sorted(referenced - ids)}")
 
@@ -27,6 +27,10 @@ class UIAssetTests(unittest.TestCase):
         self.assertIn('lang="he" dir="rtl"', shell)
         self.assertIn("css/design-system.css", shell)
         self.assertIn("css/tailwind.generated.css", shell)
+        dashboard = (ROOT / "app/templates/org_dashboard.html").read_text(encoding="utf-8")
+        self.assertIn("מדד מסמכים וציוד", dashboard)
+        self.assertNotIn("מוכנות כללית", dashboard)
+        self.assertIn("dashboard-insight-grid", dashboard)
         self.assertTrue(generated.is_file(), "Compiled Tailwind CSS must be committed for Render")
         css = generated.read_text(encoding="utf-8")
         self.assertIn(".tw-flex", css)
