@@ -352,19 +352,19 @@ const Tasks = (() => {
     const summary=document.getElementById('trackingSummary');
     if(summary)summary.textContent=list.length+' מוצגות מתוך '+_tracking.length+' רשומות · '+overdue.length+' באיחור · '+soon.length+' קרובות למועד · '+doneRows.length+' הושלמו';
     if(!list.length){host.innerHTML='<div class="empty-state">לא נמצאו רשומות התואמות לסינון.</div>';return;}
-    const statusLabel={open:'לביצוע',in_progress:'בטיפול',done:'הושלם',cancelled:'בוטל'};
+    const statusLabel={open:'לביצוע',in_progress:'בטיפול',waiting_approval:'ממתין לאישור',done:'הושלם',cancelled:'בוטל'};
     const escDate=v=>{if(!v)return '—';const iso=isoDate(v);return /^\d{4}-\d{2}-\d{2}$/.test(iso)?esc(iso.split('-').reverse().join('/')):esc(v);};
     const statusClass=t=>{const d=days(t);if(t.status==='done')return'done';if(t.status==='cancelled')return'open';if(d!==null&&d<0)return'overdue';if(d!==null&&d<=7)return'soon';return t.status==='waiting_approval'?'waiting_approval':t.status==='in_progress'?'in_progress':'open';};
     host.innerHTML='<div class="fire-table-wrap"><table class="fire-table"><thead><tr>'+
       '<th>שלב / שבוע</th><th>משימה / נושא מרכזי</th><th>נכס רלוונטי</th><th>מס׳ תיק</th><th>טופס להגשה</th><th>גורם אחראי</th><th>תאריך יעד</th><th>סטטוס נוכחי</th><th>הערות ודגשים</th><th>ביצוע בפועל</th><th>ימים ליעד</th><th>התראת מועד</th><th>תחום</th>'+
       '</tr></thead><tbody>'+list.map(t=>{
-        const d=days(t);const alert=t.status==='done'?'הושלם':d===null?'לא הוגדר':d<0?'באיחור':d<=7?'קרוב למועד':'תקין';
+        const d=days(t);const alert=t.status==='done'?'הושלם':t.target_is_proposed?'ממתין לאישור יעד':d===null?'לא הוגדר':d<0?'באיחור':d<=7?'קרוב למועד':'תקין';
         const dLabel=d===null?'—':d<0?Math.abs(d)+' ימים באיחור':d+' ימים';
         return '<tr>'+
           '<td>'+esc(t.phase||'—')+'</td>'+
           '<td class="fire-task-name">'+esc(t.title||'—')+'<div class="fire-muted" style="font-size:.68rem;margin-top:3px;">שורה '+esc(t.source_row)+'</div></td>'+
           '<td>'+esc(t.asset||'—')+'</td><td class="fire-date">'+esc(t.case_number||'—')+'</td><td>'+esc(t.forms||'לא נדרש')+'</td><td>'+esc(t.assignee||'לא הוגדר')+'</td>'+
-          '<td class="fire-date">'+escDate(t.due_date)+'</td>'+
+          '<td class="fire-date">'+escDate(t.target_date||t.due_date)+(t.target_is_proposed?'<div class="fire-muted">מוצע · לא אושר</div>':'')+'</td>'+
           '<td><select class="status-select" aria-label="סטטוס משימה" onchange="Tasks.updateTrackingStatus('+t.id+',this.value)"><option value="open" '+(t.status==='open'?'selected':'')+'>לביצוע</option><option value="in_progress" '+(t.status==='in_progress'?'selected':'')+'>בטיפול</option><option value="waiting_approval" '+(t.status==='waiting_approval'?'selected':'')+'>ממתין לאישור</option><option value="done" '+(t.status==='done'?'selected':'')+'>הושלם</option><option value="cancelled" '+(t.status==='cancelled'?'selected':'')+'>בוטל</option></select></td>'+
           '<td class="fire-notes">'+esc(t.notes||'—')+'<details><summary class="fire-detail-btn">היסטוריה ופירוט</summary><div class="fire-detail">'+esc(t.description||'')+'</div>'+renderAIReports(t.ai_reports)+'</details></td>'+
           '<td class="fire-date">'+escDate(t.completed_date)+'</td><td class="fire-date">'+dLabel+'</td>'+
