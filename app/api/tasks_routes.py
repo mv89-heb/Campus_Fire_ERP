@@ -1,7 +1,10 @@
 """
 API עבור מערכת משימות (שלב 7).
 """
+from datetime import datetime
+
 from flask import Blueprint, jsonify, request, render_template
+from app.extensions import db
 from app.services import task_service as svc
 from app.services.task_service import TaskServiceError
 
@@ -48,7 +51,7 @@ def api_fire_safety_tracking():
     import re
     from app.models import Task
 
-    source_marker = "ייבוא טבלת מעקב כבאות והצלה"
+    source_marker = "גרסה: 2026-11-22-v2"
     tasks = Task.query.filter(Task.description.ilike(f"%{source_marker}%")).order_by(Task.id.asc()).all()
     # Reuse the persisted Gemini analyses; do not generate new AI output here.
     try:
@@ -99,10 +102,15 @@ def api_fire_safety_tracking():
                 "phase": fields.get("שלב / שבוע", ""),
                 "notes": fields.get("הערות ודגשים", ""),
                 "source": fields.get("ייבוא טבלת מעקב כבאות והצלה", ""),
-                "assignee": task.assignee or "",
+                "domain": fields.get("תחום", ""),
+                "assignee": fields.get("גורם אחראי", task.assignee or ""),
                 "status": task.status,
                 "priority": task.priority,
                 "due_date": str(task.due_date) if task.due_date else None,
+                "target_date": fields.get("תאריך יעד לביצוע", ""),
+                "target_is_proposed": fields.get("תאריך יעד מאושר", "").startswith("לא"),
+                "completed_date": fields.get("תאריך ביצוע בפועל") or (task.completed_at.date().isoformat() if task.completed_at else None),
+                "deadline_alert": fields.get("התראת מועד", ""),
                 "description": desc,
                 "duplicate_count": 0,
                 "ai_reports": [{
@@ -153,7 +161,11 @@ def api_get_task(task_id):
 
 @tasks_bp.route('/api/tasks/<int:task_id>', methods=['PUT'])
 def api_update_task(task_id):
-    task = svc.update_task(task_id, _json_body())
+    body = _json_body()
+    task = svc.update_task(task_id, body)
+    if body.get("status") == "done" and not task.completed_at:
+        task.completed_at = datetime.utcnow()
+        db.session.commit()
     return jsonify(svc.serialize_task(task))
 
 

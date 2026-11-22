@@ -36,6 +36,7 @@
 .badge.low { background: rgba(110,118,129,0.15); color: var(--text-muted); }
 .badge.open { background: rgba(110,118,129,0.15); color: var(--text-muted); }
 .badge.in_progress { background: rgba(88,166,255,0.15); color: #58a6ff; }
+.badge.waiting_approval { background: rgba(227,179,65,0.18); color: var(--warning); }
 .badge.done { background: rgba(63,185,80,0.15); color: var(--valid); }
 .badge.cancelled { background: rgba(248,81,73,0.15); color: var(--critical); }
 .checklist { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
@@ -76,32 +77,95 @@
 .view-switch .active { border-color:var(--accent); color:var(--accent); }
 .error-state { text-align: center; color: var(--critical); padding: 20px; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .retry-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border-mid); background: var(--bg-hover); color: var(--text); cursor: pointer; font-size: 0.8rem; }
+
+/* Fire safety control center — workbook-first information architecture */
+.fire-workspace{max-width:1720px;margin:0 auto 36px}
+.fire-workspace .fire-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;padding:8px 0 20px;margin-bottom:18px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.fire-workspace .fire-kicker{font-size:.72rem;font-weight:800;color:var(--color-primary);letter-spacing:.04em;margin-bottom:7px}
+.fire-workspace .fire-hero h1{font-size:clamp(1.45rem,2.5vw,2.15rem);font-weight:850;letter-spacing:-.035em}
+.fire-workspace .fire-subtitle{color:var(--color-text-muted);font-size:.88rem;margin-top:7px;line-height:1.6}
+.fire-workspace .fire-actions{display:flex;gap:8px;flex-wrap:wrap}
+.fire-workspace .fire-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:16px 0}
+.fire-workspace .fire-metric{background:var(--color-surface);border:1px solid var(--color-border);border-radius:14px;padding:14px;min-width:0;box-shadow:var(--shadow-sm)}
+.fire-workspace .fire-metric-label{font-size:.73rem;color:var(--color-text-muted);display:flex;align-items:center;gap:7px}
+.fire-workspace .fire-metric-value{font-size:1.8rem;font-weight:850;line-height:1.25;font-variant-numeric:tabular-nums;margin-top:7px}
+.fire-workspace .fire-metric-note{font-size:.68rem;color:var(--color-text-muted);margin-top:3px}
+.fire-workspace .fire-metric.danger .fire-metric-value{color:var(--color-danger)}
+.fire-workspace .fire-metric.warning .fire-metric-value{color:var(--color-warning)}
+.fire-workspace .fire-metric.success .fire-metric-value{color:var(--color-success)}
+.fire-workspace .fire-panel{background:var(--color-surface);border:1px solid var(--color-border);border-radius:16px;padding:16px;box-shadow:var(--shadow-sm);margin-bottom:14px}
+.fire-workspace .fire-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:13px}
+.fire-workspace .fire-panel-title{font-weight:800;font-size:.98rem}
+.fire-workspace .fire-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.fire-workspace .fire-toolbar input,.fire-workspace .fire-toolbar select{min-height:40px;border:1px solid var(--color-border-strong);border-radius:9px;background:var(--color-surface-raised);color:var(--color-text);padding:8px 11px;font:inherit;font-size:.82rem}
+.fire-workspace .fire-toolbar input{flex:1;min-width:220px}
+.fire-workspace .fire-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.fire-workspace .fire-tab{border:1px solid var(--color-border);background:var(--color-surface-raised);color:var(--color-text-muted);border-radius:999px;padding:7px 13px;font-size:.77rem;font-weight:700;cursor:pointer}
+.fire-workspace .fire-tab.active{background:var(--tint-primary);border-color:var(--color-primary);color:var(--color-primary)}
+.fire-workspace .fire-table-wrap{overflow:auto;max-height:calc(100vh - 340px);border:1px solid var(--color-border);border-radius:11px}
+.fire-workspace .fire-table{width:100%;min-width:1780px;border-collapse:separate;border-spacing:0;direction:rtl}
+.fire-workspace .fire-table th{position:sticky;top:0;z-index:2;background:var(--color-surface-raised);color:var(--color-text-muted);font-size:.72rem;font-weight:800;text-align:right;padding:11px 10px;border-bottom:1px solid var(--color-border);white-space:nowrap}
+.fire-workspace .fire-table td{padding:11px 10px;border-bottom:1px solid var(--color-border);font-size:.78rem;vertical-align:top;line-height:1.55;background:var(--color-surface)}
+.fire-workspace .fire-table tr:last-child td{border-bottom:0}
+.fire-workspace .fire-table tbody tr:hover td{background:var(--color-surface-hover)}
+.fire-workspace .fire-table .fire-task-name{font-weight:800;min-width:220px;max-width:300px}
+.fire-workspace .fire-table .fire-notes{min-width:310px;max-width:430px;white-space:pre-wrap}
+.fire-workspace .fire-table .fire-muted{color:var(--color-text-muted)}
+.fire-workspace .fire-status{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;font-size:.69rem;font-weight:800;white-space:nowrap}
+.fire-workspace .fire-status.open{background:rgba(148,163,184,.15);color:var(--color-text-muted)}
+.fire-workspace .fire-status.in_progress{background:rgba(59,130,246,.13);color:var(--color-primary)}
+.fire-workspace .fire-status.waiting_approval{background:rgba(245,158,11,.16);color:var(--color-warning)}
+.fire-workspace .fire-status.done{background:rgba(34,197,94,.13);color:var(--color-success)}
+.fire-workspace .fire-status.overdue{background:rgba(239,68,68,.13);color:var(--color-danger)}
+.fire-workspace .fire-status.soon{background:rgba(245,158,11,.15);color:var(--color-warning)}
+.fire-workspace .fire-date{white-space:nowrap;font-variant-numeric:tabular-nums}
+.fire-workspace .fire-detail-btn{border:0;background:transparent;color:var(--color-primary);font-weight:750;cursor:pointer;padding:2px 0}
+.fire-workspace .fire-detail{margin-top:8px;padding:10px;background:var(--color-surface-raised);border-radius:9px;white-space:pre-wrap;min-width:250px}
+.fire-workspace .fire-count{font-size:.74rem;color:var(--color-text-muted)}
+@media(max-width:900px){.fire-workspace .fire-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.fire-workspace .fire-table-wrap{max-height:none}.fire-workspace .fire-hero{align-items:flex-start}}
+@media(max-width:480px){.fire-workspace .fire-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.fire-workspace .fire-metric{padding:11px}.fire-workspace .fire-metric-value{font-size:1.5rem}.fire-workspace .fire-toolbar input{min-width:100%}.fire-workspace .fire-panel{padding:11px}}
+
 {% endblock %}
 
 {% block content %}
-<header class="ds-module-hero">
-  <div class="ds-module-heading"><span class="ds-module-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-list-checks"></use></svg></span>
-    <div><div class="ds-module-kicker">תפעול ומעקב</div><h1>משימות ומעקב כבאות</h1><p class="ds-module-subtitle">מעקב מרוכז אחר משימות, נכסים, טפסים, מועדים ואחריות לביצוע.</p></div>
+<div class="fire-workspace">
+<header class="fire-hero ds-module-hero">
+  <div>
+    <div class="fire-kicker">CAMPUS FIRE · CONTROL CENTER</div>
+    <h1>תוכנית עבודה ומעקב בטיחות אש</h1>
+    <p class="fire-subtitle">ניהול מרוכז של ליקויים, משימות, אישורים, מועדים והגשות — לפי הנכסים ותיקי הכבאות.</p>
   </div>
-  <div class="ds-module-actions"><button class="btn" onclick="Tasks.importFireSafetyTracking()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-upload"></use></svg> ייבוא / רענון נתוני Excel</button></div>
+  <div class="fire-actions">
+    <button class="btn" onclick="Tasks.importFireSafetyTracking()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-refresh-cw"></use></svg> סנכרון נתוני מעקב</button>
+    <button class="btn btn-primary" onclick="Tasks.openModal()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-file-plus"></use></svg> משימה חדשה</button>
+  </div>
 </header>
-
-<div class="card" id="trackingCard">
-  <div class="card-title">
-    <svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-chart-no-axes-combined"></use></svg> מעקב כבאות והצלה — תצוגת גיליון
-    <span style="font-size:.8rem;color:var(--text-muted);">כל המעקב מרוכז כאן</span>
+<section class="fire-metrics" aria-label="סיכום תוכנית העבודה">
+  <div class="fire-metric danger"><div class="fire-metric-label">באיחור</div><div class="fire-metric-value" id="fireOverdueCount">—</div><div class="fire-metric-note">משימות שחלף מועדן</div></div>
+  <div class="fire-metric warning"><div class="fire-metric-label">קרובים למועד</div><div class="fire-metric-value" id="fireSoonCount">—</div><div class="fire-metric-note">יעד בתוך 7 ימים</div></div>
+  <div class="fire-metric success"><div class="fire-metric-label">הושלמו</div><div class="fire-metric-value" id="fireDoneCount">—</div><div class="fire-metric-note">לפי סטטוס המשימה</div></div>
+  <div class="fire-metric"><div class="fire-metric-label">פתוחות ובטיפול</div><div class="fire-metric-value" id="fireOpenCount">—</div><div class="fire-metric-note">דורשות מעקב</div></div>
+  <div class="fire-metric"><div class="fire-metric-label">כלל הרשומות</div><div class="fire-metric-value" id="fireTotalCount">—</div><div class="fire-metric-note">בתוכנית העבודה</div></div>
+</section>
+<section class="fire-panel" id="trackingCard">
+  <div class="fire-panel-head">
+    <div><div class="fire-panel-title">תוכנית העבודה המלאה</div><div class="fire-count" id="trackingSummary">טוען נתוני מעקב…</div></div>
+    <div class="fire-toolbar">
+      <input id="trackingSearch" type="search" placeholder="חיפוש משימה, נכס, תיק, טופס, אחראי או הערה..." oninput="Tasks.renderTracking()">
+      <select id="trackingStatusFilter" onchange="Tasks.renderTracking()"><option value="">כל הסטטוסים</option><option value="open">לביצוע</option><option value="in_progress">בטיפול</option><option value="waiting_approval">ממתין לאישור</option><option value="done">הושלם</option><option value="cancelled">בוטל</option></select>
+      <select id="trackingAssetFilter" onchange="Tasks.renderTracking()"><option value="">כל הנכסים</option></select>
+      <select id="trackingDomainFilter" onchange="Tasks.renderTracking()"><option value="">כל התחומים</option></select>
+    </div>
   </div>
-  <div class="tracking-controls">
-    <input id="trackingSearch" type="search" placeholder="חיפוש במשימה, נכס, תיק, טופס או אחראי..." oninput="Tasks.renderTracking()">
-    <select id="trackingStatusFilter" onchange="Tasks.renderTracking()">
-      <option value="">כל הסטטוסים</option><option value="open">פתוחה</option><option value="in_progress">בביצוע</option><option value="done">הושלמה</option><option value="cancelled">בוטלה</option>
-    </select>
-    <select id="trackingAssetFilter" onchange="Tasks.renderTracking()"><option value="">כל הנכסים</option></select>
+  <div class="fire-tabs" aria-label="תצוגות מהירות">
+    <button class="fire-tab active" data-fire-filter="all" onclick="Tasks.setTrackingFilter('all',this)">הכול</button>
+    <button class="fire-tab" data-fire-filter="overdue" onclick="Tasks.setTrackingFilter('overdue',this)">באיחור</button>
+    <button class="fire-tab" data-fire-filter="soon" onclick="Tasks.setTrackingFilter('soon',this)">קרובים למועד</button>
+    <button class="fire-tab" data-fire-filter="open" onclick="Tasks.setTrackingFilter('open',this)">פתוחים</button>
+    <button class="fire-tab" data-fire-filter="done" onclick="Tasks.setTrackingFilter('done',this)">הושלמו</button>
   </div>
-  <div class="tracking-summary" id="trackingSummary">טוען נתוני מעקב…</div>
   <div id="trackingTableHost"><div class="skeleton"></div></div>
-</div>
-
+</section>
 <div class="card" id="generalTaskCard" style="display:none !important;">
   <div class="card-title"><span>📋 משימות נוספות</span></div>
   <div class="filters-row task-filters">
@@ -154,7 +218,8 @@
         </select>
         <select id="taskStatus">
           <option value="open">פתוחה</option>
-          <option value="in_progress">בביצוע</option>
+          <option value="in_progress">בטיפול</option>
+          <option value="waiting_approval">ממתין לאישור</option>
           <option value="done">הושלמה</option>
           <option value="cancelled">בוטלה</option>
         </select>
@@ -199,7 +264,7 @@ const Tasks = (() => {
   };
   const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const priorityLabel = { urgent: 'דחוף', high: 'גבוה', normal: 'רגיל', low: 'נמוך' };
-  const statusLabel = { open: 'פתוחה', in_progress: 'בביצוע', done: 'הושלמה', cancelled: 'בוטלה' };
+  const statusLabel = { open: 'פתוחה', in_progress: 'בטיפול', waiting_approval: 'ממתין לאישור', done: 'הושלמה', cancelled: 'בוטלה' };
 
   async function refresh() {
     try {
@@ -254,37 +319,57 @@ const Tasks = (() => {
     }).join('');
   }
 
+  let _trackingQuickFilter = 'all';
+  function setTrackingFilter(filter,button){
+    _trackingQuickFilter=filter;
+    document.querySelectorAll('.fire-tab').forEach(el=>el.classList.toggle('active',el===button));
+    renderTracking();
+  }
   function renderTracking() {
-    const host = document.getElementById('trackingTableHost');
-    if (!host) return;
-    const search = (document.getElementById('trackingSearch')?.value || '').trim().toLocaleLowerCase('he');
-    const status = document.getElementById('trackingStatusFilter')?.value || '';
-    const asset = document.getElementById('trackingAssetFilter')?.value || '';
-    const assets = [...new Set(_tracking.map(t => t.asset).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'he'));
-    const assetSelect = document.getElementById('trackingAssetFilter');
-    if (assetSelect && assetSelect.dataset.ready !== '1') {
-      assetSelect.innerHTML = '<option value="">כל הנכסים</option>' + assets.map(a => '<option value="' + esc(a) + '">' + esc(a) + '</option>').join('');
-      assetSelect.dataset.ready = '1';
-    }
-    const list = _tracking.filter(t => {
-      const haystack = [t.title,t.asset,t.case_number,t.forms,t.assignee,t.phase,t.notes].join(' ').toLocaleLowerCase('he');
-      return (!search || haystack.includes(search)) && (!status || t.status === status) && (!asset || t.asset === asset);
+    const host=document.getElementById('trackingTableHost'); if(!host)return;
+    const search=(document.getElementById('trackingSearch')?.value||'').trim().toLocaleLowerCase('he');
+    const status=document.getElementById('trackingStatusFilter')?.value||'';
+    const asset=document.getElementById('trackingAssetFilter')?.value||'';
+    const domain=document.getElementById('trackingDomainFilter')?.value||'';
+    const today=new Date(); today.setHours(0,0,0,0);
+    const isoDate=v=>{if(!v)return '';const s=String(v).trim();const m=s.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);return m?m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):s;};
+    const days=t=>{if(!t.due_date)return null;const d=new Date(isoDate(t.due_date)+'T00:00:00');return Number.isNaN(d.getTime())?null:Math.round((d-today)/86400000);};
+    const openRows=_tracking.filter(t=>!['done','cancelled'].includes(t.status));
+    const overdue=openRows.filter(t=>days(t)!==null&&days(t)<0);
+    const soon=openRows.filter(t=>days(t)!==null&&days(t)>=0&&days(t)<=7);
+    const doneRows=_tracking.filter(t=>t.status==='done');
+    const metric=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=String(value);};
+    metric('fireOverdueCount',overdue.length);metric('fireSoonCount',soon.length);metric('fireDoneCount',doneRows.length);metric('fireOpenCount',openRows.length);metric('fireTotalCount',_tracking.length);
+    const unique=(key)=>[...new Set(_tracking.map(t=>t[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'he'));
+    const fill=(id,values,label)=>{const el=document.getElementById(id);if(!el)return;const current=el.value;el.innerHTML='<option value="">'+label+'</option>'+values.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');if(values.includes(current))el.value=current;};
+    fill('trackingAssetFilter',unique('asset'),'כל הנכסים');fill('trackingDomainFilter',unique('domain'),'כל התחומים');
+    let list=_tracking.filter(t=>{
+      const hay=[t.title,t.asset,t.case_number,t.forms,t.assignee,t.phase,t.notes,t.domain].join(' ').toLocaleLowerCase('he');
+      const delta=days(t);
+      const quick=_trackingQuickFilter==='all'||(_trackingQuickFilter==='overdue'&&delta!==null&&delta<0&&!['done','cancelled'].includes(t.status))||(_trackingQuickFilter==='soon'&&delta!==null&&delta>=0&&delta<=7&&!['done','cancelled'].includes(t.status))||(_trackingQuickFilter==='open'&&!['done','cancelled'].includes(t.status))||(_trackingQuickFilter==='done'&&t.status==='done');
+      return quick&&(!search||hay.includes(search))&&(!status||t.status===status)&&(!asset||t.asset===asset)&&(!domain||t.domain===domain);
     });
-    const done = _tracking.filter(t => t.status === 'done').length;
-    const duplicates = _tracking.reduce((sum,t) => sum + (t.duplicate_count || 0), 0);
-    document.getElementById('trackingSummary').textContent = `${list.length} שורות מוצגות מתוך ${_tracking.length} | הושלמו: ${done} | פתוחות/בטיפול: ${_tracking.filter(t => !['done','cancelled'].includes(t.status)).length}${duplicates ? ' | שורות כפולות שזוהו והוסתרו: ' + duplicates : ''}`;
-    if (!list.length) {
-      host.innerHTML = '<div class="empty-state">אין שורות מעקב התואמות למסננים. אם טרם ייבאת את הקובץ, לחץ על "ייבוא/רענון נתוני אקסל".</div>';
-      return;
-    }
-    const statusLabels = {open:'פתוחה',in_progress:'בביצוע',done:'הושלמה',cancelled:'בוטלה'};
-    host.innerHTML = '<div class="tracking-table-wrap"><table class="tracking-table"><thead><tr><th>משימה</th><th>נכס / מבנה</th><th>מספר תיק</th><th>טופס / אישור</th><th>אחראי</th><th>שלב</th><th>סטטוס</th><th>פירוט</th></tr></thead><tbody>' +
-      list.map(t => `<tr>
-        <td><strong>${esc(t.title)}</strong>${t.duplicate_count ? '<div style="color:var(--warning);font-size:.75rem;">זוהו ' + t.duplicate_count + ' עותקים נוספים</div>' : ''}</td>
-        <td>${esc(t.asset)}</td><td>${esc(t.case_number)}</td><td>${esc(t.forms)}</td><td>${esc(t.assignee)}</td><td>${esc(t.phase)}</td>
-        <td><select class="status-select" aria-label="סטטוס משימה" onchange="Tasks.updateTrackingStatus(${t.id},this.value)"><option value="open" ${t.status==='open'?'selected':''}>פתוחה</option><option value="in_progress" ${t.status==='in_progress'?'selected':''}>בביצוע</option><option value="done" ${t.status==='done'?'selected':''}>הושלמה</option><option value="cancelled" ${t.status==='cancelled'?'selected':''}>בוטלה</option></select>${t.due_date ? '<div style="font-size:.75rem;margin-top:4px;">יעד: '+esc(t.due_date)+'</div>':''}</td>
-        <td><details><summary style="cursor:pointer;color:var(--accent);">הרחב פירוט</summary><div class="tracking-detail"><strong>הערות ודגשים:</strong> ${esc(t.notes || 'אין הערות')}\n<strong>אחראי:</strong> ${esc(t.assignee || 'לא הוגדר')}\n<strong>מקור:</strong> שורה ${t.source_row} בקובץ האקסל\n\n<strong>תיאור מלא:</strong>\n${esc(t.description || '')}</div><h4 style="margin-top:12px;">🧠 פירוט ניתוח AI</h4>${renderAIReports(t.ai_reports)}<button class="btn btn-sm" style="margin-top:6px;" onclick="Tasks.openModal(${t.id})">✏️ עריכת פרטים</button></details></td>
-      </tr>`).join('') + '</tbody></table></div>';
+    const summary=document.getElementById('trackingSummary');
+    if(summary)summary.textContent=list.length+' מוצגות מתוך '+_tracking.length+' רשומות · '+overdue.length+' באיחור · '+soon.length+' קרובות למועד · '+doneRows.length+' הושלמו';
+    if(!list.length){host.innerHTML='<div class="empty-state">לא נמצאו רשומות התואמות לסינון.</div>';return;}
+    const statusLabel={open:'לביצוע',in_progress:'בטיפול',waiting_approval:'ממתין לאישור',done:'הושלם',cancelled:'בוטל'};
+    const escDate=v=>{if(!v)return '—';const iso=isoDate(v);return /^\d{4}-\d{2}-\d{2}$/.test(iso)?esc(iso.split('-').reverse().join('/')):esc(v);};
+    const statusClass=t=>{const d=days(t);if(t.status==='done')return'done';if(t.status==='cancelled')return'open';if(d!==null&&d<0)return'overdue';if(d!==null&&d<=7)return'soon';return t.status==='waiting_approval'?'waiting_approval':t.status==='in_progress'?'in_progress':'open';};
+    host.innerHTML='<div class="fire-table-wrap"><table class="fire-table"><thead><tr>'+
+      '<th>שלב / שבוע</th><th>משימה / נושא מרכזי</th><th>נכס רלוונטי</th><th>מס׳ תיק</th><th>טופס להגשה</th><th>גורם אחראי</th><th>תאריך יעד</th><th>סטטוס נוכחי</th><th>הערות ודגשים</th><th>ביצוע בפועל</th><th>ימים ליעד</th><th>התראת מועד</th><th>תחום</th>'+
+      '</tr></thead><tbody>'+list.map(t=>{
+        const d=days(t);const alert=t.status==='done'?'הושלם':t.target_is_proposed?'ממתין לאישור יעד':d===null?'לא הוגדר':d<0?'באיחור':d<=7?'קרוב למועד':'תקין';
+        const dLabel=d===null?'—':d<0?Math.abs(d)+' ימים באיחור':d+' ימים';
+        return '<tr>'+
+          '<td>'+esc(t.phase||'—')+'</td>'+
+          '<td class="fire-task-name">'+esc(t.title||'—')+'<div class="fire-muted" style="font-size:.68rem;margin-top:3px;">שורה '+esc(t.source_row)+'</div></td>'+
+          '<td>'+esc(t.asset||'—')+'</td><td class="fire-date">'+esc(t.case_number||'—')+'</td><td>'+esc(t.forms||'לא נדרש')+'</td><td>'+esc(t.assignee||'לא הוגדר')+'</td>'+
+          '<td class="fire-date">'+escDate(t.target_date||t.due_date)+(t.target_is_proposed?'<div class="fire-muted">מוצע · לא אושר</div>':'')+'</td>'+
+          '<td><select class="status-select" aria-label="סטטוס משימה" onchange="Tasks.updateTrackingStatus('+t.id+',this.value)"><option value="open" '+(t.status==='open'?'selected':'')+'>לביצוע</option><option value="in_progress" '+(t.status==='in_progress'?'selected':'')+'>בטיפול</option><option value="waiting_approval" '+(t.status==='waiting_approval'?'selected':'')+'>ממתין לאישור</option><option value="done" '+(t.status==='done'?'selected':'')+'>הושלם</option><option value="cancelled" '+(t.status==='cancelled'?'selected':'')+'>בוטל</option></select></td>'+
+          '<td class="fire-notes">'+esc(t.notes||'—')+'<details><summary class="fire-detail-btn">היסטוריה ופירוט</summary><div class="fire-detail">'+esc(t.description||'')+'</div>'+renderAIReports(t.ai_reports)+'</details></td>'+
+          '<td class="fire-date">'+escDate(t.completed_date)+'</td><td class="fire-date">'+dLabel+'</td>'+
+          '<td><span class="fire-status '+statusClass(t)+'">'+alert+'</span></td><td>'+esc(t.domain||'—')+'</td></tr>';
+      }).join('')+'</tbody></table></div>';
   }
 
   async function updateTrackingStatus(id, status) {
@@ -293,7 +378,10 @@ const Tasks = (() => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'עדכון הסטטוס נכשל');
       const row = _tracking.find(t => t.id === id);
-      if (row) row.status = status;
+      if (row) {
+        row.status = status;
+        if (status === 'done' && data.completed_at) row.completed_date = data.completed_at.slice(0,10);
+      }
       showToast('הסטטוס עודכן');
       renderTracking();
     } catch (e) { showToast(e.message || 'שגיאה בעדכון הסטטוס', 'error'); await refresh(); }
@@ -365,7 +453,7 @@ const Tasks = (() => {
     document.getElementById('filterPriority').value = '';
     const today = todayISOIL();
     let list = _all;
-    if (type === 'open') list = list.filter(t => ['open','in_progress'].includes(t.status));
+    if (type === 'open') list = list.filter(t => ['open','in_progress','waiting_approval'].includes(t.status));
     if (type === 'urgent') list = list.filter(t => ['urgent','high'].includes(t.priority) && t.status !== 'done' && t.status !== 'cancelled');
     if (type === 'overdue') list = list.filter(t => t.due_date && t.due_date < today && t.status !== 'done' && t.status !== 'cancelled');
     render(list);
@@ -404,15 +492,16 @@ const Tasks = (() => {
     applyFilters,
     showView,
     renderTracking,
+    setTrackingFilter,
     updateTrackingStatus,
     importFireSafetyTracking: async () => {
-      if (!confirm('ייבא את שורות קובץ מעקב כבאות והצלה שחסרות במערכת? משימות שיובאו בעבר ידולגו.')) return;
+      if (!confirm('לסנכרן את 35 הרשומות מתוכנית העבודה שסופקה? הסנכרון יעדכן רק רשומות שסומנו בגרסת הייבוא הזו, לא ימחק משימות קיימות ולא ישנה רשומות אחרות.')) return;
       try {
         const response = await fetch('/api/tasks/import-fire-safety-tracking', { method: 'POST', credentials: 'same-origin' });
         const payload = await response.json();
         if (!response.ok || !payload.success) throw new Error(payload.error || 'הייבוא נכשל');
         const result = payload.result || {};
-        showToast(`ייבוא הסתיים: ${result.imported || 0} נוספו, ${result.skipped_existing || 0} כבר קיימות`);
+        showToast(`סנכרון הסתיים: ${result.created || 0} נוספו, ${result.updated || 0} עודכנו, ${result.unchanged || 0} ללא שינוי`);
         await refresh();
         showView('tracking');
       } catch (error) {

@@ -65,6 +65,18 @@ class UIAssetTests(unittest.TestCase):
         design_system = (ROOT / "app/static/css/design-system.css").read_text(encoding="utf-8")
         self.assertIn(".ds-module-hero", design_system)
 
+    def test_work_plan_page_follows_the_supplied_workbook_structure(self):
+        tasks = (ROOT / "app/templates/tasks.html").read_text(encoding="utf-8")
+        for column in [
+            "שלב / שבוע", "משימה / נושא מרכזי", "נכס רלוונטי", "מס׳ תיק",
+            "טופס להגשה", "גורם אחראי", "תאריך יעד", "סטטוס נוכחי",
+            "הערות ודגשים", "ביצוע בפועל", "ימים ליעד", "התראת מועד", "תחום",
+        ]:
+            self.assertIn(column, tasks)
+        self.assertIn("fireOverdueCount", tasks)
+        self.assertIn("trackingDomainFilter", tasks)
+        self.assertIn("waiting_approval", tasks)
+
     def test_home_dashboard_counts_unverified_documents_as_needing_review(self):
         index = (ROOT / "app/templates/index.html").read_text(encoding="utf-8")
         self.assertIn("פג תוקף / דורש בדיקה", index)
