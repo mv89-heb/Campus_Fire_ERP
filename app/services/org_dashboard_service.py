@@ -68,7 +68,7 @@ def _task_kpis():
     today = date.today()
     overdue = [t for t in tasks if t.status not in ('done', 'cancelled') and t.due_date and t.due_date < today]
     return {
-        "open_count": by_status.get('open', 0) + by_status.get('in_progress', 0),
+        "open_count": by_status.get('open', 0) + by_status.get('in_progress', 0) + by_status.get('waiting_approval', 0),
         "overdue_count": len(overdue),
         "by_status": dict(by_status),
         "urgent_tasks": [
