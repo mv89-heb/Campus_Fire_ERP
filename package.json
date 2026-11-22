@@ -1,0 +1,12 @@
+{
+  "name": "campus-fire-erp-ui-assets",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Local, reproducible CSS utility build for the Flask/Jinja interface",
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.cjs -i ./app/static/css/tailwind.input.css -o ./app/static/css/tailwind.generated.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

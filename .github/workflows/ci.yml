@@ -17,6 +17,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build and verify local Tailwind utilities
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build:css
+          git diff --exit-code -- app/static/css/tailwind.generated.css
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
