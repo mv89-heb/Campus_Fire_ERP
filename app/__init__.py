@@ -21,7 +21,11 @@ class InMemoryCertificateRequest(Request):
     """Keep one-time certificate uploads in memory instead of Werkzeug's disk spool."""
     def _get_file_stream(self, total_content_length, content_type, filename=None, content_length=None):
         path = self.environ.get("PATH_INFO", "")
-        if path.startswith("/api/fire-form-templates/") and path.endswith("/print-package"):
+        # The batch-print endpoint has no template ID; the legacy single-form
+        # endpoint does. Both accept one-time certificate uploads and must bypass
+        # Werkzeug's disk-backed multipart spool.
+        if (path == "/api/fire-form-templates/print-package"
+                or (path.startswith("/api/fire-form-templates/") and path.endswith("/print-package"))):
             return io.BytesIO()
         return super()._get_file_stream(total_content_length, content_type, filename, content_length)
 
