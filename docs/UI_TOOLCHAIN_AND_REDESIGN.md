@@ -25,10 +25,10 @@ Use for rapid component and layout exploration only. Generated React/Next.js out
 Use for brand collateral, training graphics and approved static visual assets. Operational icons must remain vector-based and consistent; Canva is not the source of truth for interactive UI components.
 
 ### Tailwind CSS
-Introduce only as a local build-time dependency if the Render build pipeline can be updated and verified. Scope it with a dedicated prefix (for example `tw-`) and disable Preflight so it cannot reset or damage existing Jinja pages. Keep the existing CSS custom properties as the single source of truth for brand colors, semantic statuses, typography and theme behavior. Do not load Tailwind from a CDN in production.
+Use the pinned local build-time dependency (`tailwindcss@3.4.17`) with a dedicated `tw-` prefix and Preflight disabled. The generated utility stylesheet is committed so the current Python-only Render build can serve it without installing Node packages at deploy time. GitHub CI rebuilds the stylesheet from `package-lock.json` and fails if the committed output is stale. Keep the existing CSS custom properties as the single source of truth for brand colors, semantic statuses, typography and theme behavior. Do not load Tailwind from a CDN in production.
 
 ### Lucide Icons
-Use a pinned, locally bundled Lucide icon set. Replace decorative emoji in navigation and primary controls with consistent accessible SVG icons, while preserving meaningful emoji/text in user content and records. Icons must have accessible labels where they convey meaning.
+Use selected official Lucide SVG symbols bundled in `app/static/img/lucide-sprite.svg`. Replace decorative emoji in navigation and primary controls with consistent accessible SVG icons, while preserving meaningful emoji/text in user content and records. Icons must have accessible labels where they convey meaning. License notices are recorded in `docs/THIRD_PARTY_NOTICES.md`.
 
 ### n8n / Make
 Treat automation platforms as optional external integrations, not application runtime dependencies. Start with low-risk notifications and reminders. Any webhook must use server-side secrets, tenant-scoped authorization, signature verification where supported, idempotency, retries with limits, and audit logging. Never send certificates, personal data, document contents or cross-tenant data to an automation service by default. Do not put safety-critical approvals or compliance state changes exclusively in an external automation.
