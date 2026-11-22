@@ -51,7 +51,7 @@
 .ff-page-header .ff-muted { margin-top:5px; font-size:.84rem; }
 .ff-intro { background:linear-gradient(120deg,var(--tint-primary),var(--color-surface)); border-color:var(--color-border); border-radius:14px; line-height:1.7; }
 .ff-steps { gap:9px; margin:16px 0 20px; }
-.ff-step { padding:13px 14px; border-color:var(--color-border); background:var(--color-surface); box-shadow:var(--shadow-xs); }
+.ff-step { padding:13px 14px; border-color:var(--color-border); background:var(--color-surface); box-shadow:var(--shadow-sm); }
 .ff-step-num { background:var(--color-primary); color:#fff; box-shadow:0 0 0 4px var(--tint-primary); }
 .ff-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:16px; padding:clamp(15px,1.8vw,22px); margin-bottom:16px; box-shadow:var(--shadow-sm); }
 .ff-section-heading { display:flex; align-items:center; gap:11px; min-width:0; }
@@ -299,7 +299,7 @@ function addMappedField(){
 }
 function renderMappedFields(){
   const target=document.getElementById('ffMappedFields');
-  target.innerHTML=mappedFields.length?mappedFields.map((f,i)=>'<div class="ff-field-row"><span><b>'+escapeHtml(f.label)+'</b> · '+escapeHtml(f.key)+' · עמוד '+(Number(f.page)+1)+' · X '+Math.round(Number(f.x)*100)+'% / Y '+Math.round(Number(f.y)*100)+'%</span><span><button class="ff-btn secondary ff-map-field-action" type="button" onclick="startMoveMappedField('+i+')">הזזת מיקום</button> <button class="ff-btn secondary ff-map-field-action" type="button" onclick="removeMappedField('+i+')">הסרה</button></span></div>').join(''):'אין שדות מוגדרים.';
+  target.innerHTML=mappedFields.length?mappedFields.map((f,i)=>'<div class="ff-field-row"><span><b>'+escapeHtml(f.label)+'</b> · '+escapeHtml(f.key)+' · עמוד '+(Number(f.page)+1)+' · X '+Math.round(Number(f.x)*100)+'% / Y '+Math.round(Number(f.y)*100)+'%</span><span><button class="ff-btn secondary ff-map-field-action" type="button" onclick="startMoveMappedField('+i+')">'+ffIcon('map-pin')+' הזזת מיקום</button> <button class="ff-btn secondary ff-map-field-action" type="button" onclick="removeMappedField('+i+')">'+ffIcon('x')+' הסרה</button></span></div>').join(''):'אין שדות מוגדרים.';
 }
 function startMoveMappedField(index){
   const field=mappedFields[index];if(!field)return;
