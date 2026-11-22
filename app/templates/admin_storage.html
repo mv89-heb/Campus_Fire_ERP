@@ -19,15 +19,23 @@
 .migration-summary { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin:12px 0; }
 @media (min-width:768px) { .migration-summary { grid-template-columns:repeat(5,1fr); } }
 .migration-note { font-size:var(--text-sm); color:var(--color-text-muted); line-height:1.6; }
+
+.storage-cost-note { display:flex; align-items:flex-start; gap:8px; margin-top:12px; padding:10px 12px; border-radius:9px; background:var(--tint-warning); color:var(--color-warning); font-size:.74rem; line-height:1.55; }
+.storage-cost-note .lucide-icon { width:16px; height:16px; flex:0 0 16px; }
+.migration-note { line-height:1.7; }
+.section-title .lucide-icon { width:17px; height:17px; color:var(--color-primary); }
+.ds-modal h3 .lucide-icon { width:18px; height:18px; vertical-align:middle; }
+.ds-module-hero .lucide-icon { width:18px; height:18px; }
+
 {% endblock %}
 
 {% block content %}
-<div style="margin-bottom:8px;"><a href="/settings" style="color:var(--color-text-muted); font-size:var(--text-sm); text-decoration:none;">⚙️ הגדרות</a> <span style="color:var(--color-text-faint);">/</span> <span style="color:var(--color-text-muted); font-size:var(--text-sm);">ניהול אחסון מסמכים</span></div>
-
-<div class="page-title-row">
-  <h1>🗄️ ניהול אחסון מסמכים</h1>
-  <button class="ds-btn ds-btn-primary" id="btnScan" onclick="StorageAdmin.runScan()">🔍 הרץ סריקה</button>
-</div>
+<header class="ds-module-hero">
+  <div class="ds-module-heading"><span class="ds-module-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-files"></use></svg></span>
+    <div><div class="ds-module-kicker">בקרה על קבצים ואחסון</div><h1>ניהול אחסון מסמכים</h1><p class="ds-module-subtitle">בדיקת תקינות, איתור קבצים חסרים ושחזור מבוקר של מסמכים.</p></div>
+  </div>
+  <div class="ds-module-actions"><button class="ds-btn ds-btn-primary" id="btnScan" onclick="StorageAdmin.runScan()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-search"></use></svg> הרץ סריקה</button></div>
+</header>
 
 <div class="kpi-grid" id="kpiGrid">
   <div class="ds-skeleton" style="height:76px;"></div>
@@ -38,14 +46,15 @@
 
 <div class="ds-card migration-card">
   <div class="section-title">
-    <span>🔄 שחזור והעברת מסמכים ישנים ל-Supabase</span>
+    <span><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-refresh-cw"></use></svg> שחזור והעברת מסמכים ישנים ל-Supabase</span>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="ds-btn ds-btn-primary ds-btn-sm" id="btnGeminiSync" onclick="StorageAdmin.runGeminiSync()">🤖 Gemini: ניתוח מחדש וסנכרון ERP</button>
-      <button class="ds-btn ds-btn-sm" id="btnMigrationScan" onclick="StorageAdmin.runMigrationScan()">🔎 בדוק התאמה</button>
-      <button class="ds-btn ds-btn-primary ds-btn-sm" id="btnMigrationRun" onclick="StorageAdmin.runMigration()">☁️ העבר/שחזר ל-Supabase</button>
+      <button class="ds-btn ds-btn-primary ds-btn-sm" id="btnGeminiSync" onclick="StorageAdmin.runGeminiSync()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-bot"></use></svg> Gemini: ניתוח מחדש וסנכרון ERP</button>
+      <button class="ds-btn ds-btn-sm" id="btnMigrationScan" onclick="StorageAdmin.runMigrationScan()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-search"></use></svg> בדוק התאמה</button>
+      <button class="ds-btn ds-btn-primary ds-btn-sm" id="btnMigrationRun" onclick="StorageAdmin.runMigration()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-files"></use></svg> העבר/שחזר ל-Supabase</button>
     </div>
   </div>
   <div class="migration-note">
+    <b>לפני העברה:</b> בצע תחילה סריקה ובדיקת התאמה. העברה משנה את נתיבי האחסון של הקבצים.
     המערכת בודקת מסמכים ישנים שהנתיב שלהם מצביע ל-Render/דיסק מקומי. מסמך יועבר רק אם הוא קיים מקומית או שנמצא ב-Supabase בדיוק לפי שם הקובץ. מסמכים חסרים או עם שם כפול לא ישונו.
   </div>
   <div class="migration-summary" id="migrationSummary">
@@ -56,18 +65,18 @@
     <div class="ds-kpi-card warn"><div class="ds-kpi-value" id="migAmbiguous">-</div><div class="ds-kpi-label">שמות כפולים</div></div>
   </div>
   <div id="migrationResult" style="font-size:var(--text-sm);"></div>
-  <div id="geminiSyncResult" style="font-size:var(--text-sm); margin-top:10px;"></div>
+  <div class="storage-cost-note"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-activity"></use></svg> ניתוח מחדש דרך Gemini עשוי לצרוך מכסת API או לגרור עלות. הפעולה אינה מתבצעת אוטומטית.</div><div id="geminiSyncResult" style="font-size:var(--text-sm); margin-top:10px;"></div>
 </div>
 
 <div class="ds-card" style="margin-bottom:var(--space-5);">
-  <div class="section-title"><span>⚠️ בעיות שזוהו</span></div>
+  <div class="section-title"><span><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-activity"></use></svg> בעיות שזוהו</span></div>
   <div id="issuesBox"><div class="ds-skeleton" style="height:40px;"></div></div>
 </div>
 
 <div class="ds-card">
   <div class="section-title">
-    <span>🧹 ניקוי קבצים יתומים (Orphans)</span>
-    <button class="ds-btn ds-btn-sm" onclick="StorageAdmin.loadPreview()">🔄 רענן רשימה</button>
+    <span><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-files"></use></svg> ניקוי קבצים יתומים (Orphans)</span>
+    <button class="ds-btn ds-btn-sm" onclick="StorageAdmin.loadPreview()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-refresh-cw"></use></svg> רענן רשימה</button>
   </div>
   <div class="select-links" id="selectLinks" style="display:none; margin-bottom:8px;">
     <a onclick="StorageAdmin.selectAll()">בחר הכל</a>
@@ -75,7 +84,7 @@
   </div>
   <div class="cleanup-bar" id="cleanupBar">
     <span id="cleanupCount">0 נבחרו</span>
-    <button class="ds-btn ds-btn-sm" style="background:var(--color-danger); color:#fff; border:none;" onclick="StorageAdmin.confirmCleanup()">🗑️ אשר מחיקה של הנבחרים</button>
+    <button class="ds-btn ds-btn-sm" style="background:var(--color-danger); color:#fff; border:none;" onclick="StorageAdmin.confirmCleanup()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-x"></use></svg> אשר מחיקה של הנבחרים</button>
   </div>
   <div class="table-scroll">
     <table class="ds-table" id="orphanTable" style="display:none;">
@@ -83,14 +92,14 @@
       <tbody id="orphanBody"></tbody>
     </table>
     <div id="orphanEmpty" style="display:none;" class="ds-empty-state">
-      <div class="ds-empty-icon">✅</div><div class="ds-empty-title">אין קבצים יתומים</div><div class="ds-empty-desc">כל הקבצים באחסון משויכים לרשומה במסד הנתונים.</div>
+      <div class="ds-empty-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-circle-check"></use></svg></div><div class="ds-empty-title">אין קבצים יתומים</div><div class="ds-empty-desc">כל הקבצים באחסון משויכים לרשומה במסד הנתונים.</div>
     </div>
   </div>
 </div>
 
 <div class="ds-modal-overlay" id="cleanupConfirmModal">
   <div class="ds-modal" style="max-width:420px;">
-    <h3 style="margin-bottom:10px;">🗑️ אישור ניקוי קבצים יתומים</h3>
+    <h3 style="margin-bottom:10px;"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-x"></use></svg> אישור ניקוי קבצים יתומים</h3>
     <p style="font-size:var(--text-sm); color:var(--color-text-muted); margin-bottom:14px;">
       <span id="cleanupConfirmCount"></span> קבצים ימחקו לצמיתות מהאחסון. הפעולה נבדקת שוב ברגע האמת.
     </p>
