@@ -81,6 +81,8 @@ class UIAssetTests(unittest.TestCase):
         self.assertIn("waiting_approval", tasks)
         dashboard = (ROOT / "app/templates/org_dashboard.html").read_text(encoding="utf-8")
         self.assertIn("waiting_approval: 'ממתין לאישור'", dashboard)
+        self.assertIn('href="/tasks"', dashboard)
+        self.assertIn("לתוכנית העבודה", dashboard)
         dashboard_service = (ROOT / "app/services/org_dashboard_service.py").read_text(encoding="utf-8")
         self.assertIn("גרסה: 2026-11-22-v2", dashboard_service)
         self.assertIn("ייבוא טבלת מעקב כבאות והצלה", dashboard_service)
