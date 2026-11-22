@@ -124,72 +124,174 @@ td { vertical-align: middle; }
   .bar-label { font-size: .65rem; overflow-wrap: anywhere; }
 }
 
+/* Operational dashboard — decision-first hierarchy and responsive layout */
+.dashboard-page { max-width: 1600px; margin: 0 auto; }
+.dashboard-hero {
+  display:flex; align-items:flex-end; justify-content:space-between; gap:20px;
+  padding: 8px 0 20px; margin-bottom:20px;
+  border-bottom:1px solid var(--color-border);
+}
+.dashboard-kicker {
+  display:flex; align-items:center; gap:7px; color:var(--color-primary);
+  font-size:.72rem; font-weight:800; letter-spacing:.04em; margin-bottom:7px;
+}
+.dashboard-hero h1 { font-size:clamp(1.5rem,2.6vw,2.15rem); font-weight:850; letter-spacing:-.035em; }
+.dashboard-subtitle { color:var(--color-text-muted); font-size:.88rem; margin-top:6px; line-height:1.6; }
+.dashboard-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.dashboard-updated { color:var(--color-text-muted); font-size:.72rem; }
+.dashboard-section-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:20px 0 10px; }
+.dashboard-section-heading h2 { font-size:.98rem; font-weight:800; }
+.dashboard-section-heading p { color:var(--color-text-muted); font-size:.73rem; }
+.dashboard-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr)); gap:10px; }
+.dashboard-kpi-grid .kpi-card { min-height:112px; }
+.dashboard-kpi-grid .kpi-label { max-width:100%; }
+.dashboard-kpi-note { color:var(--color-text-muted); font-size:.66rem; line-height:1.35; margin-top:5px; }
+.kpi-card.neutral::after { background:var(--color-neutral); }
+.dashboard-insight-grid { display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.5fr); gap:14px; margin-top:16px; align-items:stretch; }
+.dashboard-insight-grid .card { margin-bottom:0; min-width:0; }
+.dashboard-card-title { display:flex; align-items:center; gap:9px; }
+.dashboard-card-title .lucide-icon { color:var(--color-primary); }
+.dashboard-integrity-body { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.dashboard-integrity-copy { color:var(--color-text-muted); font-size:.8rem; line-height:1.6; }
+.dashboard-integrity-counts { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+.dashboard-integrity-count { border:1px solid var(--color-border); background:var(--color-bg); border-radius:8px; padding:6px 9px; font-size:.72rem; }
+.dashboard-integrity-action { margin-top:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.dashboard-integrity-warning { color:var(--color-warning); font-size:.72rem; line-height:1.5; }
+.dashboard-action-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:9px; }
+.dashboard-action-link {
+  display:flex; align-items:center; gap:10px; min-width:0; padding:12px;
+  border:1px solid var(--color-border); border-radius:11px;
+  background:var(--color-bg); color:var(--color-text); text-decoration:none;
+  transition:transform .16s ease,border-color .16s ease,background .16s ease;
+}
+.dashboard-action-link:hover { transform:translateY(-1px); border-color:var(--color-border-strong); background:var(--color-surface-hover); }
+.dashboard-action-icon { display:grid; place-items:center; width:34px; height:34px; flex:0 0 34px; border-radius:9px; background:var(--tint-warning); color:var(--color-warning); }
+.dashboard-action-link.bad .dashboard-action-icon { background:var(--tint-danger); color:var(--color-danger); }
+.dashboard-action-copy { min-width:0; }
+.dashboard-action-count { font-size:1.2rem; font-weight:850; line-height:1.1; font-variant-numeric:tabular-nums; }
+.dashboard-action-label { color:var(--color-text-muted); font-size:.72rem; line-height:1.4; margin-top:4px; }
+.dashboard-chart-grid, .dashboard-table-grid { margin-top:14px; }
+.dashboard-table-host { min-width:0; overflow-x:auto; }
+.dashboard-table-host table { min-width:420px; }
+.dashboard-table-host th { white-space:nowrap; }
+.dashboard-date-note { display:inline-flex; margin-inline-start:5px; font-size:.66rem; color:var(--color-warning); }
+.dashboard-empty { display:flex; align-items:center; justify-content:center; gap:8px; min-height:70px; color:var(--color-text-muted); font-size:.82rem; }
+.dashboard-empty .lucide-icon { color:var(--color-success); }
+.dashboard-page .btn { min-height:40px; }
+.dashboard-page .retry-btn { min-height:40px; }
+@media(max-width:900px) {
+  .dashboard-insight-grid { grid-template-columns:1fr; }
+}
+@media(max-width:620px) {
+  .dashboard-hero { align-items:flex-start; flex-direction:column; gap:12px; }
+  .dashboard-actions { width:100%; justify-content:space-between; }
+  .dashboard-section-heading { align-items:flex-start; flex-direction:column; gap:3px; }
+  .dashboard-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .dashboard-kpi-grid .kpi-card { min-height:100px; padding:12px; }
+  .dashboard-action-grid { grid-template-columns:1fr; }
+  .dashboard-table-host table { min-width:390px; }
+}
+
 {% endblock %}
 
 {% block content %}
-<div class="page-title-row">
-  <h1>🏠 דשבורד ארגוני</h1>
-  <button class="btn" onclick="loadDashboard(true)" title="רענון מיידי (עוקף מטמון)">🔄 רענן</button>
-</div>
+<div class="dashboard-page">
+  <header class="dashboard-hero">
+    <div>
+      <div class="dashboard-kicker"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-shield-check"></use></svg> מרכז שליטה תפעולי</div>
+      <h1>תמונת מצב בטיחות</h1>
+      <p class="dashboard-subtitle">מעקב אחר אישורים, ליקויים, ציוד ומשימות — עם דגש על הנושאים שדורשים טיפול.</p>
+    </div>
+    <div class="dashboard-actions">
+      <span id="dashboardLastUpdated" class="dashboard-updated">הנתונים נטענים…</span>
+      <button class="btn" onclick="loadDashboard(true)" title="רענון נתונים מהשרת">
+        <svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-refresh-cw"></use></svg>
+        רענן נתונים
+      </button>
+    </div>
+  </header>
 
-<section aria-label="מדדי מפתח"><div class="kpi-grid" id="kpiGrid">
-  <div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div>
-  <div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div>
-</div></section>
+  <section aria-label="מדדים מרכזיים">
+    <div class="dashboard-section-heading">
+      <h2>מדדים מרכזיים</h2>
+      <p>הנתונים מוצגים לפי המידע הקיים במערכת.</p>
+    </div>
+    <div class="kpi-grid dashboard-kpi-grid" id="kpiGrid">
+      <div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div>
+      <div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div>
+    </div>
+  </section>
 
-<div class="card" id="dataIntegrityCard" style="border-right:4px solid var(--warning);">
-  <div class="card-title">🧹 איכות וסדר הנתונים</div>
-  <div id="dataIntegrityBody" class="empty-state">בודק כפילויות וקשרים...</div>
-</div>
+  <div class="dashboard-insight-grid">
+    <section class="card" id="dataIntegrityCard" aria-labelledby="dataIntegrityTitle">
+      <div class="card-title dashboard-card-title" id="dataIntegrityTitle">
+        <svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-activity"></use></svg>
+        איכות הנתונים
+      </div>
+      <div id="dataIntegrityBody" class="dashboard-integrity-copy">בודק כפילויות וקשרים…</div>
+    </section>
 
-<div class="card" id="actionCenter" style="border-right:4px solid var(--critical);">
-  <div class="card-title">🎯 דורש טיפול עכשיו</div>
-  <div id="actionCenterBody" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
-    <div class="skeleton skeleton-row"></div>
+    <section class="card" id="actionCenter" aria-labelledby="actionCenterTitle">
+      <div class="card-title dashboard-card-title" id="actionCenterTitle">
+        <svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-clock"></use></svg>
+        דורש טיפול עכשיו
+      </div>
+      <div id="actionCenterBody" class="dashboard-action-grid">
+        <div class="skeleton skeleton-row"></div>
+      </div>
+    </section>
   </div>
-</div>
 
-<div class="grid-2">
-  <div class="card">
-    <div class="card-title">📅 אישורים לפי חודש תפוגה</div>
-    <div id="chartByMonth" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+  <div class="dashboard-section-heading">
+    <h2>מגמות וסטטוסים</h2>
+    <p>התפלגות הנתונים לפי סוג.</p>
   </div>
-  <div class="card">
-    <div class="card-title">📊 סטטוס אישורים</div>
-    <div id="chartByStatus" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+  <div class="grid-2 dashboard-chart-grid">
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-calendar-clock"></use></svg> אישורים לפי חודש תפוגה</div>
+      <div id="chartByMonth" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-files"></use></svg> סטטוס אישורים</div>
+      <div id="chartByStatus" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+    </div>
   </div>
-</div>
 
-<div class="grid-2">
-  <div class="card">
-    <div class="card-title">⚠️ ליקויים פתוחים לפי חומרה</div>
-    <div id="chartDeficiencies" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+  <div class="grid-2 dashboard-chart-grid">
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-wrench"></use></svg> ליקויים פתוחים לפי חומרה</div>
+      <div id="chartDeficiencies" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-list-checks"></use></svg> משימות לפי סטטוס</div>
+      <div id="chartTasks" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
+    </div>
   </div>
-  <div class="card">
-    <div class="card-title">✅ משימות לפי סטטוס</div>
-    <div id="chartTasks" class="bar-chart"><div class="skeleton skeleton-chart" style="width:100%"></div></div>
-  </div>
-</div>
 
-<div class="grid-2">
-  <div class="card">
-    <div class="card-title">⏳ אישורים הקרובים לפקיעה</div>
-    <div id="tblExpirations"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+  <div class="dashboard-section-heading">
+    <h2>רשימות עבודה</h2>
+    <p>פריטים נבחרים שמאפשרים מעבר מהיר לטיפול.</p>
   </div>
-  <div class="card">
-    <div class="card-title">🔥 משימות דחופות</div>
-    <div id="tblUrgentTasks"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+  <div class="grid-2 dashboard-table-grid">
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-calendar-clock"></use></svg> אישורים הקרובים לפקיעה</div>
+      <div id="tblExpirations" class="dashboard-table-host"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-clock"></use></svg> משימות דחופות</div>
+      <div id="tblUrgentTasks" class="dashboard-table-host"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+    </div>
   </div>
-</div>
 
-<div class="grid-2">
-  <div class="card">
-    <div class="card-title">🔍 ביקורות השבוע</div>
-    <div id="tblAudits"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
-  </div>
-  <div class="card">
-    <div class="card-title">🧯 ציוד הדורש טיפול</div>
-    <div id="tblEquipment"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+  <div class="grid-2 dashboard-table-grid">
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-clipboard-check"></use></svg> ביקורות השבוע</div>
+      <div id="tblAudits" class="dashboard-table-host"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title dashboard-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-fire-extinguisher"></use></svg> ציוד הדורש טיפול</div>
+      <div id="tblEquipment" class="dashboard-table-host"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -197,21 +299,39 @@ td { vertical-align: middle; }
 {% block extra_script %}
 <script>
 function esc(s) { return (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function dashboardIcon(name) {
+  return '<svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="/static/img/lucide-sprite.svg#icon-' + name + '"></use></svg>';
+}
+function dashboardEmpty(message) {
+  return '<div class="dashboard-empty">' + dashboardIcon('circle-check') + '<span>' + esc(message) + '</span></div>';
+}
+function dashboardDateNote(value) {
+  if (!value) return '';
+  const state = fireSafetyDateState(value);
+  if (state === 'overdue') return '<span class="dashboard-date-note">באיחור</span>';
+  if (state === 'due_soon') return '<span class="dashboard-date-note">קרוב למועד</span>';
+  return '';
+}
 
 function renderBarChart(elId, dataObj, labelMap = {}) {
   const el = document.getElementById(elId);
   const entries = Object.entries(dataObj || {});
-  if (!entries.length) { el.innerHTML = '<div class="empty-state">אין נתונים</div>'; return; }
-  const max = Math.max(...entries.map(([, v]) => v), 1);
-  el.innerHTML = entries.map(([k, v]) => `
-    <div class="bar-col">
-      <div class="bar-value">${v}</div>
-      <div class="bar" style="height:${Math.max(4, (v / max) * 100)}%"></div>
-      <div class="bar-label">${esc(labelMap[k] || k)}</div>
-    </div>`).join('');
+  if (!entries.length) { el.innerHTML = dashboardEmpty('אין נתונים להצגה'); return; }
+  const max = Math.max(...entries.map(([, value]) => Number(value) || 0), 1);
+  el.innerHTML = entries.map(([key, rawValue]) => {
+    const value = Number(rawValue) || 0;
+    const height = Math.max(4, (value / max) * 100);
+    return `
+      <div class="bar-col" role="img" aria-label="${esc(labelMap[key] || key)}: ${value}">
+        <div class="bar-value">${value}</div>
+        <div class="bar" style="height:${height}%"></div>
+        <div class="bar-label">${esc(labelMap[key] || key)}</div>
+      </div>`;
+  }).join('');
 }
 
 async function loadDashboard(forceRefresh = false) {
+  const grid = document.getElementById('kpiGrid');
   try {
     const [dashboardRes, integrityRes] = await Promise.all([
       fetch('/api/org-dashboard' + (forceRefresh ? '?refresh=true' : '')),
@@ -220,95 +340,125 @@ async function loadDashboard(forceRefresh = false) {
     if (!dashboardRes.ok || !integrityRes.ok) throw new Error('שגיאת שרת');
     const d = await dashboardRes.json();
     const integrity = await integrityRes.json();
-    const dup = Object.values(integrity.duplicates || {}).reduce((a, b) => a + Number(b || 0), 0);
-    const orphan = Object.values(integrity.orphans || {}).reduce((a, b) => a + Number(b || 0), 0);
-    const review = Object.values(integrity.review || {}).reduce((a, b) => a + Number(b || 0), 0);
+
+    const dup = Object.values(integrity.duplicates || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+    const orphan = Object.values(integrity.orphans || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+    const review = Object.values(integrity.review || {}).reduce((sum, value) => sum + Number(value || 0), 0);
     const integrityBody = document.getElementById('dataIntegrityBody');
+
     if (dup === 0 && orphan === 0 && review === 0) {
-      integrityBody.innerHTML = '<span class="pill valid">✓ הנתונים נקיים ומקושרים</span>';
+      integrityBody.innerHTML = '<div class="dashboard-integrity-copy">הסריקה הנוכחית לא מצאה כפילויות או קשרים הדורשים בדיקה.</div><div class="dashboard-integrity-counts"><span class="dashboard-integrity-count">כפילויות: 0</span><span class="dashboard-integrity-count">קשרים לבדיקה: 0</span><span class="dashboard-integrity-count">פריטים לבדיקה: 0</span></div>';
     } else {
       const parts = [];
       if (dup) parts.push('כפילויות: ' + dup);
-      if (orphan) parts.push('קשרים חסרים/יתומים: ' + orphan);
-      if (review) parts.push('דורש בדיקה: ' + review);
-      integrityBody.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;"><span class="pill warning">⚠ ' + esc(parts.join(' · ')) + '</span>' + (dup ? '<button class="btn" onclick="repairDataIntegrity()">🧹 נקה כפילויות בטוחות</button>' : '') + '</div>';
+      if (orphan) parts.push('קשרים לבדיקה: ' + orphan);
+      if (review) parts.push('פריטים לבדיקה: ' + review);
+      integrityBody.innerHTML = '<div class="dashboard-integrity-copy">נמצאו ממצאים בסריקה. מומלץ לעיין בהם לפני ביצוע פעולת תיקון.</div><div class="dashboard-integrity-counts">' +
+        parts.map(part => '<span class="dashboard-integrity-count">' + esc(part) + '</span>').join('') +
+        '</div>' +
+        (dup ? '<div class="dashboard-integrity-action"><button class="btn" type="button" onclick="repairDataIntegrity()">' + dashboardIcon('wrench') + ' מיזוג כפילויות זהות</button><span class="dashboard-integrity-warning">פעולה זו משנה רשומות וקשרים. יש לבדוק את הסיכום ולאשר במפורש לפני ביצוע.</span></div>' : '');
     }
 
-    document.getElementById('kpiGrid').innerHTML = `
-      <div class="kpi-card ${d.readiness_score >= 80 ? 'good' : d.readiness_score >= 50 ? 'warn' : 'bad'}">
-        <div class="kpi-value">${d.readiness_score != null ? d.readiness_score + '%' : '—'}</div>
-        <div class="kpi-label">מוכנות כללית</div>
+    const readiness = Number.isFinite(Number(d.readiness_score)) && d.readiness_score !== null
+      ? Math.round(Number(d.readiness_score)) : null;
+    const readinessClass = readiness === null ? 'neutral' : readiness >= 80 ? 'good' : readiness >= 50 ? 'warn' : 'bad';
+    const permits = d.permits || {};
+    const tasks = d.tasks || {};
+    const deficiencies = d.deficiencies || {};
+    const equipment = d.equipment || {};
+    const documents = d.documents || {};
+
+    grid.innerHTML = `
+      <div class="kpi-card ${readinessClass}">
+        <div class="kpi-value">${readiness === null ? 'לא זמין' : readiness + '%'}</div>
+        <div class="kpi-label">מדד מסמכים וציוד</div>
+        <div class="dashboard-kpi-note">מחושב מנתוני אישורים וציוד בלבד</div>
       </div>
-      <div class="kpi-card good"><div class="kpi-value">${d.permits.active_count}</div><div class="kpi-label">אישורים תקינים</div></div>
-      <div class="kpi-card warn"><div class="kpi-value">${d.permits.warning_30_count}</div><div class="kpi-label">אישורים לקראת פקיעה</div></div>
-      <div class="kpi-card warn"><div class="kpi-value">${d.tasks.open_count}</div><div class="kpi-label">משימות פתוחות</div></div>
-      <div class="kpi-card bad"><div class="kpi-value">${d.deficiencies.open_count}</div><div class="kpi-label">ליקויים פתוחים</div></div>
-      <div class="kpi-card bad"><div class="kpi-value">${d.equipment.faulty_count}</div><div class="kpi-label">ציוד לא תקין</div></div>
+      <div class="kpi-card good"><div class="kpi-value">${Number(permits.active_count || 0)}</div><div class="kpi-label">אישורים בתוקף</div></div>
+      <div class="kpi-card warn"><div class="kpi-value">${Number(permits.warning_30_count || 0)}</div><div class="kpi-label">אישורים לקראת פקיעה</div></div>
+      <div class="kpi-card ${Number(permits.needs_review_count || 0) ? 'warn' : 'good'}"><div class="kpi-value">${Number(permits.needs_review_count || 0)}</div><div class="kpi-label">אישורים ללא תוקף מאומת</div></div>
+      <div class="kpi-card ${Number(tasks.overdue_count || 0) ? 'bad' : 'good'}"><div class="kpi-value">${Number(tasks.overdue_count || 0)}</div><div class="kpi-label">משימות באיחור</div></div>
+      <div class="kpi-card ${Number(deficiencies.open_count || 0) ? 'bad' : 'good'}"><div class="kpi-value">${Number(deficiencies.open_count || 0)}</div><div class="kpi-label">ליקויים פתוחים</div></div>
+      <div class="kpi-card ${Number(equipment.faulty_count || 0) ? 'bad' : 'good'}"><div class="kpi-value">${Number(equipment.faulty_count || 0)}</div><div class="kpi-label">ציוד לא תקין</div></div>
     `;
 
     const actions = [
-      {label:'משימות באיחור', count:d.tasks.overdue_count || 0, url:'/tasks', icon:'⏰', cls:'bad'},
-      {label:'ליקויים קריטיים', count:d.deficiencies.critical_count || 0, url:'/audits', icon:'🔴', cls:'bad'},
-      {label:'ליקויים באיחור', count:d.deficiencies.overdue_count || 0, url:'/audits', icon:'⚠️', cls:'warn'},
-      {label:'מסמכים ללא ניתוח Gemini', count:d.documents?.unanalyzed_count || 0, url:'/document-intelligence', icon:'🤖', cls:'warn'},
-      {label:'מסמכים לבדיקה', count:d.documents?.review_count || 0, url:'/document-intelligence', icon:'🔎', cls:'warn'},
-      {label:'בדיקות ציוד שהגיעו', count:d.equipment.checks_due_count || 0, url:'/equipment', icon:'🧯', cls:'warn'}
-    ].filter(x => x.count > 0);
+      {label:'אישורים שפג תוקפם', count:Number(permits.expired_count || 0), url:'/', icon:'files', cls:'bad'},
+      {label:'משימות באיחור', count:Number(tasks.overdue_count || 0), url:'/tasks', icon:'clock', cls:'bad'},
+      {label:'ליקויים קריטיים', count:Number(deficiencies.critical_count || 0), url:'/audits', icon:'wrench', cls:'bad'},
+      {label:'ליקויים באיחור', count:Number(deficiencies.overdue_count || 0), url:'/audits', icon:'activity', cls:'warn'},
+      {label:'מסמכים ללא ניתוח', count:Number(documents.unanalyzed_count || 0), url:'/document-intelligence', icon:'bot', cls:'warn'},
+      {label:'מסמכים לבדיקה', count:Number(documents.review_count || 0), url:'/document-intelligence', icon:'search', cls:'warn'},
+      {label:'בדיקות ציוד שהגיעו', count:Number(equipment.checks_due_count || 0), url:'/equipment', icon:'calendar-clock', cls:'warn'},
+      {label:'ציוד לא תקין', count:Number(equipment.faulty_count || 0), url:'/equipment', icon:'wrench', cls:'bad'}
+    ].filter(item => item.count > 0);
+
     document.getElementById('actionCenterBody').innerHTML = actions.length
-      ? actions.map(x => '<a href="'+x.url+'" class="kpi-card '+x.cls+'" style="text-decoration:none;"><div class="kpi-value">'+x.icon+' '+x.count+'</div><div class="kpi-label">'+esc(x.label)+'</div></a>').join('')
-      : '<div class="empty-state" style="grid-column:1/-1;">✅ אין פריטים דחופים כרגע</div>';
+      ? actions.map(item => '<a href="' + item.url + '" class="dashboard-action-link ' + item.cls + '"><span class="dashboard-action-icon">' + dashboardIcon(item.icon) + '</span><span class="dashboard-action-copy"><span class="dashboard-action-count">' + item.count + '</span><span class="dashboard-action-label">' + esc(item.label) + '</span></span></a>').join('')
+      : dashboardEmpty('אין כרגע פריטים דחופים לפי הנתונים הזמינים');
 
-    renderBarChart('chartByMonth', d.permits.by_month);
-    renderBarChart('chartByStatus', d.permits.by_status, { valid: 'תקין', warning: 'אזהרה', expired: 'פג תוקף' });
-    renderBarChart('chartDeficiencies', d.deficiencies.by_severity, { low: 'נמוך', medium: 'בינוני', high: 'גבוה', critical: 'קריטי' });
-    renderBarChart('chartTasks', d.tasks.by_status, { open: 'פתוחה', in_progress: 'בביצוע', done: 'הושלמה', cancelled: 'בוטלה' });
+    renderBarChart('chartByMonth', permits.by_month);
+    renderBarChart('chartByStatus', permits.by_status, { valid: 'בתוקף', warning: 'לקראת פקיעה', critical: 'קריטי', expired: 'פג תוקף', needs_review: 'לבדיקה' });
+    renderBarChart('chartDeficiencies', deficiencies.by_severity, { low: 'נמוך', medium: 'בינוני', high: 'גבוה', critical: 'קריטי' });
+    renderBarChart('chartTasks', tasks.by_status, { open: 'פתוחה', in_progress: 'בביצוע', done: 'הושלמה', cancelled: 'בוטלה' });
 
+    const expirations = Array.isArray(permits.upcoming_expirations) ? permits.upcoming_expirations : [];
     const expEl = document.getElementById('tblExpirations');
-    expEl.innerHTML = d.permits.upcoming_expirations.length ? `
-      <table><thead><tr><th>מסמך</th><th>תוקף</th><th>ימים</th></tr></thead><tbody>
-        ${d.permits.upcoming_expirations.map(p => `
-          <tr><td>${esc(p.permit_number || p.file_name)}</td><td>${p.expiry_date ? formatDateIL(p.expiry_date) + (fireSafetyDateState(p.expiry_date)==='overdue' ? ' 🔴' : fireSafetyDateState(p.expiry_date)==='due_soon' ? ' 🟠' : '') : '—'}</td>
-          <td><span class="pill ${p.days_left < 0 ? 'expired' : p.days_left <= 14 ? 'warning' : 'valid'}">${p.days_left} ימים</span></td></tr>`).join('')}
-      </tbody></table>` : '<div class="empty-state">אין אישורים שפגים בקרוב</div>';
+    expEl.innerHTML = expirations.length ? `
+      <table><thead><tr><th>מסמך</th><th>תוקף</th><th>ימים שנותרו</th></tr></thead><tbody>
+        ${expirations.map(item => `
+          <tr>
+            <td>${esc(item.permit_number || item.file_name || 'מסמך ללא שם')}</td>
+            <td>${item.expiry_date ? formatDateIL(item.expiry_date) + dashboardDateNote(item.expiry_date) : 'לא ידוע'}</td>
+            <td><span class="pill ${item.days_left <= 14 ? 'warning' : 'valid'}">${Number(item.days_left)} ימים</span></td>
+          </tr>`).join('')}
+      </tbody></table>` : dashboardEmpty('אין אישורים שפגים ב־60 הימים הקרובים');
 
+    const urgentTasks = Array.isArray(tasks.urgent_tasks) ? tasks.urgent_tasks : [];
     const taskEl = document.getElementById('tblUrgentTasks');
-    taskEl.innerHTML = d.tasks.urgent_tasks.length ? `
+    taskEl.innerHTML = urgentTasks.length ? `
       <table><thead><tr><th>משימה</th><th>עדיפות</th><th>יעד</th></tr></thead><tbody>
-        ${d.tasks.urgent_tasks.map(t => `
-          <tr><td>${esc(t.title)}</td><td><span class="pill ${t.priority === 'urgent' ? 'critical' : 'high'}">${t.priority}</span></td><td>${t.due_date ? formatDateIL(t.due_date) + (fireSafetyDateState(t.due_date)==='overdue' ? ' 🔴' : fireSafetyDateState(t.due_date)==='due_soon' ? ' 🟠' : '') : '—'}</td></tr>`).join('')}
-      </tbody></table>` : '<div class="empty-state">אין משימות דחופות</div>';
+        ${urgentTasks.map(item => `
+          <tr>
+            <td>${esc(item.title)}</td>
+            <td><span class="pill ${item.priority === 'urgent' ? 'critical' : 'high'}">${esc(item.priority)}</span></td>
+            <td>${item.due_date ? formatDateIL(item.due_date) + dashboardDateNote(item.due_date) : 'לא נקבע יעד'}</td>
+          </tr>`).join('')}
+      </tbody></table>` : dashboardEmpty('אין משימות דחופות');
 
+    const audits = Array.isArray(d.audits?.this_week) ? d.audits.this_week : [];
     const auditEl = document.getElementById('tblAudits');
-    auditEl.innerHTML = d.audits.this_week.length ? `
+    auditEl.innerHTML = audits.length ? `
       <table><thead><tr><th>מספר ביקורת</th><th>תאריך</th></tr></thead><tbody>
-        ${d.audits.this_week.map(a => `<tr><td>${esc(a.audit_number || ('#' + a.id))}</td><td>${formatDateIL(a.audit_date)}</td></tr>`).join('')}
-      </tbody></table>` : '<div class="empty-state">אין ביקורות מתוכננות השבוע</div>';
+        ${audits.map(item => '<tr><td>' + esc(item.audit_number || ('#' + item.id)) + '</td><td>' + (item.audit_date ? formatDateIL(item.audit_date) : 'לא נקבע') + '</td></tr>').join('')}
+      </tbody></table>` : dashboardEmpty('אין ביקורות מתוכננות בשבעת הימים הקרובים');
 
+    const faultyItems = Array.isArray(equipment.faulty_items) ? equipment.faulty_items : [];
     const eqEl = document.getElementById('tblEquipment');
-    eqEl.innerHTML = d.equipment.faulty_items.length ? `
-      <table><thead><tr><th>סוג</th><th>מספר סידורי</th></tr></thead><tbody>
-        ${d.equipment.faulty_items.map(e => `<tr><td>${esc(e.equipment_type)}</td><td>${esc(e.serial_number || '—')}</td></tr>`).join('')}
-      </tbody></table>` : '<div class="empty-state">אין ציוד לא תקין</div>';
+    eqEl.innerHTML = faultyItems.length ? `
+      <table><thead><tr><th>סוג ציוד</th><th>מספר סידורי</th></tr></thead><tbody>
+        ${faultyItems.map(item => '<tr><td>' + esc(item.equipment_type) + '</td><td>' + esc(item.serial_number || '—') + '</td></tr>').join('')}
+      </tbody></table>` : dashboardEmpty('אין ציוד לא תקין לפי הרישום הנוכחי');
 
-  } catch (e) {
-    document.getElementById('kpiGrid').innerHTML = `
-      <div class="error-state" style="grid-column: 1 / -1;">
-        ⚠️ שגיאה בטעינת הדשבורד
-        <button class="retry-btn" onclick="loadDashboard(true)">🔄 נסה שוב</button>
-      </div>`;
+    const updated = document.getElementById('dashboardLastUpdated');
+    if (updated) updated.textContent = 'עודכן בשעה ' + new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'});
+  } catch (error) {
+    grid.innerHTML = '<div class="error-state" style="grid-column:1/-1;">טעינת המדדים נכשלה. הנתונים לא עודכנו.<button class="retry-btn" onclick="loadDashboard(true)">' + dashboardIcon('refresh-cw') + ' נסה שוב</button></div>';
+    const updated = document.getElementById('dashboardLastUpdated');
+    if (updated) updated.textContent = 'לא ניתן לעדכן נתונים';
   }
 }
 
 async function repairDataIntegrity() {
   const body = document.getElementById('dataIntegrityBody');
-  if (!confirm('המערכת תמזג רק כפילויות זהות לאחר נרמול, ותשמור על הרשומה הוותיקה. ליקויים לא ימוזגו. להמשיך?')) return;
-  body.innerHTML = 'מבצע ניקוי בטוח...';
+  if (!confirm('אישור מיזוג כפילויות\n\nהמערכת תמזג רשומות זהות לפי מפתח מנורמל, תעביר אליהן קשרים ותמחק את הרשומות הכפולות. יש לוודא שהמידע אכן כפול לפני האישור. להמשיך?')) return;
+  body.innerHTML = 'ממזג רשומות ומעדכן קשרים…';
   try {
     const res = await fetch('/api/data-integrity/repair', {method:'POST'});
     if (!res.ok) throw new Error('repair failed');
     await loadDashboard(true);
   } catch (e) {
-    body.innerHTML = '<span class="pill critical">ניקוי הנתונים נכשל. נסה שוב.</span>';
+    body.innerHTML = '<span class="pill critical">מיזוג הנתונים נכשל. לא ניתן לאשר שהפעולה הושלמה.</span>';
   }
 }
 
