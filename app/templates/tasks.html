@@ -218,7 +218,8 @@
         </select>
         <select id="taskStatus">
           <option value="open">פתוחה</option>
-          <option value="in_progress">בביצוע</option>
+          <option value="in_progress">בטיפול</option>
+          <option value="waiting_approval">ממתין לאישור</option>
           <option value="done">הושלמה</option>
           <option value="cancelled">בוטלה</option>
         </select>
@@ -364,7 +365,7 @@ const Tasks = (() => {
           '<td class="fire-task-name">'+esc(t.title||'—')+'<div class="fire-muted" style="font-size:.68rem;margin-top:3px;">שורה '+esc(t.source_row)+'</div></td>'+
           '<td>'+esc(t.asset||'—')+'</td><td class="fire-date">'+esc(t.case_number||'—')+'</td><td>'+esc(t.forms||'לא נדרש')+'</td><td>'+esc(t.assignee||'לא הוגדר')+'</td>'+
           '<td class="fire-date">'+escDate(t.due_date)+'</td>'+
-          '<td><select class="status-select" aria-label="סטטוס משימה" onchange="Tasks.updateTrackingStatus('+t.id+',this.value)"><option value="open" '+(t.status==='open'?'selected':'')+'>לביצוע</option><option value="in_progress" '+(t.status==='in_progress'?'selected':'')+'>בטיפול</option><option value="done" '+(t.status==='done'?'selected':'')+'>הושלם</option><option value="cancelled" '+(t.status==='cancelled'?'selected':'')+'>בוטל</option></select></td>'+
+          '<td><select class="status-select" aria-label="סטטוס משימה" onchange="Tasks.updateTrackingStatus('+t.id+',this.value)"><option value="open" '+(t.status==='open'?'selected':'')+'>לביצוע</option><option value="in_progress" '+(t.status==='in_progress'?'selected':'')+'>בטיפול</option><option value="waiting_approval" '+(t.status==='waiting_approval'?'selected':'')+'>ממתין לאישור</option><option value="done" '+(t.status==='done'?'selected':'')+'>הושלם</option><option value="cancelled" '+(t.status==='cancelled'?'selected':'')+'>בוטל</option></select></td>'+
           '<td class="fire-notes">'+esc(t.notes||'—')+'<details><summary class="fire-detail-btn">היסטוריה ופירוט</summary><div class="fire-detail">'+esc(t.description||'')+'</div>'+renderAIReports(t.ai_reports)+'</details></td>'+
           '<td class="fire-date">'+escDate(t.completed_date)+'</td><td class="fire-date">'+dLabel+'</td>'+
           '<td><span class="fire-status '+statusClass(t)+'">'+alert+'</span></td><td>'+esc(t.domain||'—')+'</td></tr>';
