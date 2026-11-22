@@ -197,7 +197,7 @@ async function loadTemplates(){
     const items=await res.json();fireTemplates=items;
     if(!items.length){target.innerHTML='<div class="ff-empty-state">עדיין לא הועלו טפסים.<br>העלה את קובצי ה-PDF או התמונות כדי להתחיל במיפוי.</div>';return;}
     target.innerHTML=items.map(item=>{
-      const mapped=Array.isArray(item.fields_schema)&&item.fields_schema.some(hasMappedFireCoordinates);
+      const mapped=Array.isArray(item.fields_schema)&&item.fields_schema.length>0&&item.fields_schema.every(hasMappedFireCoordinates);
       const fieldCount=Array.isArray(item.fields_schema)?item.fields_schema.length:0;
       return '<article class="ff-row ff-template-item">'+
         '<div class="ff-template-main"><input type="checkbox" class="ff-template-select" value="'+Number(item.id)+'" aria-label="בחירת '+escapeHtml(item.title)+'">'+
@@ -330,7 +330,7 @@ function openBatchPrint(ids=null){
   const fieldMap=new Map();
   selected.forEach(item=>(item.fields_schema||[]).forEach(field=>{if(!fieldMap.has(field.key))fieldMap.set(field.key,field);}));
   const fields=[...fieldMap.values()];
-  const missing=selected.filter(item=>!(item.fields_schema||[]).some(field=>hasMappedFireCoordinates(field)));
+  const missing=selected.filter(item=>{const fields=Array.isArray(item.fields_schema)?item.fields_schema:[];return !fields.length||!fields.every(hasMappedFireCoordinates);});
   if(missing.length){
     const names=missing.map(item=>item.title).join(' · ');
     const status=document.getElementById('ffAutoMapStatus');
