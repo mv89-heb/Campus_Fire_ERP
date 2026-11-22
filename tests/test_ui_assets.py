@@ -79,6 +79,8 @@ class UIAssetTests(unittest.TestCase):
         self.assertIn("trackingPhaseFilter", tasks)
         self.assertIn("trackingOwnerFilter", tasks)
         self.assertIn("waiting_approval", tasks)
+        dashboard = (ROOT / "app/templates/org_dashboard.html").read_text(encoding="utf-8")
+        self.assertIn("waiting_approval: 'ממתין לאישור'", dashboard)
 
     def test_sidebar_is_ordered_around_the_fire_safety_workflow(self):
         shell = (ROOT / "app/templates/_shell.html").read_text(encoding="utf-8")
