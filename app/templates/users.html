@@ -12,21 +12,26 @@
 .inline-form input, .inline-form select { background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border-strong); border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; width: 100%; }
 .modal-actions { display: flex; gap: 8px; margin-top: 14px; }
 .modal-actions .ds-btn { flex: 1; }
+
+.notice { display:flex; align-items:flex-start; gap:10px; line-height:1.7; border-radius:11px; }
+.notice .lucide-icon { width:19px; height:19px; flex:0 0 19px; color:var(--color-warning); margin-top:2px; }
+
 {% endblock %}
 
 {% block content %}
-<div style="margin-bottom:8px;"><a href="/settings" style="color:var(--color-text-muted); font-size:var(--text-sm); text-decoration:none;">⚙️ הגדרות</a> <span style="color:var(--color-text-faint);">/</span> <span style="color:var(--color-text-muted); font-size:var(--text-sm);">משתמשים</span></div>
-<div class="page-title-row">
-  <h1>👥 ניהול משתמשים</h1>
-  <button class="ds-btn ds-btn-primary" onclick="Users.openModal()">➕ משתמש חדש</button>
-</div>
+<header class="ds-module-hero">
+  <div class="ds-module-heading"><span class="ds-module-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-user-round"></use></svg></span>
+    <div><div class="ds-module-kicker">ניהול גישה וחשבונות</div><h1>ניהול משתמשים</h1><p class="ds-module-subtitle">ניהול חשבונות, תפקידים וסטטוס משתמשים.</p></div>
+  </div>
+  <div class="ds-module-actions"><button class="ds-btn ds-btn-primary" onclick="Users.openModal()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-file-plus"></use></svg> משתמש חדש</button></div>
+</header>
 
-<div class="notice">
-  ⚠️ שים לב: מודול זה מכין את התשתית להרשאות (שלב 13), אך ההתחברות עדיין <b>לא</b> נאכפת על אף מסך במערכת. כל מי שיש לו את כתובת המערכת יכול להיכנס כרגיל, ללא קשר למשתמשים שכאן.
+<div class="notice"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-activity"></use></svg>
+  שים לב: מודול זה מכין את התשתית להרשאות (שלב 13), אך ההתחברות עדיין <b>לא</b> נאכפת על אף מסך במערכת. כל מי שיש לו את כתובת המערכת יכול להיכנס כרגיל, ללא קשר למשתמשים שכאן.
 </div>
 
 <div class="ds-card">
-  <div class="ds-card-title">👥 רשימת משתמשים</div>
+  <div class="ds-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-user-round"></use></svg> רשימת משתמשים</div>
   <div id="usersTableWrap"><table class="ds-table">
     <thead><tr><th>שם משתמש</th><th>שם מלא</th><th>תפקיד</th><th>סטטוס</th><th>התחברות אחרונה</th><th>פעולות</th></tr></thead>
     <tbody id="usersBody"><tr><td colspan="6" style="text-align:center;color:var(--color-text-muted)">טוען...</td></tr></tbody>
