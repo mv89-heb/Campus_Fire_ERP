@@ -37,6 +37,10 @@ def normalized_status(value):
     }[value]
 
 
+def confirmed_due_date(row):
+    return None if len(row) > 12 and row[12] == "proposed" else parse_il_date(row[6])
+
+
 def import_rows(dry_run=False):
     app = create_app()
     created = updated = unchanged = 0
@@ -48,7 +52,7 @@ def import_rows(dry_run=False):
                 proposed = bool(extra and extra[0] == "proposed")
                 marker = f"ייבוא טבלת מעקב כבאות והצלה: {SOURCE} | גרסה: {VERSION} | שורה מקורית: {index}"
                 task = Task.query.filter(Task.description.contains(marker)).first()
-                confirmed_due = None if proposed else parse_il_date(target)
+                confirmed_due = confirmed_due_date(row)
                 actual_done = parse_il_date(completed)
                 metadata = [
                     f"שלב / שבוע: {phase}",
