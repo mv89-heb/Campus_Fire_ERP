@@ -79,14 +79,16 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-title-row">
-  <h1>✅ משימות</h1>
-  <div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="btn" onclick="Tasks.importFireSafetyTracking()">📥 ייבוא/רענון נתוני אקסל</button></div>
-</div>
+<header class="ds-module-hero">
+  <div class="ds-module-heading"><span class="ds-module-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-list-checks"></use></svg></span>
+    <div><div class="ds-module-kicker">תפעול ומעקב</div><h1>משימות ומעקב כבאות</h1><p class="ds-module-subtitle">מעקב מרוכז אחר משימות, נכסים, טפסים, מועדים ואחריות לביצוע.</p></div>
+  </div>
+  <div class="ds-module-actions"><button class="btn" onclick="Tasks.importFireSafetyTracking()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-upload"></use></svg> ייבוא / רענון נתוני Excel</button></div>
+</header>
 
 <div class="card" id="trackingCard">
   <div class="card-title">
-    <span>📊 מעקב כבאות והצלה — תצוגת גיליון</span>
+    <svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-chart-no-axes-combined"></use></svg> מעקב כבאות והצלה — תצוגת גיליון
     <span style="font-size:.8rem;color:var(--text-muted);">כל המעקב מרוכז כאן</span>
   </div>
   <div class="tracking-controls">

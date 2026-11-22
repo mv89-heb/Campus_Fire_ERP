@@ -69,15 +69,16 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-title-row">
-  <h1>🧰 ניהול ספקים</h1>
-  <button class="btn btn-primary" onclick="Suppliers.openModal()">➕ ספק חדש</button>
-</div>
-<p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:var(--space-4);">כרטיסי ספק, חוזים וביטוחים</p>
+<header class="ds-module-hero">
+  <div class="ds-module-heading"><span class="ds-module-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-truck"></use></svg></span>
+    <div><div class="ds-module-kicker">ניהול התקשרויות ושירותים</div><h1>ניהול ספקים</h1><p class="ds-module-subtitle">כרטיסי ספק, אנשי קשר, חוזים, ביטוחים ואזורי שירות.</p></div>
+  </div>
+  <div class="ds-module-actions"><button class="btn btn-primary" onclick="Suppliers.openModal()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-file-plus"></use></svg> ספק חדש</button></div>
+</header>
 
 <div class="card">
   <div class="card-title">
-    <span>📋 רשימת ספקים</span>
+    <svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-truck"></use></svg> רשימת ספקים
   </div>
   <div class="filters-row">
     <input type="text" id="filterQ" placeholder="חיפוש לפי שם / איש קשר / טלפון..." oninput="clearTimeout(window._filterDebounce); window._filterDebounce = setTimeout(() => Suppliers.applyFilters(), 150)">
@@ -153,6 +154,12 @@ const Suppliers = (() => {
   };
 
   const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const icon = (name) => '<svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="/static/img/lucide-sprite.svg#icon-' + name + '"></use></svg>';
+  const dateStateTag = (value) => {
+    const state = fireSafetyDateState(value);
+    return state === 'overdue' ? '<span class="supplier-date-state overdue">באיחור</span>' :
+      state === 'due_soon' ? '<span class="supplier-date-state due-soon">קרוב לתוקף</span>' : '';
+  };
   const statusLabel = { active: 'פעיל', inactive: 'לא פעיל', blocked: 'חסום' };
 
   async function refresh() {
@@ -193,14 +200,14 @@ const Suppliers = (() => {
         </div>
         <span class="pill ${s.status}">${statusLabel[s.status] || s.status}</span>
         ${s.rating ? `<div class="rating-stars">${'★'.repeat(s.rating)}${'☆'.repeat(5-s.rating)}</div>` : ''}
-        ${s.contact_name ? `<div class="supplier-row">👤 ${esc(s.contact_name)}</div>` : ''}
-        ${s.phone ? `<div class="supplier-row">📞 ${esc(s.phone)}</div>` : ''}
-        ${s.email ? `<div class="supplier-row">✉️ ${esc(s.email)}</div>` : ''}
-        ${s.contract_expiry ? `<div class="supplier-row">📄 חוזה עד ${formatDateIL(s.contract_expiry)} ${fireSafetyDateState(s.contract_expiry)==='overdue' ? '🔴' : fireSafetyDateState(s.contract_expiry)==='due_soon' ? '🟠' : ''}</div>` : ''}
-        ${s.insurance_expiry ? `<div class="supplier-row">🛡️ ביטוח עד ${formatDateIL(s.insurance_expiry)} ${fireSafetyDateState(s.insurance_expiry)==='overdue' ? '🔴' : fireSafetyDateState(s.insurance_expiry)==='due_soon' ? '🟠' : ''}</div>` : ''}
+        ${s.contact_name ? `<div class="supplier-row">${icon('user-round')} ${esc(s.contact_name)}</div>` : ''}
+        ${s.phone ? `<div class="supplier-row">${icon('phone')} ${esc(s.phone)}</div>` : ''}
+        ${s.email ? `<div class="supplier-row">${icon('mail')} ${esc(s.email)}</div>` : ''}
+        ${s.contract_expiry ? `<div class="supplier-row">${icon('file-check')} חוזה עד ${formatDateIL(s.contract_expiry)} ${dateStateTag(s.contract_expiry)}</div>` : ''}
+        ${s.insurance_expiry ? `<div class="supplier-row">${icon('shield-check')} ביטוח עד ${formatDateIL(s.insurance_expiry)} ${dateStateTag(s.insurance_expiry)}</div>` : ''}
         <div class="supplier-actions">
-          <button class="btn btn-sm" style="flex:1" onclick="Suppliers.openContext(${s.id})">🔗 קשרים</button><button class="btn btn-sm" onclick="Suppliers.openModal(${s.id})">✏️ עריכה</button>
-          <button class="btn btn-sm btn-danger" onclick="Suppliers.remove(${s.id})">🗑️</button>
+          <button class="btn btn-sm" style="flex:1" onclick="Suppliers.openContext(${s.id})">${icon('map-pin')} קשרים</button><button class="btn btn-sm" onclick="Suppliers.openModal(${s.id})">${icon('file-check')} עריכה</button>
+          <button class="btn btn-sm btn-danger" onclick="Suppliers.remove(${s.id})">${icon('x')}</button>
         </div>
       </div>`).join('');
   }
@@ -240,17 +247,17 @@ const Suppliers = (() => {
 
     openContext: async (id) => {
       const s=_all.find(x=>x.id===id); const modal=document.getElementById('supplierContextModal'); const body=document.getElementById('supplierContextBody');
-      document.getElementById('supplierContextTitle').innerText='🚚 '+(s?.company_name||'ספק');
+      document.getElementById('supplierContextTitle').innerHTML=icon('truck')+' '+esc(s?.company_name||'ספק');
       modal.classList.add('open'); body.innerHTML='<div class="empty-state">טוען...</div>';
       try{const r=await fetch('/api/integration/suppliers/'+id);const d=await r.json();if(!r.ok)throw Error(d.error||'שגיאה');
         const link=(href,label)=>'<a class="btn btn-sm" style="display:inline-flex;margin-top:6px;text-decoration:none" href="'+href+'">'+label+'</a>';
-        body.innerHTML='<div class="card"><b>📦 ציוד ('+d.equipment.length+')</b>'+ (d.equipment.slice(0,10).map(e=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(e.equipment_type)+' · '+esc(e.serial_number||'—')+' · '+esc(e.status)+'</div>').join('')||'<div class="muted">אין ציוד</div>')+'</div>'+
-        '<div class="card"><b>🔍 ביקורות באתר ('+d.audits.length+')</b>'+ (d.audits.slice(0,6).map(a=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(a.audit_number||('#'+a.id))+' · '+formatDateIL(a.audit_date)+' · '+esc(a.status)+'</div>').join('')||'<div class="muted">אין ביקורות</div>')+'</div>'+
-        '<div class="card"><b>⚠️ ליקויים פתוחים ('+d.deficiencies.length+')</b>'+ (d.deficiencies.map(x=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(x.title)+' · '+esc(x.severity)+' · יעד '+formatDateIL(x.due_date)+'</div>').join('')||'<div class="muted">אין ליקויים פתוחים</div>')+'</div>'+
-        '<div class="card"><b>📄 מסמכים ('+d.documents.length+')</b>'+ (d.documents.slice(0,10).map(x=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);"><a href="/api/documents/'+x.id+'/file" target="_blank">'+esc(x.file_name)+'</a> · '+esc(x.ai_status)+'</div>').join('')||'<div class="muted">אין מסמכים</div>')+'</div>'+
-        '<div class="card"><b>✅ משימות ('+d.tasks.length+')</b>'+ (d.tasks.slice(0,10).map(x=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(x.title)+' · '+esc(x.status)+' · '+formatDateIL(x.due_date)+'</div>').join('')||'<div class="muted">אין משימות</div>')+'</div>'+
+        body.innerHTML='<div class="card"><b>'+icon('fire-extinguisher')+' ציוד ('+d.equipment.length+')</b>'+ (d.equipment.slice(0,10).map(e=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(e.equipment_type)+' · '+esc(e.serial_number||'—')+' · '+esc(e.status)+'</div>').join('')||'<div class="muted">אין ציוד</div>')+'</div>'+
+        '<div class="card"><b>'+icon('clipboard-check')+' ביקורות באתר ('+d.audits.length+')</b>'+ (d.audits.slice(0,6).map(a=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(a.audit_number||('#'+a.id))+' · '+formatDateIL(a.audit_date)+' · '+esc(a.status)+'</div>').join('')||'<div class="muted">אין ביקורות</div>')+'</div>'+
+        '<div class="card"><b>'+icon('wrench')+' ליקויים פתוחים ('+d.deficiencies.length+')</b>'+ (d.deficiencies.map(x=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(x.title)+' · '+esc(x.severity)+' · יעד '+formatDateIL(x.due_date)+'</div>').join('')||'<div class="muted">אין ליקויים פתוחים</div>')+'</div>'+
+        '<div class="card"><b>'+icon('files')+' מסמכים ('+d.documents.length+')</b>'+ (d.documents.slice(0,10).map(x=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);"><a href="/api/documents/'+x.id+'/file" target="_blank">'+esc(x.file_name)+'</a> · '+esc(x.ai_status)+'</div>').join('')||'<div class="muted">אין מסמכים</div>')+'</div>'+
+        '<div class="card"><b>'+icon('list-checks')+' משימות ('+d.tasks.length+')</b>'+ (d.tasks.slice(0,10).map(x=>'<div style="padding:5px 0;border-bottom:1px solid var(--border);">'+esc(x.title)+' · '+esc(x.status)+' · '+formatDateIL(x.due_date)+'</div>').join('')||'<div class="muted">אין משימות</div>')+'</div>'+
         (d.supplier?.site_id?link('/sites?site_id='+d.supplier.site_id,'פתח אתר הספק'):'');
-      }catch(e){body.innerHTML='<div class="error-state">⚠️ '+esc(e.message)+'</div>}
+      }catch(e){body.innerHTML='<div class="error-state">'+icon('activity')+' '+esc(e.message)+'</div>';}
     },
     openModal: (id) => {
       document.getElementById('supplierModalTitle').innerText = id ? 'עריכת ספק' : 'ספק חדש';

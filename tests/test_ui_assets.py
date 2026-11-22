@@ -10,15 +10,19 @@ ROOT = Path(__file__).resolve().parents[1]
 class UIAssetTests(unittest.TestCase):
     def test_lucide_sprite_is_valid_and_contains_every_shell_icon(self):
         sprite = ROOT / "app/static/img/lucide-sprite.svg"
-        templates = [ROOT / "app/templates/_shell.html", ROOT / "app/templates/org_dashboard.html", ROOT / "app/templates/fire_forms.html", ROOT / "app/templates/document_intelligence.html"]
+        templates = [ROOT / "app/templates/_shell.html", ROOT / "app/templates/org_dashboard.html", ROOT / "app/templates/fire_forms.html", ROOT / "app/templates/document_intelligence.html", ROOT / "app/templates/sites.html", ROOT / "app/templates/equipment.html", ROOT / "app/templates/tasks.html", ROOT / "app/templates/audits.html", ROOT / "app/templates/suppliers.html", ROOT / "app/templates/reports.html"]
         tree = ET.parse(sprite)
         ids = {
             node.attrib["id"]
             for node in tree.iter()
             if node.tag.rsplit("}", 1)[-1] == "symbol" and "id" in node.attrib
         }
-        referenced = set().union(*(set(re.findall(r"#(icon-[a-z0-9-]+)", template.read_text(encoding="utf-8"))) for template in templates))
-        self.assertTrue(referenced, "The shared shell should use local Lucide symbols")
+        referenced = set()
+        for template in templates:
+            source = template.read_text(encoding="utf-8")
+            referenced.update(re.findall(r"#(icon-[a-z0-9-]+)", source))
+            referenced.update("icon-" + name for name in re.findall(r"(?:icon|ffIcon|dashboardIcon)\('([a-z0-9-]+)'\)", source))
+        self.assertTrue(referenced, "The templates should use local Lucide symbols")
         self.assertFalse(referenced - ids, f"Missing local icon symbols: {sorted(referenced - ids)}")
 
     def test_shell_uses_local_rtl_stylesheets_and_prefixed_utilities(self):
@@ -50,6 +54,16 @@ class UIAssetTests(unittest.TestCase):
         self.assertIn("filter,analyze", documents)
         self.assertIn("ניתוח Gemini עשוי לצרוך מכסת API או לגרור עלות", documents)
         self.assertIn("ai-overview-grid", documents)
+
+    def test_operational_pages_share_the_module_header_system(self):
+        pages = ["sites", "equipment", "tasks", "audits", "suppliers"]
+        for page in pages:
+            source = (ROOT / f"app/templates/{page}.html").read_text(encoding="utf-8")
+            self.assertIn("ds-module-hero", source, f"{page} should use the shared module header")
+        reports = (ROOT / "app/templates/reports.html").read_text(encoding="utf-8")
+        self.assertIn("reports-hero", reports)
+        design_system = (ROOT / "app/static/css/design-system.css").read_text(encoding="utf-8")
+        self.assertIn(".ds-module-hero", design_system)
 
 
 if __name__ == "__main__":

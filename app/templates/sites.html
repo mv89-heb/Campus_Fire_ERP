@@ -63,14 +63,15 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-title-row">
-  <h1>🏢 ניהול אתרים</h1>
-  <button class="btn btn-primary" onclick="Sites.openSiteModal()">➕ אתר חדש</button>
-</div>
-<p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:var(--space-4);">היררכיה: אתר ← מבנה ← קומה ← אזור</p>
+<header class="ds-module-hero">
+  <div class="ds-module-heading"><span class="ds-module-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-building"></use></svg></span>
+    <div><div class="ds-module-kicker">מבנה ארגוני ותשתיות</div><h1>ניהול אתרים</h1><p class="ds-module-subtitle">היררכיה ארגונית: אתר ← מבנה ← קומה ← אזור.</p></div>
+  </div>
+  <div class="ds-module-actions"><button class="btn btn-primary" onclick="Sites.openSiteModal()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-file-plus"></use></svg> אתר חדש</button></div>
+</header>
 
 <div class="card">
-  <div class="card-title"><span>🗂️ רשימת אתרים</span></div>
+  <div class="card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-folder-open"></use></svg> רשימת אתרים</div>
   <div id="sitesList"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
 </div>
 

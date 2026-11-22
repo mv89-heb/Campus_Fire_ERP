@@ -49,14 +49,15 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-title-row">
-  <h1>🧯 ציוד כיבוי אש</h1>
-  <button class="btn btn-primary" onclick="Equip.openModal()">➕ ציוד חדש</button>
-</div>
-<p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:var(--space-4);">מטפים, גלגלונים, גלאים ועוד</p>
+<header class="ds-module-hero">
+  <div class="ds-module-heading"><span class="ds-module-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-fire-extinguisher"></use></svg></span>
+    <div><div class="ds-module-kicker">נכסי בטיחות ובדיקות</div><h1>ציוד כיבוי אש</h1><p class="ds-module-subtitle">ניהול מטפים, גלגלונים, גלאים וציוד בטיחות נוסף.</p></div>
+  </div>
+  <div class="ds-module-actions"><button class="btn btn-primary" onclick="Equip.openModal()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-file-plus"></use></svg> ציוד חדש</button></div>
+</header>
 
 <div class="card">
-  <div class="card-title"><span>🧯 רשימת ציוד</span></div>
+  <div class="card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-fire-extinguisher"></use></svg> רשימת ציוד</div>
   <div class="filters-row">
     <input type="text" id="filterQ" placeholder="חיפוש לפי מס' סידורי / דגם / יצרן..." oninput="clearTimeout(window._filterDebounce); window._filterDebounce = setTimeout(() => Equip.applyFilters(), 150)">
     <select id="filterType" onchange="Equip.applyFilters()"><option value="">כל סוגי הציוד</option></select>
