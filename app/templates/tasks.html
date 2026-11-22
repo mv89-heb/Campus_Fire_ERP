@@ -495,13 +495,13 @@ const Tasks = (() => {
     setTrackingFilter,
     updateTrackingStatus,
     importFireSafetyTracking: async () => {
-      if (!confirm('ייבא את שורות קובץ מעקב כבאות והצלה שחסרות במערכת? משימות שיובאו בעבר ידולגו.')) return;
+      if (!confirm('לסנכרן את 35 הרשומות מתוכנית העבודה שסופקה? הסנכרון יעדכן רק רשומות שסומנו בגרסת הייבוא הזו, לא ימחק משימות קיימות ולא ישנה רשומות אחרות.')) return;
       try {
         const response = await fetch('/api/tasks/import-fire-safety-tracking', { method: 'POST', credentials: 'same-origin' });
         const payload = await response.json();
         if (!response.ok || !payload.success) throw new Error(payload.error || 'הייבוא נכשל');
         const result = payload.result || {};
-        showToast(`ייבוא הסתיים: ${result.imported || 0} נוספו, ${result.skipped_existing || 0} כבר קיימות`);
+        showToast(`סנכרון הסתיים: ${result.created || 0} נוספו, ${result.updated || 0} עודכנו, ${result.unchanged || 0} ללא שינוי`);
         await refresh();
         showView('tracking');
       } catch (error) {
