@@ -36,6 +36,7 @@
 .badge.low { background: rgba(110,118,129,0.15); color: var(--text-muted); }
 .badge.open { background: rgba(110,118,129,0.15); color: var(--text-muted); }
 .badge.in_progress { background: rgba(88,166,255,0.15); color: #58a6ff; }
+.badge.waiting_approval { background: rgba(227,179,65,0.18); color: var(--warning); }
 .badge.done { background: rgba(63,185,80,0.15); color: var(--valid); }
 .badge.cancelled { background: rgba(248,81,73,0.15); color: var(--critical); }
 .checklist { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
@@ -113,6 +114,7 @@
 .fire-workspace .fire-status{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;font-size:.69rem;font-weight:800;white-space:nowrap}
 .fire-workspace .fire-status.open{background:rgba(148,163,184,.15);color:var(--color-text-muted)}
 .fire-workspace .fire-status.in_progress{background:rgba(59,130,246,.13);color:var(--color-primary)}
+.fire-workspace .fire-status.waiting_approval{background:rgba(245,158,11,.16);color:var(--color-warning)}
 .fire-workspace .fire-status.done{background:rgba(34,197,94,.13);color:var(--color-success)}
 .fire-workspace .fire-status.overdue{background:rgba(239,68,68,.13);color:var(--color-danger)}
 .fire-workspace .fire-status.soon{background:rgba(245,158,11,.15);color:var(--color-warning)}
@@ -150,7 +152,7 @@
     <div><div class="fire-panel-title">תוכנית העבודה המלאה</div><div class="fire-count" id="trackingSummary">טוען נתוני מעקב…</div></div>
     <div class="fire-toolbar">
       <input id="trackingSearch" type="search" placeholder="חיפוש משימה, נכס, תיק, טופס, אחראי או הערה..." oninput="Tasks.renderTracking()">
-      <select id="trackingStatusFilter" onchange="Tasks.renderTracking()"><option value="">כל הסטטוסים</option><option value="open">לביצוע</option><option value="in_progress">בטיפול</option><option value="done">הושלם</option><option value="cancelled">בוטל</option></select>
+      <select id="trackingStatusFilter" onchange="Tasks.renderTracking()"><option value="">כל הסטטוסים</option><option value="open">לביצוע</option><option value="in_progress">בטיפול</option><option value="waiting_approval">ממתין לאישור</option><option value="done">הושלם</option><option value="cancelled">בוטל</option></select>
       <select id="trackingAssetFilter" onchange="Tasks.renderTracking()"><option value="">כל הנכסים</option></select>
       <select id="trackingDomainFilter" onchange="Tasks.renderTracking()"><option value="">כל התחומים</option></select>
     </div>
@@ -261,7 +263,7 @@ const Tasks = (() => {
   };
   const esc = (s) => (s || '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const priorityLabel = { urgent: 'דחוף', high: 'גבוה', normal: 'רגיל', low: 'נמוך' };
-  const statusLabel = { open: 'פתוחה', in_progress: 'בביצוע', done: 'הושלמה', cancelled: 'בוטלה' };
+  const statusLabel = { open: 'פתוחה', in_progress: 'בטיפול', waiting_approval: 'ממתין לאישור', done: 'הושלמה', cancelled: 'בוטלה' };
 
   async function refresh() {
     try {
@@ -351,7 +353,7 @@ const Tasks = (() => {
     if(!list.length){host.innerHTML='<div class="empty-state">לא נמצאו רשומות התואמות לסינון.</div>';return;}
     const statusLabel={open:'לביצוע',in_progress:'בטיפול',done:'הושלם',cancelled:'בוטל'};
     const escDate=v=>{if(!v)return '—';const iso=isoDate(v);return /^\d{4}-\d{2}-\d{2}$/.test(iso)?esc(iso.split('-').reverse().join('/')):esc(v);};
-    const statusClass=t=>{const d=days(t);if(t.status==='done')return'done';if(t.status==='cancelled')return'open';if(d!==null&&d<0)return'overdue';if(d!==null&&d<=7)return'soon';return t.status==='in_progress'?'in_progress':'open';};
+    const statusClass=t=>{const d=days(t);if(t.status==='done')return'done';if(t.status==='cancelled')return'open';if(d!==null&&d<0)return'overdue';if(d!==null&&d<=7)return'soon';return t.status==='waiting_approval'?'waiting_approval':t.status==='in_progress'?'in_progress':'open';};
     host.innerHTML='<div class="fire-table-wrap"><table class="fire-table"><thead><tr>'+
       '<th>שלב / שבוע</th><th>משימה / נושא מרכזי</th><th>נכס רלוונטי</th><th>מס׳ תיק</th><th>טופס להגשה</th><th>גורם אחראי</th><th>תאריך יעד</th><th>סטטוס נוכחי</th><th>הערות ודגשים</th><th>ביצוע בפועל</th><th>ימים ליעד</th><th>התראת מועד</th><th>תחום</th>'+
       '</tr></thead><tbody>'+list.map(t=>{
@@ -447,7 +449,7 @@ const Tasks = (() => {
     document.getElementById('filterPriority').value = '';
     const today = todayISOIL();
     let list = _all;
-    if (type === 'open') list = list.filter(t => ['open','in_progress'].includes(t.status));
+    if (type === 'open') list = list.filter(t => ['open','in_progress','waiting_approval'].includes(t.status));
     if (type === 'urgent') list = list.filter(t => ['urgent','high'].includes(t.priority) && t.status !== 'done' && t.status !== 'cancelled');
     if (type === 'overdue') list = list.filter(t => t.due_date && t.due_date < today && t.status !== 'done' && t.status !== 'cancelled');
     render(list);
