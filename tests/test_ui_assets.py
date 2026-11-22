@@ -41,8 +41,7 @@ class UIAssetTests(unittest.TestCase):
         fire_forms = (ROOT / "app/templates/fire_forms.html").read_text(encoding="utf-8")
         self.assertIn("hasMappedFireCoordinates", fire_forms)
         self.assertIn('disabled title="יש להגדיר מיקומים לפני מילוי"', fire_forms)
-        self.assertIn("ff-template-state ready", fire_forms)
-        self.assertIn("ff-template-state needs", fire_forms)
+        self.assertIn("mapped?'ready':'needs'", fire_forms)
 
 
 if __name__ == "__main__":
