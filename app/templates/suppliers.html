@@ -69,15 +69,16 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-title-row">
-  <h1>🧰 ניהול ספקים</h1>
-  <button class="btn btn-primary" onclick="Suppliers.openModal()">➕ ספק חדש</button>
-</div>
-<p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:var(--space-4);">כרטיסי ספק, חוזים וביטוחים</p>
+<header class="ds-module-hero">
+  <div class="ds-module-heading"><span class="ds-module-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-truck"></use></svg></span>
+    <div><div class="ds-module-kicker">ניהול התקשרויות ושירותים</div><h1>ניהול ספקים</h1><p class="ds-module-subtitle">כרטיסי ספק, אנשי קשר, חוזים, ביטוחים ואזורי שירות.</p></div>
+  </div>
+  <div class="ds-module-actions"><button class="btn btn-primary" onclick="Suppliers.openModal()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-file-plus"></use></svg> ספק חדש</button></div>
+</header>
 
 <div class="card">
   <div class="card-title">
-    <span>📋 רשימת ספקים</span>
+    <svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-truck"></use></svg> רשימת ספקים
   </div>
   <div class="filters-row">
     <input type="text" id="filterQ" placeholder="חיפוש לפי שם / איש קשר / טלפון..." oninput="clearTimeout(window._filterDebounce); window._filterDebounce = setTimeout(() => Suppliers.applyFilters(), 150)">
