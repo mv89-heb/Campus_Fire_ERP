@@ -13,77 +13,85 @@
 .settings-icon { font-size: 1.6rem; margin-bottom: var(--space-2); }
 .settings-title { font-weight: 700; font-size: var(--text-base); margin-bottom: 4px; }
 .settings-desc { font-size: var(--text-sm); color: var(--color-text-muted); }
+
+.settings-icon { display:grid; place-items:center; width:42px; height:42px; margin-bottom:13px; border-radius:11px; color:var(--color-primary); background:var(--tint-primary); font-size:1rem; }
+.settings-icon .lucide-icon { width:21px; height:21px; }
+.settings-card { min-height:132px; padding:18px; border-radius:13px; }
+.settings-card.disabled { opacity:.68; }
+.settings-card.disabled .settings-icon { color:var(--color-text-muted); background:var(--color-bg); }
+
 {% endblock %}
 
 {% block content %}
-<div class="page-title-row">
-  <h1>⚙️ הגדרות</h1>
-  <p style="color:var(--color-text-muted); font-size:var(--text-sm); margin-top:4px;">ניהול המערכת, לפי קטגוריות</p>
-</div>
+<header class="ds-module-hero">
+  <div class="ds-module-heading"><span class="ds-module-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-settings"></use></svg></span>
+    <div><div class="ds-module-kicker">ניהול ובקרה</div><h1>הגדרות מערכת</h1><p class="ds-module-subtitle">ניהול משתמשים, יומן ביקורת, אחסון ותשתיות מערכת.</p></div>
+  </div>
+</header>
 
 <div class="settings-grid">
   <a class="ds-card settings-card" href="/users">
-    <div class="settings-icon">👥</div>
+    <div class="settings-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-user-round"></use></svg></div>
     <div class="settings-title">משתמשים</div>
     <div class="settings-desc">ניהול משתמשים ותפקידים במערכת</div>
   </a>
 
   <a class="ds-card settings-card" href="/audit-log">
-    <div class="settings-icon">🕵️</div>
+    <div class="settings-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-activity"></use></svg></div>
     <div class="settings-title">Audit Log</div>
     <div class="settings-desc">יומן כל הפעולות שבוצעו במערכת</div>
   </a>
 
   <a class="ds-card settings-card" href="/sites">
-    <div class="settings-icon">🏢</div>
+    <div class="settings-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-building"></use></svg></div>
     <div class="settings-title">אתרים</div>
     <div class="settings-desc">ניהול היררכיית אתרים, מבנים וקומות</div>
   </a>
 
   <a class="ds-card settings-card" href="/design-system">
-    <div class="settings-icon">🎨</div>
+    <div class="settings-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-chart"></use></svg></div>
     <div class="settings-title">Design System</div>
     <div class="settings-desc">ספריית העיצוב והרכיבים המשותפים</div>
   </a>
 
   <a class="ds-card settings-card" href="/admin/storage">
-    <div class="settings-icon">🗄️</div>
+    <div class="settings-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-files"></use></svg></div>
     <div class="settings-title">ניהול אחסון מסמכים</div>
     <div class="settings-desc">בדיקת תקינות קבצים, קבצים חסרים/יתומים, וניקוי מבוקר</div>
   </a>
 
   <div class="ds-card settings-card disabled">
-    <div class="settings-icon">🔐</div>
+    <div class="settings-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-shield-check"></use></svg></div>
     <div class="settings-title">הרשאות <span class="ds-badge ds-badge-neutral">בקרוב</span></div>
     <div class="settings-desc">תשתית המשתמשים קיימת; אכיפת הרשאות טרם הופעלה במכוון</div>
   </div>
 
   <div class="ds-card settings-card disabled">
-    <div class="settings-icon">🏭</div>
+    <div class="settings-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-building"></use></svg></div>
     <div class="settings-title">ארגון <span class="ds-badge ds-badge-neutral">בקרוב</span></div>
     <div class="settings-desc">פרטי הארגון, לוגו ומידע כללי</div>
   </div>
 
   <div class="ds-card settings-card disabled">
-    <div class="settings-icon">🔔</div>
+    <div class="settings-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-bell"></use></svg></div>
     <div class="settings-title">התראות <span class="ds-badge ds-badge-neutral">בקרוב</span></div>
     <div class="settings-desc">התאמה אישית של חלונות זמן וערוצי התראה</div>
   </div>
 
   <div class="ds-card settings-card disabled">
-    <div class="settings-icon">📄</div>
+    <div class="settings-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-files"></use></svg></div>
     <div class="settings-title">תבניות <span class="ds-badge ds-badge-neutral">בקרוב</span></div>
     <div class="settings-desc">תבניות מסמכים ודוחות מותאמות אישית</div>
   </div>
 
   <div class="ds-card settings-card disabled">
-    <div class="settings-icon">🔌</div>
+    <div class="settings-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-activity"></use></svg></div>
     <div class="settings-title">אינטגרציות <span class="ds-badge ds-badge-neutral">בקרוב</span></div>
     <div class="settings-desc">חיבור למערכות חיצוניות</div>
   </div>
 
   <div class="ds-card settings-card disabled">
-    <div class="settings-icon">💾</div>
+    <div class="settings-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-files"></use></svg></div>
     <div class="settings-title">גיבוי <span class="ds-badge ds-badge-neutral">בקרוב</span></div>
     <div class="settings-desc">גיבוי ושחזור נתוני המערכת</div>
   </div>
