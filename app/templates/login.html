@@ -46,6 +46,15 @@ body { min-height:100vh; display:flex; align-items:center; justify-content:cente
 .setup-note { font-size:var(--text-sm); color:var(--color-text-muted); line-height:1.55; margin-bottom:14px; text-align:center; }
 .setup-title { font-weight:700; text-align:center; margin-bottom:6px; }
 .form-actions { display:flex; flex-direction:column; gap:8px; }
+
+.login-theme-toggle .lucide-icon { width:18px; height:18px; }
+.login-title { display:flex; align-items:center; justify-content:center; gap:8px; }
+.login-title .lucide-icon { width:19px; height:19px; color:var(--color-primary); }
+.login-card .ds-btn-primary { display:inline-flex; align-items:center; justify-content:center; gap:9px; }
+.login-card .ds-btn-primary .lucide-icon { width:17px; height:17px; }
+.setup-title { display:flex; align-items:center; gap:8px; }
+.setup-title .lucide-icon { width:18px; height:18px; color:var(--color-primary); }
+
 </style>
 </head>
 <body>
@@ -61,28 +70,28 @@ body { min-height:100vh; display:flex; align-items:center; justify-content:cente
 </div>
 <div class="login-stage">
 <div class="login-card">
-  <button class="login-theme-toggle" type="button" onclick="toggleLoginTheme()" aria-label="החלפת מצב תצוגה">◐</button>
+  <button class="login-theme-toggle" id="loginThemeToggle" type="button" onclick="toggleLoginTheme()" aria-label="החלפת מצב תצוגה"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-moon"></use></svg></button>
   <div class="login-brand">
     <img src="{{ url_for('static', filename='img/campus-fire-mark.svg') }}" alt="סמל Campus Fire ERP">
     <div class="login-brand-name">Campus Fire ERP</div>
     <div class="login-brand-tagline">מערכת ניהול בטיחות אש וציות</div>
   </div>
-  <div class="login-title">ברוכים הבאים</div>
+  <div class="login-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-shield-check"></use></svg> ברוכים הבאים</div>
   <div class="login-subtitle" id="loginSubtitle">התחברות מאובטחת למערכת</div>
 
   <div id="loginForm">
-    <div class="ds-field"><input class="ds-input" type="text" id="username" placeholder="שם משתמש" autocomplete="username"></div>
-    <div class="ds-field"><input class="ds-input" type="password" id="password" placeholder="סיסמה" autocomplete="current-password"></div>
+    <div class="ds-field"><input class="ds-input" type="text" id="username" placeholder="שם משתמש" aria-label="שם משתמש" autocomplete="username"></div>
+    <div class="ds-field"><input class="ds-input" type="password" id="password" placeholder="סיסמה" aria-label="סיסמה" autocomplete="current-password"></div>
     <div class="error-msg" id="errorMsg" role="alert" aria-live="polite"></div>
-    <button class="ds-btn ds-btn-primary" id="submitBtn" onclick="Login.submit()" style="width:100%;">התחברות</button>
+    <button class="ds-btn ds-btn-primary" id="submitBtn" onclick="Login.submit()" style="width:100%;"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-shield-check"></use></svg> התחברות</button>
   </div>
 
   <div class="setup-panel" id="setupPanel" aria-live="polite">
-    <div class="setup-title">הגדרת מנהל ראשוני</div>
+    <div class="setup-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-user-round"></use></svg> הגדרת מנהל ראשוני</div>
     <div class="setup-note">לא נמצא עדיין משתמש במערכת. צור כאן את חשבון המנהל הראשי.<br>המשתמש הראשון יקבל הרשאת <strong>Super Admin</strong>. לאחר יצירתו אפשרות זו תיסגר.</div>
-    <div class="ds-field"><input class="ds-input" type="text" id="setupUsername" placeholder="שם משתמש למנהל" autocomplete="username"></div>
-    <div class="ds-field"><input class="ds-input" type="password" id="setupPassword" placeholder="סיסמה (לפחות 12 תווים)" autocomplete="new-password"></div>
-    <div class="ds-field"><input class="ds-input" type="password" id="setupPasswordConfirm" placeholder="אימות סיסמה" autocomplete="new-password"></div>
+    <div class="ds-field"><input class="ds-input" type="text" id="setupUsername" placeholder="שם משתמש למנהל" aria-label="שם משתמש למנהל" autocomplete="username"></div>
+    <div class="ds-field"><input class="ds-input" type="password" id="setupPassword" placeholder="סיסמה (לפחות 12 תווים)" aria-label="סיסמה למנהל" autocomplete="new-password"></div>
+    <div class="ds-field"><input class="ds-input" type="password" id="setupPasswordConfirm" placeholder="אימות סיסמה" aria-label="אימות סיסמה" autocomplete="new-password"></div>
     <div class="error-msg" id="setupError" role="alert" aria-live="polite"></div>
     <div class="form-actions">
       <button class="ds-btn ds-btn-primary" id="setupBtn" onclick="Login.bootstrap()">יצירת מנהל ראשי</button>
@@ -104,6 +113,8 @@ function toggleLoginTheme() {
   const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
   root.setAttribute('data-theme', next);
   try { localStorage.setItem('erp-theme', next); } catch (_) {}
+  const button=document.getElementById('loginThemeToggle');
+  if(button)button.innerHTML='<svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-'+(next==='dark'?'moon':'sun')+'"></use></svg>';
 }
 (function startIntro() {
   let alreadySeen = false;
