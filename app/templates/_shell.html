@@ -58,28 +58,29 @@
         <div><strong>Campus Fire ERP</strong><span>בטיחות אש · ציות · תפעול</span></div>
       </div>
       <div class="ds-sidebar-group">
-        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'dashboard' else '' }}" href="/org-dashboard"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-layout-dashboard"></use></svg> <span>לוח בקרה</span></a>
+        <div class="ds-sidebar-group-label">מרכז שליטה</div>
+        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'dashboard' else '' }}" href="/org-dashboard"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-layout-dashboard"></use></svg> <span>תמונת מצב</span></a>
+        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'tasks' else '' }}" href="/tasks"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-list-checks"></use></svg> <span>תוכנית עבודה</span><span class="ds-nav-hint">ראשי</span></a>
       </div>
       <div class="ds-sidebar-group">
-        <div class="ds-sidebar-group-label">בטיחות וציות</div>
-        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'permits' else '' }}" href="/"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-file-check"></use></svg> <span>אישורים</span></a>
-        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'fire_forms' else '' }}" href="/fire-forms"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-files"></use></svg> <span>מאגר טפסי כיבוי</span></a>
-        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'audits' else '' }}" href="/audits"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-clipboard-check"></use></svg> <span>ביקורות וליקויים</span></a>
-        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'document_intelligence' else '' }}" href="/document-intelligence"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-files"></use></svg> <span>מסמכים ו-Gemini</span></a>
+        <div class="ds-sidebar-group-label">נכסים ותיקי כבאות</div>
+        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'sites' else '' }}" href="/sites"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-building"></use></svg> <span>נכסים ומבנים</span></a>
+        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'audits' else '' }}" href="/audits"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-clipboard-check"></use></svg> <span>ליקויים וביקורות</span></a>
       </div>
       <div class="ds-sidebar-group">
-        <div class="ds-sidebar-group-label">אתרים ותשתיות</div>
-        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'sites' else '' }}" href="/sites"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-building"></use></svg> <span>אתרים ומבנים</span></a>
+        <div class="ds-sidebar-group-label">טפסים, אישורים וראיות</div>
+        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'fire_forms' else '' }}" href="/fire-forms"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-files"></use></svg> <span>טפסים להגשה</span></a>
+        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'permits' else '' }}" href="/"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-file-check"></use></svg> <span>אישורים ורישיונות</span></a>
+        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'document_intelligence' else '' }}" href="/document-intelligence"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-files"></use></svg> <span>מסמכים וראיות</span></a>
       </div>
       <div class="ds-sidebar-group">
-        <div class="ds-sidebar-group-label">ציוד ותפעול</div>
+        <div class="ds-sidebar-group-label">ביצוע ותחזוקה</div>
+        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'suppliers' else '' }}" href="/suppliers"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-truck"></use></svg> <span>ספקים ואנשי מקצוע</span></a>
         <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'equipment' else '' }}" href="/equipment"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-fire-extinguisher"></use></svg> <span>ציוד כיבוי אש</span></a>
       </div>
       <div class="ds-sidebar-group">
-        <div class="ds-sidebar-group-label">ניהול ותכנון</div>
-        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'tasks' else '' }}" href="/tasks"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-list-checks"></use></svg> <span>משימות</span></a>
-        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'suppliers' else '' }}" href="/suppliers"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-truck"></use></svg> <span>ספקים</span></a>
-        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'reports' else '' }}" href="/reports"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-chart-no-axes-combined"></use></svg> <span>דוחות</span></a>
+        <div class="ds-sidebar-group-label">בקרה והגשה</div>
+        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'reports' else '' }}" href="/reports"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-chart-no-axes-combined"></use></svg> <span>דוחות ובקרה</span></a>
       </div>
       <div class="ds-sidebar-group">
         <div class="ds-sidebar-group-label">מערכת</div>
