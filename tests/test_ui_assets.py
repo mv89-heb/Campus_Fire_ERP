@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class UIAssetTests(unittest.TestCase):
     def test_lucide_sprite_is_valid_and_contains_every_shell_icon(self):
         sprite = ROOT / "app/static/img/lucide-sprite.svg"
-        templates = [ROOT / "app/templates/_shell.html", ROOT / "app/templates/org_dashboard.html", ROOT / "app/templates/fire_forms.html"]
+        templates = [ROOT / "app/templates/_shell.html", ROOT / "app/templates/org_dashboard.html", ROOT / "app/templates/fire_forms.html", ROOT / "app/templates/document_intelligence.html"]
         tree = ET.parse(sprite)
         ids = {
             node.attrib["id"]
@@ -43,6 +43,13 @@ class UIAssetTests(unittest.TestCase):
         self.assertIn('disabled title="יש להגדיר מיקומים לפני מילוי"', fire_forms)
         self.assertIn("mapped?'ready':'needs'", fire_forms)
         self.assertIn("fields.every(hasMappedFireCoordinates)", fire_forms)
+
+    def test_document_intelligence_has_search_and_clear_gemini_cost_notice(self):
+        documents = (ROOT / "app/templates/document_intelligence.html").read_text(encoding="utf-8")
+        self.assertIn("AI.filter(this.value)", documents)
+        self.assertIn("filter,analyze", documents)
+        self.assertIn("ניתוח Gemini עשוי לצרוך מכסת API או לגרור עלות", documents)
+        self.assertIn("ai-overview-grid", documents)
 
 
 if __name__ == "__main__":

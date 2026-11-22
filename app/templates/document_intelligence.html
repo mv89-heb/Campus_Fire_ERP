@@ -2,18 +2,121 @@
 {% block title %}מרכז ניתוח מסמכים AI | Campus Fire ERP{% endblock %}
 {% block extra_style %}
 .ai-grid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:18px;align-items:start}.doc-list-card{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow:auto}.doc{padding:12px;border:1px solid transparent;border-radius:8px;margin-bottom:5px;cursor:pointer;transition:.15s}.doc:hover{background:var(--bg-hover);border-color:var(--border)}.doc b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.doc.selected{background:var(--tint-primary);border-color:var(--accent)}.ai-detail{min-width:0}@media(max-width:850px){.ai-grid{grid-template-columns:1fr}.doc-list-card{position:static;max-height:280px}}.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:15px;margin-bottom:15px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.btn{padding:9px 14px;border-radius:var(--radius);border:1px solid var(--border-mid);background:var(--bg-hover);color:var(--text);cursor:pointer}.btn-primary{background:var(--accent);color:#000;border:0}.btn:disabled{opacity:.55;cursor:not-allowed}.doc{padding:10px;border-bottom:1px solid var(--border);cursor:pointer}.doc:hover{background:var(--bg-hover)}.finding{border:1px solid var(--border);border-radius:8px;padding:12px;margin:9px 0}.finding.high,.finding.critical{border-right:4px solid var(--critical)}.relationship{border:1px solid var(--border);border-radius:8px;padding:12px;margin:12px 0}.relationship-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.relationship-box{background:var(--bg-hover);border-radius:8px;padding:10px}.relationship-box select{width:100%;margin-top:7px;padding:8px;border:1px solid var(--border-mid);border-radius:6px;background:var(--bg-card);color:var(--text)}.relationship-ok{color:var(--valid)}.relationship-warn{color:var(--warning)}@media(max-width:850px){.relationship-grid{grid-template-columns:1fr}}.finding.medium{border-right:4px solid var(--warning)}.action{background:rgba(63,185,80,.06);padding:10px;border-radius:7px;margin-top:8px}.muted{color:var(--text-muted);font-size:.82rem}.progress{height:10px;background:var(--bg-hover);border-radius:999px;overflow:hidden;margin-top:10px}.progress>div{height:100%;width:0%;background:var(--accent);transition:width .2s}@media(max-width:850px){.ai-grid{grid-template-columns:1fr}}
+
+/* Document intelligence workspace — clear evidence, review and action hierarchy */
+.ai-page { max-width:1600px; margin:0 auto; }
+.ai-hero { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:8px 0 18px; margin-bottom:16px; border-bottom:1px solid var(--color-border); }
+.ai-heading { display:flex; align-items:center; gap:13px; min-width:0; }
+.ai-heading-icon { display:grid; place-items:center; width:48px; height:48px; flex:0 0 48px; border:1px solid var(--color-border); border-radius:14px; color:var(--color-primary); background:var(--tint-primary); }
+.ai-heading-icon .lucide-icon { width:24px; height:24px; }
+.ai-eyebrow { color:var(--color-primary); font-size:.7rem; font-weight:850; margin-bottom:4px; }
+.ai-hero h1 { font-size:clamp(1.4rem,2.4vw,1.95rem); font-weight:850; letter-spacing:-.03em; }
+.ai-hero-subtitle { color:var(--color-text-muted); font-size:.82rem; margin-top:5px; line-height:1.6; }
+.ai-toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+.ai-toolbar-note { color:var(--color-text-muted); font-size:.68rem; max-width:170px; line-height:1.4; }
+.ai-page .btn { min-height:40px; display:inline-flex; align-items:center; justify-content:center; gap:8px; border-radius:9px; font:inherit; font-size:.8rem; font-weight:750; }
+.ai-page .btn .lucide-icon { width:16px; height:16px; }
+.ai-overview-card { padding:17px 18px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:14px; box-shadow:var(--shadow-sm); margin-bottom:14px; }
+.ai-overview-title { display:flex; align-items:center; gap:9px; font-weight:850; margin-bottom:12px; }
+.ai-overview-title .lucide-icon { color:var(--color-primary); }
+.ai-overview-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(125px,1fr)); gap:8px; }
+.ai-overview-metric { display:flex; flex-direction:column; gap:4px; min-width:0; padding:10px 11px; border:1px solid var(--color-border); border-radius:10px; background:var(--color-bg); }
+.ai-overview-metric span { color:var(--color-text-muted); font-size:.68rem; line-height:1.4; }
+.ai-overview-metric b { font-size:1.18rem; font-weight:850; font-variant-numeric:tabular-nums; }
+.ai-overview-recurring { margin-top:12px; padding:10px 12px; border-radius:9px; background:var(--color-bg); font-size:.78rem; line-height:1.6; }
+.ai-bulk-panel { border:1px solid var(--color-border); border-radius:13px; background:var(--color-surface); margin-bottom:14px; }
+.ai-bulk-title { display:flex; align-items:center; gap:8px; font-weight:800; }
+.ai-bulk-title .lucide-icon { color:var(--color-primary); }
+.ai-grid { grid-template-columns:minmax(290px,350px) minmax(0,1fr); gap:14px; align-items:start; }
+.doc-list-card { top:84px; max-height:calc(100vh - 105px); padding:14px; border-radius:14px; }
+.ai-list-header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+.ai-card-title { display:flex; align-items:center; gap:8px; font-weight:850; }
+.ai-card-title .lucide-icon { color:var(--color-primary); }
+.ai-doc-count { color:var(--color-text-muted); font-size:.7rem; white-space:nowrap; }
+.ai-doc-search { width:100%; min-height:40px; padding:8px 11px; margin-bottom:10px; border:1px solid var(--color-border-strong); border-radius:9px; background:var(--color-bg); color:var(--color-text); font:inherit; font-size:.8rem; }
+.ai-doc-search:focus { outline:0; border-color:var(--color-primary); box-shadow:0 0 0 3px var(--tint-primary); }
+.doc { display:block; width:100%; text-align:right; background:transparent; color:var(--color-text); border:1px solid transparent; border-radius:10px; padding:11px; margin-bottom:6px; cursor:pointer; font:inherit; }
+.doc:hover { background:var(--color-surface-hover); border-color:var(--color-border); }
+.doc.selected { background:var(--tint-primary); border-color:var(--color-primary); }
+.doc:focus-visible { outline:2px solid var(--color-primary); outline-offset:2px; }
+.doc-name { display:block; font-size:.79rem; font-weight:800; line-height:1.45; overflow-wrap:anywhere; }
+.doc-meta { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:7px; }
+.ai-status-pill { display:inline-flex; align-items:center; padding:3px 7px; border-radius:999px; background:var(--color-bg); color:var(--color-text-muted); border:1px solid var(--color-border); font-size:.64rem; font-weight:750; }
+.ai-status-pill.review { color:var(--color-warning); background:var(--tint-warning); border-color:transparent; }
+.ai-status-pill.done { color:var(--color-success); background:var(--tint-success); border-color:transparent; }
+.ai-status-pill.failed { color:var(--color-danger); background:var(--tint-danger); border-color:transparent; }
+.ai-detail { min-width:0; padding:clamp(15px,2vw,22px); border-radius:14px; }
+.ai-detail > h2 { font-size:1.15rem; font-weight:850; line-height:1.45; overflow-wrap:anywhere; }
+.ai-detail > .muted { margin:5px 0 14px; }
+.ai-detail .card { background:var(--color-bg); border:1px solid var(--color-border); border-radius:11px; box-shadow:none; padding:14px; }
+.ai-detail .card > b, .ai-detail .relationship > b { display:flex; align-items:center; gap:8px; font-weight:850; }
+.ai-detail input, .ai-detail select, .ai-detail textarea { width:100%; min-height:40px; margin-top:5px; padding:8px 10px; border:1px solid var(--color-border-strong); border-radius:8px; background:var(--color-surface); color:var(--color-text); font:inherit; font-size:.8rem; }
+.ai-detail input:focus, .ai-detail select:focus, .ai-detail textarea:focus { outline:0; border-color:var(--color-primary); box-shadow:0 0 0 3px var(--tint-primary); }
+.finding { border:1px solid var(--color-border); border-radius:11px; padding:13px; margin:10px 0; background:var(--color-surface); }
+.finding.high, .finding.critical { border-right:4px solid var(--color-danger); }
+.finding.medium { border-right:4px solid var(--color-warning); }
+.finding.low, .finding.info { border-right:4px solid var(--color-info); }
+.relationship { border:1px solid var(--color-border); border-radius:12px; padding:14px; margin:12px 0; background:var(--color-surface); }
+.relationship-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; }
+.relationship-box { background:var(--color-bg); border:1px solid var(--color-border); border-radius:9px; padding:10px; min-width:0; }
+.relationship-box b { display:flex; align-items:center; gap:7px; }
+.ai-relationship-dot { width:8px; height:8px; display:inline-block; border-radius:50%; background:var(--color-text-muted); }
+.ai-relationship-dot.linked { background:var(--color-success); }
+.ai-relationship-dot.candidate { background:var(--color-warning); }
+.relationship-ok { color:var(--color-success); }
+.relationship-warn { color:var(--color-warning); }
+.action { background:var(--tint-success); border-radius:9px; padding:11px; margin-top:9px; font-size:.8rem; line-height:1.65; }
+.ai-empty { display:flex; align-items:center; justify-content:center; min-height:160px; color:var(--color-text-muted); text-align:center; line-height:1.7; }
+@media(max-width:900px) {
+  .ai-grid { grid-template-columns:1fr; }
+  .doc-list-card { position:static; max-height:360px; }
+  .relationship-grid { grid-template-columns:1fr; }
+}
+@media(max-width:640px) {
+  .ai-hero { align-items:flex-start; flex-direction:column; }
+  .ai-toolbar { width:100%; justify-content:flex-start; }
+  .ai-toolbar .btn { flex:1 1 auto; }
+  .ai-overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .ai-detail { padding:13px; }
+}
+
 {% endblock %}
 {% block content %}
-<div class="page-title-row"><div><h1>🤖 מסמכים ו-Gemini</h1><div class="muted" style="margin-top:4px">העלאה → ניתוח → קישור לאתר/ביקורת/ספק → ממצאים → פעולות</div></div><div class="toolbar"><button id="bulkBtn" class="btn btn-primary" onclick="AI.analyzeAll()">🤖 נתח מסמכים ממתינים</button><button class="btn" onclick="AI.load()">🔄 רענן</button></div></div>
-<div id="overview" class="card" style="margin-bottom:15px">טוען תמונת מצב...</div>
-<div class="card" id="bulkPanel" style="display:none">
-  <b>⚙️ עיבוד המוני דרך הדפדפן</b>
-  <div id="bulkText" class="muted" style="margin-top:6px">מכין...</div>
-  <div class="progress"><div id="bulkProgress"></div></div>
-</div>
-<div class="ai-grid">
-  <div class="card doc-list-card"><div class="card-title"><span>📄 מסמכים</span><span id="docCount" class="muted"></span></div><div id="list">טוען...</div></div>
-  <div class="card ai-detail"><div id="detail" class="muted">בחר מסמך מהרשימה כדי לראות את הסיכום, הקשרים והממצאים.</div></div>
+<div class="ai-page">
+  <header class="ai-hero">
+    <div class="ai-heading">
+      <span class="ai-heading-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-files"></use></svg></span>
+      <div><div class="ai-eyebrow">בדיקת מסמכים מבוססת ראיות</div><h1>מרכז ניתוח מסמכים</h1>
+        <p class="ai-hero-subtitle">סקירת מסמכים, אימות תאריכים, קישור לאתר ולביקורת, ובדיקת ממצאים לפני יצירת פעולות.</p></div>
+    </div>
+    <div class="ai-toolbar">
+      <span class="ai-toolbar-note">ניתוח Gemini עשוי לצרוך מכסת API או לגרור עלות.</span>
+      <button id="bulkBtn" class="btn btn-primary" onclick="AI.analyzeAll()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-bot"></use></svg> נתח מסמכים ממתינים</button>
+      <button class="btn" onclick="AI.load()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-refresh-cw"></use></svg> רענון</button>
+    </div>
+  </header>
+
+  <section id="overview" class="ai-overview-card" aria-label="תמונת מצב מסמכים">טוען תמונת מצב…</section>
+
+  <section class="card ai-bulk-panel" id="bulkPanel" style="display:none">
+    <div class="ai-bulk-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-bot"></use></svg> עיבוד המוני דרך Gemini</div>
+    <div id="bulkText" class="muted" style="margin-top:6px">מכין…</div>
+    <div class="progress" role="progressbar" aria-label="התקדמות ניתוח מסמכים"><div id="bulkProgress"></div></div>
+  </section>
+
+  <div class="ai-grid">
+    <aside class="card doc-list-card" aria-label="רשימת מסמכים">
+      <div class="ai-list-header">
+        <div class="ai-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-files"></use></svg> מסמכים</div>
+        <span id="docCount" class="ai-doc-count"></span>
+      </div>
+      <input id="docSearch" class="ai-doc-search" type="search" placeholder="חיפוש לפי שם מסמך…" aria-label="חיפוש מסמכים" oninput="AI.filter(this.value)">
+      <div id="list">טוען…</div>
+    </aside>
+    <main class="card ai-detail" aria-label="פרטי המסמך">
+      <div id="detail" class="ai-empty">בחר מסמך מהרשימה כדי לראות את הסיכום, תאריכי התוקף, הקשרים והממצאים.</div>
+    </main>
+  </div>
 </div>
 {% endblock %}
 {% block extra_script %}
@@ -24,26 +127,37 @@ const AI=(()=>{
   let running=false;
 
   const esc=s=>(s??'').toString().replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const icon=name=>'<svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="/static/img/lucide-sprite.svg#icon-'+name+'"></use></svg>';
+  function filter(query){
+    const value=(query||'').trim().toLocaleLowerCase('he');
+    document.querySelectorAll('#list .doc').forEach(item=>{
+      item.hidden=!!value&&!item.textContent.toLocaleLowerCase('he').includes(value);
+    });
+  }
   const labels={not_requested:'טרם נותח',processing:'בתהליך',completed:'הושלם',failed:'נכשל'};
   const sev={critical:'קריטי',high:'גבוהה',medium:'בינונית',low:'נמוכה',info:'מידע',unclear:'לא ברור'};
 
   async function overview(){
     const r=await fetch('/api/document-intelligence/overview');
     const d=await r.json();
-    if(!r.ok)return;
+    if(!r.ok) return;
     const sc=d.status_counts||{}, sv=d.severity_counts||{};
+    const metric=(label,value)=>'<div class="ai-overview-metric"><span>'+esc(label)+'</span><b>'+esc(value??0)+'</b></div>';
+    const total=Number(d.total_documents||0);
     document.getElementById('overview').innerHTML=
-      '<b>📊 תמונת מצב כוללת</b><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">'+
-      '<span>סה"כ מסמכים: <b>'+d.total_documents+'</b></span>'+
-      '<span>הושלמו: <b>'+((sc.completed)||0)+'</b></span>'+
-      '<span>ממתינים לניתוח: <b>'+((sc.not_requested)||0)+'</b></span>'+
-      '<span>בתהליך: <b>'+((sc.processing)||0)+'</b></span>'+
-      '<span>דורשים בדיקה: <b>'+d.review_required+'</b></span>'+
-      '<span>ליקויים קריטיים/גבוהים: <b>'+(((sv.critical)||0)+((sv.high)||0))+'</b></span>'+
-      '<span>חוסרים: <b>'+((d.missing_items||[]).length)+'</b></span>'+
-      '<span>סתירות: <b>'+((d.contradictions||[]).length)+'</b></span>'+
-      '<span>קשרים לבדיקה: <b>'+((d.relationship_review_required)||0)+'</b></span></div>'+
-      (d.recurring_findings?.length?'<div style="margin-top:10px"><b>ליקויים חוזרים:</b> '+d.recurring_findings.slice(0,5).map(x=>esc(x.title)+' × '+x.count).join(' · ')+'</div>':'');
+      '<div class="ai-overview-title">'+icon('activity')+' תמונת מצב מסמכים</div>'+
+      '<div class="ai-overview-grid">'+
+      metric('סה״כ מסמכים',total)+
+      metric('ניתוח הושלם',Number(sc.completed||0))+
+      metric('ממתינים לניתוח',Number(sc.not_requested||0))+
+      metric('בתהליך',Number(sc.processing||0))+
+      metric('דורשים בדיקה',Number(d.review_required||0))+
+      metric('ליקויים קריטיים / גבוהים',Number(sv.critical||0)+Number(sv.high||0))+
+      metric('חוסרים שזוהו',(d.missing_items||[]).length)+
+      metric('סתירות שזוהו',(d.contradictions||[]).length)+
+      metric('קשרים לבדיקה',Number(d.relationship_review_required||0))+
+      '</div>'+
+      (d.recurring_findings?.length?'<div class="ai-overview-recurring"><b>ממצאים חוזרים:</b> '+d.recurring_findings.slice(0,5).map(x=>esc(x.title)+' × '+esc(x.count)).join(' · ')+'</div>':'');
   }
 
   async function load(){
@@ -53,10 +167,15 @@ const AI=(()=>{
     if(!r.ok){document.getElementById('list').innerHTML='<span class="muted">שגיאה בטעינת המסמכים</span>';return}
     docs=d.documents||[];
     document.getElementById('docCount').innerText=docs.length+' מסמכים';
-    document.getElementById('list').innerHTML=docs.map(x=>
-      '<div id="doc-'+x.document_id+'" class="doc" onclick="AI.open('+x.document_id+')"><b>'+esc(x.file_name)+'</b><br>'+
-      '<span class="muted">'+(labels[x.ai_status]||x.ai_status)+(x.review_required?' · ⚠️ בדיקה נדרשת':'')+'</span></div>'
-    ).join('')||'<span class="muted">אין מסמכים</span>';
+    document.getElementById('list').innerHTML=docs.map(x=>{
+      const status=x.ai_status==='completed'?'done':x.ai_status==='failed'?'failed':'';
+      return '<button type="button" id="doc-'+Number(x.document_id)+'" class="doc" aria-pressed="false" onclick="AI.open('+Number(x.document_id)+')">'+
+        '<span class="doc-name">'+esc(x.file_name)+'</span>'+
+        '<span class="doc-meta"><span class="ai-status-pill '+status+'">'+esc(labels[x.ai_status]||x.ai_status)+'</span>'+
+        (x.review_required?'<span class="ai-status-pill review">בדיקה נדרשת</span>':'')+
+        '</span></button>';
+    }).join('')||'<div class="ai-empty">אין מסמכים במאגר.</div>';
+    filter(document.getElementById('docSearch')?.value||'');
   }
 
   function relationshipLabel(type){return type==='audit'?'ביקורת':type==='site'?'אתר':'ספק';}
@@ -89,28 +208,28 @@ const AI=(()=>{
     const l=ctx.links||{}, current=ctx.current||{};
     const box=(type,currentId)=>{
       const state=l[type]?.status||'missing';
-      const icon=state==='linked'?'🟢':state==='candidate'?'🟡':'⚪';
+      const iconClass=state==='linked'?'linked':state==='candidate'?'candidate':'';
       const label=state==='linked'?'מקושר':state==='candidate'?'נדרש אישור':'לא זוהה';
-      return '<div class="relationship-box"><b>'+icon+' '+relationshipLabel(type)+'</b><div class="muted">'+label+'</div>'+
+      return '<div class="relationship-box"><b><span class="ai-relationship-dot '+iconClass+'"></span>'+relationshipLabel(type)+'</b><div class="muted">'+label+'</div>'+
         '<select id="rel'+type.charAt(0).toUpperCase()+type.slice(1)+'">'+
         (currentId?'<option value="'+currentId+'" selected>הקשר הנוכחי #'+currentId+'</option>':'')+
         relationshipOptions(type,l)+'</select></div>';
     };
-    return '<div class="relationship"><b>🔗 קשרים תפעוליים</b><div class="muted" style="margin:5px 0 10px">קישור אוטומטי נעשה רק כשיש התאמה ברורה. התאמות מועמדות דורשות אישור ידני.</div>'+
+    return '<div class="relationship"><b>'+icon('map-pin')+' קשרים תפעוליים</b><div class="muted" style="margin:5px 0 10px">קישור אוטומטי נעשה רק כשיש התאמה ברורה. התאמות מועמדות דורשות אישור ידני.</div>'+
       '<div class="relationship-grid">'+box('audit',current.audit_id)+box('site',current.site_id)+box('supplier',current.supplier_id)+'</div>'+
-      '<button class="btn btn-primary" style="margin-top:10px" onclick="AI.saveRelationships('+id+')">💾 שמור קשרים</button></div>';
+      '<button class="btn btn-primary" style="margin-top:10px" onclick="AI.saveRelationships('+id+')">'+icon('file-check')+' שמור קשרים</button></div>';
   }
 
   async function open(id){
-    document.querySelectorAll('.doc.selected').forEach(el=>el.classList.remove('selected'));
-    const selected=document.getElementById('doc-'+id); if(selected) selected.classList.add('selected');
+    document.querySelectorAll('.doc.selected').forEach(el=>{el.classList.remove('selected');el.setAttribute('aria-pressed','false');});
+    const selected=document.getElementById('doc-'+id); if(selected){selected.classList.add('selected');selected.setAttribute('aria-pressed','true');}
     const r=await fetch('/api/document-intelligence/'+id);
     const d=await r.json();
     if(!r.ok){document.getElementById('detail').innerHTML='<div class="finding critical">'+esc(d.error||'שגיאה')+'</div>';return}
     let h='<h2>'+esc(d.file_name)+'</h2><div class="muted">'+esc(d.document_type||'לא זוהה')+' · '+(labels[d.ai_status]||d.ai_status)+(d.confidence!=null?' · ביטחון '+Math.round(d.confidence*100)+'%':'')+'</div>';
     if(d.error)h+='<div class="finding critical">'+esc(d.error)+'</div>';
     if(d.summary)h+='<div class="card"><b>סיכום המסמך</b><p>'+esc(d.summary)+'</p></div>';
-    h+='<div class="card"><b>📅 תאריכי מסמך ותוקף</b>'+
+    h+='<div class="card"><b>'+icon('calendar-clock')+' תאריכי מסמך ותוקף</b>'+
       '<div class="muted" style="margin:6px 0">סטטוס מחושב: <b>'+esc(d.calculated_status_label||d.calculated_status||'ממתין לחישוב')+'</b>'+
       (d.is_multi_year?' · אישור רב-שנתי':'')+'</div><p class="muted">'+esc(d.date_status_reason||'')+'</p>'+
       (d.effective_status&&d.effective_status!==d.calculated_status?' · חריג ידני פעיל: '+esc(d.effective_status):'')+'</div>'+
@@ -121,13 +240,13 @@ const AI=(()=>{
         :'<div class="relationship-grid">'+
           '<label>תאריך הנפקה<input id="docIssueDate" type="date" value="'+esc(d.issue_date||'')+'"></label>'+
           '<label>תאריך תפוגה<input id="docExpiryDate" type="date" value="'+esc(d.expiry_date||'')+'"></label>'+
-          '</div><button class="btn btn-primary" style="margin-top:10px" onclick="AI.saveDates('+d.document_id+')">💾 שמור ואמת תאריכים</button>')+
+          '</div><button class="btn btn-primary" style="margin-top:10px" onclick="AI.saveDates('+d.document_id+')">'+icon('file-check')+' שמור ואמת תאריכים</button>')+
       ((d.date_extraction_conflict&&!d.is_audit_summary&&!d.date_policy_exempt)?'<div class="finding high">נמצאה סתירה בין תאריכי החילוץ. תאריך Gemini: '+esc(d.gemini_issue_date||'לא זוהה')+' עד '+esc(d.gemini_expiry_date||'לא זוהה')+'. יש לבדוק מול ה-PDF ולאשר ידנית.</div>':'')+
       (!d.is_audit_summary&&!d.date_policy_exempt&&d.date_extraction_confidence!=null?'<p class="muted">ביטחון חילוץ תאריכים: '+Math.round(d.date_extraction_confidence*100)+'% · מקור: '+esc(d.date_extraction_source||'לא ידוע')+'</p>':'')+
       (d.override_reason?'<p class="muted">סיבת חריג: '+esc(d.override_reason)+'</p>':'')+'</div>';
     if(d.is_audit_summary&&d.reconciliation){
       const rec=d.reconciliation;
-      h+='<div class="card"><b>🔎 הצלבת סיכום ביקורת '+esc(rec.audit_year||'')+'</b>'+
+      h+='<div class="card"><b>'+icon('search')+' הצלבת סיכום ביקורת '+esc(rec.audit_year||'')+'</b>'+
         '<div class="muted">מסמכים שנבדקו בתיק: '+esc(rec.documents_checked??0)+'</div>'+
         (rec.warning?'<div class="finding medium">'+esc(rec.warning)+'</div>':'')+
         (rec.items||[]).map(x=>'<div class="finding '+(x.status==='conflict'?'high':x.status==='missing_document'?'critical':'medium')+'"><b>'+esc(x.finding)+'</b>'+
@@ -137,7 +256,7 @@ const AI=(()=>{
         '</div>';
     }
     if(!d.is_audit_summary&&!d.date_policy_exempt&&['admin','super_admin'].includes(USER_ROLE)){
-      h+='<div class="card"><b>🛡️ אישור חריג מנהלי</b><p class="muted">החריג אינו משנה את הסטטוס המחושב, נרשם ביומן ופג אוטומטית לאחר 90 יום.</p>'+
+      h+='<div class="card"><b>'+icon('shield-check')+' אישור חריג מנהלי</b><p class="muted">החריג אינו משנה את הסטטוס המחושב, נרשם ביומן ופג אוטומטית לאחר 90 יום.</p>'+
         '<select id="docOverrideStatus"><option value="active">אישור תקף בחריג</option><option value="old_approval">אישור ישן</option><option value="expired">פג תוקף</option><option value="grace_period">תקופת חסד</option><option value="needs_manual_review">דורש בדיקה</option></select>'+
         '<textarea id="docOverrideReason" rows="2" placeholder="סיבה מפורטת לאישור החריג (לפחות 10 תווים)"></textarea>'+
         '<button class="btn" style="margin-top:8px" onclick="AI.applyOverride('+d.document_id+')">אשר חריג מתועד</button></div>';
@@ -154,13 +273,13 @@ const AI=(()=>{
     if(s.missing_items?.length)h+='<div class="finding medium"><b>חוסרים</b><ul>'+s.missing_items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';
     if(s.contradictions?.length)h+='<div class="finding high"><b>סתירות</b><ul>'+s.contradictions.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';
     if(d.ai_status==='not_requested'||d.ai_status==='failed'||d.processing_stale)
-      h+='<button class="btn btn-primary" onclick="AI.analyze('+d.document_id+')">🤖 '+(d.processing_stale?'נסה שוב עם Gemini':'נתח עם Gemini')+'</button>';
+      h+='<button class="btn btn-primary" onclick="AI.analyze('+d.document_id+')">'+icon('bot')+' '+(d.processing_stale?'נסה שוב עם Gemini':'נתח עם Gemini')+'</button>';
     if(d.ai_status==='completed' && ['admin','super_admin'].includes(USER_ROLE) &&
        !d.is_audit_summary && !d.date_policy_exempt &&
        ['needs_manual_review','date_conflict','future_issue_date','old_approval'].includes(d.calculated_status))
-      h+='<button class="btn" onclick="AI.reanalyze('+d.document_id+')">🔄 נתח מחדש ב-Gemini</button>';
+      h+='<button class="btn" onclick="AI.reanalyze('+d.document_id+')">'+icon('refresh-cw')+' נתח מחדש ב-Gemini</button>';
     if(d.ai_status==='completed')
-      h+='<button class="btn btn-primary" onclick="AI.actions('+d.document_id+')">✅ צור ליקויים ומשימות</button>';
+      h+='<button class="btn btn-primary" onclick="AI.actions('+d.document_id+')">'+icon('list-checks')+' צור ליקויים ומשימות</button>';
     document.getElementById('detail').innerHTML=h;
   }
 
@@ -283,7 +402,7 @@ const AI=(()=>{
     await open(id);
   }
 
-  return {load,open,analyze,reanalyze,analyzeAll,actions,saveRelationships,saveDates,applyOverride};
+  return {load,open,filter,analyze,reanalyze,analyzeAll,actions,saveRelationships,saveDates,applyOverride};
 })();
 document.addEventListener('DOMContentLoaded',async()=>{await AI.load();const id=new URLSearchParams(window.location.search).get('document');if(id)await AI.open(Number(id));});
 </script>
