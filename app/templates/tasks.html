@@ -329,7 +329,7 @@ const Tasks = (() => {
     const asset=document.getElementById('trackingAssetFilter')?.value||'';
     const domain=document.getElementById('trackingDomainFilter')?.value||'';
     const today=new Date(); today.setHours(0,0,0,0);
-    const isoDate=v=>{if(!v)return '';const s=String(v).trim();const m=s.match(/^(\\d{1,2})[/.](\\d{1,2})[/.](\\d{4})$/);return m?m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):s;};
+    const isoDate=v=>{if(!v)return '';const s=String(v).trim();const m=s.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);return m?m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):s;};
     const days=t=>{if(!t.due_date)return null;const d=new Date(isoDate(t.due_date)+'T00:00:00');return Number.isNaN(d.getTime())?null:Math.round((d-today)/86400000);};
     const openRows=_tracking.filter(t=>!['done','cancelled'].includes(t.status));
     const overdue=openRows.filter(t=>days(t)!==null&&days(t)<0);
@@ -350,7 +350,7 @@ const Tasks = (() => {
     if(summary)summary.textContent=list.length+' מוצגות מתוך '+_tracking.length+' רשומות · '+overdue.length+' באיחור · '+soon.length+' קרובות למועד · '+doneRows.length+' הושלמו';
     if(!list.length){host.innerHTML='<div class="empty-state">לא נמצאו רשומות התואמות לסינון.</div>';return;}
     const statusLabel={open:'לביצוע',in_progress:'בטיפול',done:'הושלם',cancelled:'בוטל'};
-    const escDate=v=>{if(!v)return '—';const iso=isoDate(v);return /^\\d{4}-\\d{2}-\\d{2}$/.test(iso)?esc(iso.split('-').reverse().join('/')):esc(v);};
+    const escDate=v=>{if(!v)return '—';const iso=isoDate(v);return /^\d{4}-\d{2}-\d{2}$/.test(iso)?esc(iso.split('-').reverse().join('/')):esc(v);};
     const statusClass=t=>{const d=days(t);if(t.status==='done')return'done';if(t.status==='cancelled')return'open';if(d!==null&&d<0)return'overdue';if(d!==null&&d<=7)return'soon';return t.status==='in_progress'?'in_progress':'open';};
     host.innerHTML='<div class="fire-table-wrap"><table class="fire-table"><thead><tr>'+
       '<th>שלב / שבוע</th><th>משימה / נושא מרכזי</th><th>נכס רלוונטי</th><th>מס׳ תיק</th><th>טופס להגשה</th><th>גורם אחראי</th><th>תאריך יעד</th><th>סטטוס נוכחי</th><th>הערות ודגשים</th><th>ביצוע בפועל</th><th>ימים ליעד</th><th>התראת מועד</th><th>תחום</th>'+
