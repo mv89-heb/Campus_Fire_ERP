@@ -11,6 +11,7 @@
   })();
 </script>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.generated.css') }}">
 <style>
   body { margin: 0; }
   {% block extra_style %}{% endblock %}
@@ -29,7 +30,7 @@
       <svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-search"></use></svg><input type="text" id="shellGlobalSearch" placeholder="חיפוש גלובלי בכל המערכת..." oninput="Shell.onSearchInput(this.value)" role="searchbox" aria-autocomplete="list">
       <div id="shellSearchResults" role="listbox" style="display:none; position:absolute; top:calc(100% + 4px); right:0; left:0; background:var(--color-surface); border:1px solid var(--color-border-strong); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); z-index:400; max-height:320px; overflow-y:auto;"></div>
     </div>
-    <div class="ds-header-actions">
+    <div class="ds-header-actions tw-flex tw-items-center tw-gap-2">
       <button class="ds-btn ds-btn-icon" onclick="Shell.toggleTheme()" id="shellThemeToggle" aria-label="החלף בין מצב כהה לבהיר"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-moon"></use></svg></button>
       <button class="ds-btn ds-btn-icon" onclick="Shell.toggleNotifications()" aria-label="פתח מרכז התראות" aria-haspopup="true" style="position:relative;">
         <svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-bell"></use></svg><span id="shellNotifBadge" style="display:none; position:absolute; top:-4px; left:-4px; background:var(--color-danger); color:#fff; border-radius:50%; width:18px; height:18px; font-size:0.65rem; align-items:center; justify-content:center;"></span>
@@ -57,7 +58,7 @@
         <div><strong>Campus Fire ERP</strong><span>בטיחות אש · ציות · תפעול</span></div>
       </div>
       <div class="ds-sidebar-group">
-        <a class="ds-sidebar-link {{ 'active' if active_nav == 'dashboard' else '' }}" href="/org-dashboard"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-layout-dashboard"></use></svg> <span>לוח בקרה</span></a>
+        <a class="ds-sidebar-link tw-flex tw-items-center tw-gap-3 {{ 'active' if active_nav == 'dashboard' else '' }}" href="/org-dashboard"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-layout-dashboard"></use></svg> <span>לוח בקרה</span></a>
       </div>
       <div class="ds-sidebar-group">
         <div class="ds-sidebar-group-label">בטיחות וציות</div>
