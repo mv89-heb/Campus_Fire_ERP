@@ -75,6 +75,9 @@ class UIAssetTests(unittest.TestCase):
             self.assertIn(column, tasks)
         self.assertIn("fireOverdueCount", tasks)
         self.assertIn("trackingDomainFilter", tasks)
+        self.assertIn("trackingCaseFilter", tasks)
+        self.assertIn("trackingPhaseFilter", tasks)
+        self.assertIn("trackingOwnerFilter", tasks)
         self.assertIn("waiting_approval", tasks)
 
     def test_sidebar_is_ordered_around_the_fire_safety_workflow(self):
