@@ -11,17 +11,20 @@
 .table-scroll { overflow-x: auto; max-height: 70vh; overflow-y: auto; }
 .ds-table th.sortable { cursor: pointer; user-select: none; }
 .ds-table th.sortable:hover { color: var(--color-text); }
+
+.ds-card-title .lucide-icon { width:17px; height:17px; color:var(--color-primary); }
+
 {% endblock %}
 
 {% block content %}
-<div style="margin-bottom:8px;"><a href="/settings" style="color:var(--color-text-muted); font-size:var(--text-sm); text-decoration:none;">⚙️ הגדרות</a> <span style="color:var(--color-text-faint);">/</span> <span style="color:var(--color-text-muted); font-size:var(--text-sm);">Audit Log</span></div>
-<div class="page-title-row">
-  <h1>🕵️ Audit Log</h1>
-  <p style="color:var(--color-text-muted); font-size:var(--text-sm);">יומן פעולות מערכתי - כל היצירות/עדכונים/מחיקות</p>
-</div>
+<header class="ds-module-hero">
+  <div class="ds-module-heading"><span class="ds-module-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-activity"></use></svg></span>
+    <div><div class="ds-module-kicker">בקרה ושקיפות</div><h1>יומן פעולות מערכת</h1><p class="ds-module-subtitle">תיעוד פעולות יצירה, עדכון, מחיקה, נעילה ושחרור במערכת.</p></div>
+  </div>
+</header>
 
 <div class="ds-card">
-  <div class="ds-card-title">🔎 סינון</div>
+  <div class="ds-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-search"></use></svg> סינון</div>
   <div class="filters-row">
     <input type="text" id="filterQ" placeholder="חיפוש לפי שם ישות / משתמש..." oninput="AuditLog.refresh()">
     <select id="filterEntity" onchange="AuditLog.refresh()"><option value="">כל סוגי הישויות</option></select>
@@ -37,7 +40,7 @@
 </div>
 
 <div class="ds-card" style="margin-top:var(--space-4);">
-  <div class="ds-card-title">📜 יומן פעולות (200 אחרונות)</div>
+  <div class="ds-card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-files"></use></svg> יומן פעולות (200 אחרונות)</div>
   <div class="table-scroll">
     <table class="ds-table">
       <thead><tr>
