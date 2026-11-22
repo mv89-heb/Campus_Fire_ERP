@@ -6,6 +6,7 @@ Service Layer עבור הדשבורד הארגוני.
 import time
 from datetime import date, timedelta
 from collections import Counter
+from sqlalchemy import or_
 
 from app.models import Document, Supplier, Task, Audit, Deficiency, Equipment, Zone
 from app.services.document_analysis_service import validity_status
@@ -61,7 +62,12 @@ def _permit_kpis():
 
 
 def _task_kpis():
-    tasks = Task.query.all()
+    # Retain ordinary tasks and the current workbook snapshot; exclude stale legacy imports from KPIs.
+    tasks = Task.query.filter(or_(
+        Task.description.is_(None),
+        ~Task.description.ilike('%ייבוא טבלת מעקב כבאות והצלה%'),
+        Task.description.ilike('%גרסה: 2026-11-22-v2%'),
+    )).all()
     by_status = Counter(t.status for t in tasks)
     urgent = [t for t in tasks if t.status != 'done' and t.priority in ('urgent', 'high')]
     urgent.sort(key=lambda t: (t.due_date is None, t.due_date or date.max))
