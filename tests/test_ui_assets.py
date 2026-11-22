@@ -87,6 +87,18 @@ class UIAssetTests(unittest.TestCase):
         positions = [shell.index(label) for label in labels]
         self.assertEqual(positions, sorted(positions))
         self.assertIn("ds-nav-hint", shell)
+        expected_titles = {
+            "tasks.html": "תוכנית עבודה",
+            "sites.html": "נכסים ומבנים",
+            "fire_forms.html": "טפסים להגשה",
+            "document_intelligence.html": "מסמכים וראיות",
+            "suppliers.html": "ספקים ואנשי מקצוע",
+            "reports.html": "דוחות ובקרה",
+            "org_dashboard.html": "תמונת מצב",
+        }
+        for filename, title in expected_titles.items():
+            page = (ROOT / "app/templates" / filename).read_text(encoding="utf-8")
+            self.assertIn(title, page)
         styles = (ROOT / "app/static/css/design-system.css").read_text(encoding="utf-8")
         self.assertIn(".ds-nav-hint", styles)
 
