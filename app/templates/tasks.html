@@ -378,7 +378,10 @@ const Tasks = (() => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'עדכון הסטטוס נכשל');
       const row = _tracking.find(t => t.id === id);
-      if (row) row.status = status;
+      if (row) {
+        row.status = status;
+        if (status === 'done' && data.completed_at) row.completed_date = data.completed_at.slice(0,10);
+      }
       showToast('הסטטוס עודכן');
       renderTracking();
     } catch (e) { showToast(e.message || 'שגיאה בעדכון הסטטוס', 'error'); await refresh(); }
