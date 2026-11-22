@@ -68,13 +68,15 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-title-row">
-  <div><h1>🔍 ביקורות וליקויים</h1><div class="muted page-subtitle">מעקב מהביקורת ועד לסגירת הליקויים והמשימות</div></div>
-  <button class="btn btn-primary" onclick="Audits.openAuditModal()">➕ ביקורת חדשה</button>
-</div>
+<header class="ds-module-hero">
+  <div class="ds-module-heading"><span class="ds-module-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-clipboard-check"></use></svg></span>
+    <div><div class="ds-module-kicker">ציות, ביקורות וסגירת פערים</div><h1>ביקורות וליקויים</h1><p class="ds-module-subtitle">מעקב מהביקורת ועד לאימות סגירת הליקויים והמשימות.</p></div>
+  </div>
+  <div class="ds-module-actions"><button class="btn btn-primary" onclick="Audits.openAuditModal()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-file-plus"></use></svg> ביקורת חדשה</button></div>
+</header>
 
 <div class="card workspace-card">
-  <div class="card-title"><span>🔍 ביקורות</span><span id="auditsCount" class="muted"></span></div>
+  <div class="card-title"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-clipboard-check"></use></svg> ביקורות <span id="auditsCount" class="muted"></span></div>
   <div class="filters-row">
     <select id="filterStatus" onchange="Audits.refresh()">
       <option value="">כל הסטטוסים</option>
