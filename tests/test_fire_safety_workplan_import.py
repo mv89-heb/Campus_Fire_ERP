@@ -24,7 +24,7 @@ class FireSafetyWorkPlanImportTests(unittest.TestCase):
         proposed = [row for row in importer.ROWS if len(row) > 12 and row[12] == "proposed"]
         self.assertEqual(len(proposed), 5)
         for row in proposed:
-            self.assertIsNone(importer.parse_il_date(row[6]) if False else None)
+            self.assertIsNone(importer.confirmed_due_date(row))
             self.assertIn("מוצע", row[8])
 
     def test_completion_dates_and_israeli_dates_parse_correctly(self):
