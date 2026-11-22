@@ -127,26 +127,37 @@ const AI=(()=>{
   let running=false;
 
   const esc=s=>(s??'').toString().replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const icon=name=>'<svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="/static/img/lucide-sprite.svg#icon-'+name+'"></use></svg>';
+  function filter(query){
+    const value=(query||'').trim().toLocaleLowerCase('he');
+    document.querySelectorAll('#list .doc').forEach(item=>{
+      item.hidden=!!value&&!item.textContent.toLocaleLowerCase('he').includes(value);
+    });
+  }
   const labels={not_requested:'טרם נותח',processing:'בתהליך',completed:'הושלם',failed:'נכשל'};
   const sev={critical:'קריטי',high:'גבוהה',medium:'בינונית',low:'נמוכה',info:'מידע',unclear:'לא ברור'};
 
   async function overview(){
     const r=await fetch('/api/document-intelligence/overview');
     const d=await r.json();
-    if(!r.ok)return;
+    if(!r.ok) return;
     const sc=d.status_counts||{}, sv=d.severity_counts||{};
+    const metric=(label,value)=>'<div class="ai-overview-metric"><span>'+esc(label)+'</span><b>'+esc(value??0)+'</b></div>';
+    const total=Number(d.total_documents||0);
     document.getElementById('overview').innerHTML=
-      '<b>📊 תמונת מצב כוללת</b><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">'+
-      '<span>סה"כ מסמכים: <b>'+d.total_documents+'</b></span>'+
-      '<span>הושלמו: <b>'+((sc.completed)||0)+'</b></span>'+
-      '<span>ממתינים לניתוח: <b>'+((sc.not_requested)||0)+'</b></span>'+
-      '<span>בתהליך: <b>'+((sc.processing)||0)+'</b></span>'+
-      '<span>דורשים בדיקה: <b>'+d.review_required+'</b></span>'+
-      '<span>ליקויים קריטיים/גבוהים: <b>'+(((sv.critical)||0)+((sv.high)||0))+'</b></span>'+
-      '<span>חוסרים: <b>'+((d.missing_items||[]).length)+'</b></span>'+
-      '<span>סתירות: <b>'+((d.contradictions||[]).length)+'</b></span>'+
-      '<span>קשרים לבדיקה: <b>'+((d.relationship_review_required)||0)+'</b></span></div>'+
-      (d.recurring_findings?.length?'<div style="margin-top:10px"><b>ליקויים חוזרים:</b> '+d.recurring_findings.slice(0,5).map(x=>esc(x.title)+' × '+x.count).join(' · ')+'</div>':'');
+      '<div class="ai-overview-title">'+icon('activity')+' תמונת מצב מסמכים</div>'+
+      '<div class="ai-overview-grid">'+
+      metric('סה״כ מסמכים',total)+
+      metric('ניתוח הושלם',Number(sc.completed||0))+
+      metric('ממתינים לניתוח',Number(sc.not_requested||0))+
+      metric('בתהליך',Number(sc.processing||0))+
+      metric('דורשים בדיקה',Number(d.review_required||0))+
+      metric('ליקויים קריטיים / גבוהים',Number(sv.critical||0)+Number(sv.high||0))+
+      metric('חוסרים שזוהו',(d.missing_items||[]).length)+
+      metric('סתירות שזוהו',(d.contradictions||[]).length)+
+      metric('קשרים לבדיקה',Number(d.relationship_review_required||0))+
+      '</div>'+
+      (d.recurring_findings?.length?'<div class="ai-overview-recurring"><b>ממצאים חוזרים:</b> '+d.recurring_findings.slice(0,5).map(x=>esc(x.title)+' × '+esc(x.count)).join(' · ')+'</div>':'');
   }
 
   async function load(){
@@ -156,10 +167,15 @@ const AI=(()=>{
     if(!r.ok){document.getElementById('list').innerHTML='<span class="muted">שגיאה בטעינת המסמכים</span>';return}
     docs=d.documents||[];
     document.getElementById('docCount').innerText=docs.length+' מסמכים';
-    document.getElementById('list').innerHTML=docs.map(x=>
-      '<div id="doc-'+x.document_id+'" class="doc" onclick="AI.open('+x.document_id+')"><b>'+esc(x.file_name)+'</b><br>'+
-      '<span class="muted">'+(labels[x.ai_status]||x.ai_status)+(x.review_required?' · ⚠️ בדיקה נדרשת':'')+'</span></div>'
-    ).join('')||'<span class="muted">אין מסמכים</span>';
+    document.getElementById('list').innerHTML=docs.map(x=>{
+      const status=x.ai_status==='completed'?'done':x.ai_status==='failed'?'failed':'';
+      return '<button type="button" id="doc-'+Number(x.document_id)+'" class="doc" aria-pressed="false" onclick="AI.open('+Number(x.document_id)+')">'+
+        '<span class="doc-name">'+esc(x.file_name)+'</span>'+
+        '<span class="doc-meta"><span class="ai-status-pill '+status+'">'+esc(labels[x.ai_status]||x.ai_status)+'</span>'+
+        (x.review_required?'<span class="ai-status-pill review">בדיקה נדרשת</span>':'')+
+        '</span></button>';
+    }).join('')||'<div class="ai-empty">אין מסמכים במאגר.</div>';
+    filter(document.getElementById('docSearch')?.value||'');
   }
 
   function relationshipLabel(type){return type==='audit'?'ביקורת':type==='site'?'אתר':'ספק';}
@@ -192,28 +208,28 @@ const AI=(()=>{
     const l=ctx.links||{}, current=ctx.current||{};
     const box=(type,currentId)=>{
       const state=l[type]?.status||'missing';
-      const icon=state==='linked'?'🟢':state==='candidate'?'🟡':'⚪';
+      const iconClass=state==='linked'?'linked':state==='candidate'?'candidate':'';
       const label=state==='linked'?'מקושר':state==='candidate'?'נדרש אישור':'לא זוהה';
-      return '<div class="relationship-box"><b>'+icon+' '+relationshipLabel(type)+'</b><div class="muted">'+label+'</div>'+
+      return '<div class="relationship-box"><b><span class="ai-relationship-dot '+iconClass+'"></span>'+relationshipLabel(type)+'</b><div class="muted">'+label+'</div>'+
         '<select id="rel'+type.charAt(0).toUpperCase()+type.slice(1)+'">'+
         (currentId?'<option value="'+currentId+'" selected>הקשר הנוכחי #'+currentId+'</option>':'')+
         relationshipOptions(type,l)+'</select></div>';
     };
-    return '<div class="relationship"><b>🔗 קשרים תפעוליים</b><div class="muted" style="margin:5px 0 10px">קישור אוטומטי נעשה רק כשיש התאמה ברורה. התאמות מועמדות דורשות אישור ידני.</div>'+
+    return '<div class="relationship"><b>'+icon('map-pin')+' קשרים תפעוליים</b><div class="muted" style="margin:5px 0 10px">קישור אוטומטי נעשה רק כשיש התאמה ברורה. התאמות מועמדות דורשות אישור ידני.</div>'+
       '<div class="relationship-grid">'+box('audit',current.audit_id)+box('site',current.site_id)+box('supplier',current.supplier_id)+'</div>'+
-      '<button class="btn btn-primary" style="margin-top:10px" onclick="AI.saveRelationships('+id+')">💾 שמור קשרים</button></div>';
+      '<button class="btn btn-primary" style="margin-top:10px" onclick="AI.saveRelationships('+id+')">'+icon('file-check')+' שמור קשרים</button></div>';
   }
 
   async function open(id){
-    document.querySelectorAll('.doc.selected').forEach(el=>el.classList.remove('selected'));
-    const selected=document.getElementById('doc-'+id); if(selected) selected.classList.add('selected');
+    document.querySelectorAll('.doc.selected').forEach(el=>{el.classList.remove('selected');el.setAttribute('aria-pressed','false');});
+    const selected=document.getElementById('doc-'+id); if(selected){selected.classList.add('selected');selected.setAttribute('aria-pressed','true');}
     const r=await fetch('/api/document-intelligence/'+id);
     const d=await r.json();
     if(!r.ok){document.getElementById('detail').innerHTML='<div class="finding critical">'+esc(d.error||'שגיאה')+'</div>';return}
     let h='<h2>'+esc(d.file_name)+'</h2><div class="muted">'+esc(d.document_type||'לא זוהה')+' · '+(labels[d.ai_status]||d.ai_status)+(d.confidence!=null?' · ביטחון '+Math.round(d.confidence*100)+'%':'')+'</div>';
     if(d.error)h+='<div class="finding critical">'+esc(d.error)+'</div>';
     if(d.summary)h+='<div class="card"><b>סיכום המסמך</b><p>'+esc(d.summary)+'</p></div>';
-    h+='<div class="card"><b>📅 תאריכי מסמך ותוקף</b>'+
+    h+='<div class="card"><b>'+icon('calendar-clock')+' תאריכי מסמך ותוקף</b>'+
       '<div class="muted" style="margin:6px 0">סטטוס מחושב: <b>'+esc(d.calculated_status_label||d.calculated_status||'ממתין לחישוב')+'</b>'+
       (d.is_multi_year?' · אישור רב-שנתי':'')+'</div><p class="muted">'+esc(d.date_status_reason||'')+'</p>'+
       (d.effective_status&&d.effective_status!==d.calculated_status?' · חריג ידני פעיל: '+esc(d.effective_status):'')+'</div>'+
@@ -230,7 +246,7 @@ const AI=(()=>{
       (d.override_reason?'<p class="muted">סיבת חריג: '+esc(d.override_reason)+'</p>':'')+'</div>';
     if(d.is_audit_summary&&d.reconciliation){
       const rec=d.reconciliation;
-      h+='<div class="card"><b>🔎 הצלבת סיכום ביקורת '+esc(rec.audit_year||'')+'</b>'+
+      h+='<div class="card"><b>'+icon('search')+' הצלבת סיכום ביקורת '+esc(rec.audit_year||'')+'</b>'+
         '<div class="muted">מסמכים שנבדקו בתיק: '+esc(rec.documents_checked??0)+'</div>'+
         (rec.warning?'<div class="finding medium">'+esc(rec.warning)+'</div>':'')+
         (rec.items||[]).map(x=>'<div class="finding '+(x.status==='conflict'?'high':x.status==='missing_document'?'critical':'medium')+'"><b>'+esc(x.finding)+'</b>'+
@@ -240,7 +256,7 @@ const AI=(()=>{
         '</div>';
     }
     if(!d.is_audit_summary&&!d.date_policy_exempt&&['admin','super_admin'].includes(USER_ROLE)){
-      h+='<div class="card"><b>🛡️ אישור חריג מנהלי</b><p class="muted">החריג אינו משנה את הסטטוס המחושב, נרשם ביומן ופג אוטומטית לאחר 90 יום.</p>'+
+      h+='<div class="card"><b>'+icon('shield-check')+' אישור חריג מנהלי</b><p class="muted">החריג אינו משנה את הסטטוס המחושב, נרשם ביומן ופג אוטומטית לאחר 90 יום.</p>'+
         '<select id="docOverrideStatus"><option value="active">אישור תקף בחריג</option><option value="old_approval">אישור ישן</option><option value="expired">פג תוקף</option><option value="grace_period">תקופת חסד</option><option value="needs_manual_review">דורש בדיקה</option></select>'+
         '<textarea id="docOverrideReason" rows="2" placeholder="סיבה מפורטת לאישור החריג (לפחות 10 תווים)"></textarea>'+
         '<button class="btn" style="margin-top:8px" onclick="AI.applyOverride('+d.document_id+')">אשר חריג מתועד</button></div>';
@@ -257,13 +273,13 @@ const AI=(()=>{
     if(s.missing_items?.length)h+='<div class="finding medium"><b>חוסרים</b><ul>'+s.missing_items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';
     if(s.contradictions?.length)h+='<div class="finding high"><b>סתירות</b><ul>'+s.contradictions.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>';
     if(d.ai_status==='not_requested'||d.ai_status==='failed'||d.processing_stale)
-      h+='<button class="btn btn-primary" onclick="AI.analyze('+d.document_id+')">🤖 '+(d.processing_stale?'נסה שוב עם Gemini':'נתח עם Gemini')+'</button>';
+      h+='<button class="btn btn-primary" onclick="AI.analyze('+d.document_id+')">'+icon('bot')+' '+(d.processing_stale?'נסה שוב עם Gemini':'נתח עם Gemini')+'</button>';
     if(d.ai_status==='completed' && ['admin','super_admin'].includes(USER_ROLE) &&
        !d.is_audit_summary && !d.date_policy_exempt &&
        ['needs_manual_review','date_conflict','future_issue_date','old_approval'].includes(d.calculated_status))
-      h+='<button class="btn" onclick="AI.reanalyze('+d.document_id+')">🔄 נתח מחדש ב-Gemini</button>';
+      h+='<button class="btn" onclick="AI.reanalyze('+d.document_id+')">'+icon('refresh-cw')+' נתח מחדש ב-Gemini</button>';
     if(d.ai_status==='completed')
-      h+='<button class="btn btn-primary" onclick="AI.actions('+d.document_id+')">✅ צור ליקויים ומשימות</button>';
+      h+='<button class="btn btn-primary" onclick="AI.actions('+d.document_id+')">'+icon('list-checks')+' צור ליקויים ומשימות</button>';
     document.getElementById('detail').innerHTML=h;
   }
 
@@ -386,7 +402,7 @@ const AI=(()=>{
     await open(id);
   }
 
-  return {load,open,analyze,reanalyze,analyzeAll,actions,saveRelationships,saveDates,applyOverride};
+  return {load,open,filter,analyze,reanalyze,analyzeAll,actions,saveRelationships,saveDates,applyOverride};
 })();
 document.addEventListener('DOMContentLoaded',async()=>{await AI.load();const id=new URLSearchParams(window.location.search).get('document');if(id)await AI.open(Number(id));});
 </script>
