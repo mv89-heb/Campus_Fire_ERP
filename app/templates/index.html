@@ -1,5 +1,14 @@
 {% extends "_shell.html" %}
-{% block title %}Campus Fire ERP | מערכת בטיחות אש{% endblock %}
+{% block title %}Campus Fire ERP | מערכת בטיחות אש
+.date-state { display:inline-flex; align-items:center; margin-inline-start:5px; padding:2px 6px; border-radius:999px; font-size:.65rem; font-weight:800; }
+.date-state.overdue { background:var(--tint-danger); color:var(--color-danger); }
+.date-state.due-soon { background:var(--tint-warning); color:var(--color-warning); }
+#kpiExpired { font-variant-numeric:tabular-nums; }
+.card-title .lucide-icon { width:17px; height:17px; flex:0 0 17px; color:var(--color-primary); }
+#permitDocActions .lucide-icon { width:14px; height:14px; }
+#permitBtnArchive .lucide-icon { width:14px; height:14px; }
+
+{% endblock %}
 {% block extra_style %}
 .page-title-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-4); flex-wrap:wrap; gap:var(--space-2); }
 .page-title-row h1 { font-size:var(--text-xl); }
