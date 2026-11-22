@@ -38,7 +38,7 @@ def normalized_status(value):
 
 
 def confirmed_due_date(row):
-    return None if len(row) > 12 and row[12] == "proposed" else parse_il_date(row[6])
+    return None if len(row) > 11 and row[11] == "proposed" else parse_il_date(row[6])
 
 
 def import_rows(dry_run=False):
