@@ -117,6 +117,8 @@ function toggleLoginTheme() {
   if(button)button.innerHTML='<svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-'+(next==='dark'?'moon':'sun')+'"></use></svg>';
 }
 (function startIntro() {
+  const themeButton=document.getElementById('loginThemeToggle');
+  if(themeButton){const theme=document.documentElement.getAttribute('data-theme')||'dark';themeButton.innerHTML='<svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-'+(theme==='dark'?'moon':'sun')+'"></use></svg>';}
   let alreadySeen = false;
   try { alreadySeen = sessionStorage.getItem('campus-fire-intro-seen') === '1'; } catch (_) {}
   if (alreadySeen) { document.getElementById('loginSplash')?.remove(); return; }
