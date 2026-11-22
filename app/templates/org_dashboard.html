@@ -400,7 +400,7 @@ async function loadDashboard(forceRefresh = false) {
     renderBarChart('chartByMonth', permits.by_month);
     renderBarChart('chartByStatus', permits.by_status, { valid: 'בתוקף', warning: 'לקראת פקיעה', critical: 'קריטי', expired: 'פג תוקף', needs_review: 'לבדיקה' });
     renderBarChart('chartDeficiencies', deficiencies.by_severity, { low: 'נמוך', medium: 'בינוני', high: 'גבוה', critical: 'קריטי' });
-    renderBarChart('chartTasks', tasks.by_status, { open: 'פתוחה', in_progress: 'בביצוע', done: 'הושלמה', cancelled: 'בוטלה' });
+    renderBarChart('chartTasks', tasks.by_status, { open: 'לביצוע', in_progress: 'בטיפול', waiting_approval: 'ממתין לאישור', done: 'הושלם', cancelled: 'בוטל' });
 
     const expirations = Array.isArray(permits.upcoming_expirations) ? permits.upcoming_expirations : [];
     const expEl = document.getElementById('tblExpirations');
