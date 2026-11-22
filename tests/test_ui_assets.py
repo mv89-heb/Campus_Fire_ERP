@@ -87,6 +87,20 @@ class UIAssetTests(unittest.TestCase):
         self.assertIn("גרסה: 2026-11-22-v2", dashboard_service)
         self.assertIn("ייבוא טבלת מעקב כבאות והצלה", dashboard_service)
 
+    def test_all_pages_use_one_clear_hebrew_typography_system(self):
+        shell = (ROOT / "app/templates/_shell.html").read_text(encoding="utf-8")
+        login = (ROOT / "app/templates/login.html").read_text(encoding="utf-8")
+        self.assertLess(shell.index("css/tailwind.generated.css"), shell.index("css/typography.css"))
+        self.assertIn("css/typography.css", login)
+        typography = (ROOT / "app/static/css/typography.css").read_text(encoding="utf-8")
+        self.assertIn('--font-family-ui: Arial, "Segoe UI", sans-serif', typography)
+        self.assertIn("body *::before, body *::after", typography)
+        self.assertIn("--type-h1", typography)
+        self.assertIn("--type-table", typography)
+        self.assertIn("font-weight: 700 !important", typography)
+        self.assertNotIn("fonts.googleapis.com", typography)
+        self.assertNotIn("@import", typography)
+
     def test_sidebar_is_ordered_around_the_fire_safety_workflow(self):
         shell = (ROOT / "app/templates/_shell.html").read_text(encoding="utf-8")
         labels = [
