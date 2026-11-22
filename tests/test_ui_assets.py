@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class UIAssetTests(unittest.TestCase):
     def test_lucide_sprite_is_valid_and_contains_every_shell_icon(self):
         sprite = ROOT / "app/static/img/lucide-sprite.svg"
-        templates = [ROOT / "app/templates/_shell.html", ROOT / "app/templates/org_dashboard.html", ROOT / "app/templates/fire_forms.html", ROOT / "app/templates/document_intelligence.html", ROOT / "app/templates/sites.html", ROOT / "app/templates/equipment.html", ROOT / "app/templates/tasks.html", ROOT / "app/templates/audits.html", ROOT / "app/templates/suppliers.html", ROOT / "app/templates/reports.html"]
+        templates = [ROOT / "app/templates/_shell.html", ROOT / "app/templates/org_dashboard.html", ROOT / "app/templates/fire_forms.html", ROOT / "app/templates/document_intelligence.html", ROOT / "app/templates/sites.html", ROOT / "app/templates/equipment.html", ROOT / "app/templates/tasks.html", ROOT / "app/templates/audits.html", ROOT / "app/templates/suppliers.html", ROOT / "app/templates/reports.html", ROOT / "app/templates/index.html", ROOT / "app/templates/login.html", ROOT / "app/templates/settings.html", ROOT / "app/templates/users.html", ROOT / "app/templates/audit_log.html", ROOT / "app/templates/admin_storage.html"]
         tree = ET.parse(sprite)
         ids = {
             node.attrib["id"]
@@ -64,6 +64,26 @@ class UIAssetTests(unittest.TestCase):
         self.assertIn("reports-hero", reports)
         design_system = (ROOT / "app/static/css/design-system.css").read_text(encoding="utf-8")
         self.assertIn(".ds-module-hero", design_system)
+
+    def test_home_dashboard_counts_unverified_documents_as_needing_review(self):
+        index = (ROOT / "app/templates/index.html").read_text(encoding="utf-8")
+        self.assertIn("פג תוקף / דורש בדיקה", index)
+        self.assertIn("_data.alerts?.needs_review?.length", index)
+        self.assertIn("totalRequirements?Math.round", index)
+        self.assertIn("לא זמין", index)
+
+    def test_admin_and_login_surfaces_keep_security_and_cost_disclosures(self):
+        users = (ROOT / "app/templates/users.html").read_text(encoding="utf-8")
+        self.assertIn("ההתחברות עדיין", users)
+        for page in ["settings", "users", "audit_log", "admin_storage"]:
+            source = (ROOT / f"app/templates/{page}.html").read_text(encoding="utf-8")
+            self.assertIn("ds-module-hero", source, f"{page} should use the shared module header")
+        storage = (ROOT / "app/templates/admin_storage.html").read_text(encoding="utf-8")
+        self.assertIn("storage-cost-note", storage)
+        self.assertIn("עשוי לצרוך מכסת API או לגרור עלות", storage)
+        login = (ROOT / "app/templates/login.html").read_text(encoding="utf-8")
+        self.assertIn("loginSplash", login)
+        self.assertIn("loginThemeToggle", login)
 
 
 if __name__ == "__main__":
