@@ -42,8 +42,14 @@
 {% endblock %}
 {% block content %}
 <div class="fire-forms">
-  <div class="ff-title"><h1>📄 מאגר טפסי כיבוי והדפסה</h1><a class="ff-btn secondary" href="/">חזרה לאישורים</a></div>
-  <p class="ff-muted">מעלים כאן את הטפסים הרשמיים פעם אחת. הקבצים נשמרים במאגר המערכת וניתן להשתמש בהם שוב להפקת חבילות הדפסה.</p>
+  <header class="ff-page-header">
+    <div class="ff-heading-main">
+      <span class="ff-heading-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-files"></use></svg></span>
+      <div><div class="ff-eyebrow">ניהול מסמכים ותבניות</div><h1>מאגר טפסי כיבוי והדפסה</h1>
+        <p class="ff-muted">מאגר הטפסים הרשמי, מיפוי השדות והפקת חבילות PDF להדפסה.</p></div>
+    </div>
+    <a class="ff-btn secondary" href="/"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-arrow-up-right"></use></svg> חזרה לאישורים</a>
+  </header>
   <div class="ff-intro"><b>כך מפיקים טופס תקין:</b> בוחרים טופס, מוודאים שהשדות ממופים למקומם בטופס, מזינים ערכים ובודקים בתצוגה המקדימה לפני ההדפסה. ערכי המילוי ותעודת בעל המקצוע אינם נשמרים.</div>
   <div class="ff-steps" aria-label="שלבי העבודה">
     <div class="ff-step"><span class="ff-step-num">1</span><div><b>בחירת טפסים</b><small>בחר טופס אחד או חבילה</small></div></div>
@@ -52,28 +58,28 @@
   </div>
 
   <section class="ff-card">
-    <h2>העלאה מרוכזת של טפסים</h2>
+    <div class="ff-section-heading"><span class="ff-section-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-upload"></use></svg></span><div><h2>העלאה מרוכזת של טפסים</h2><p class="ff-muted">הוסף תבניות רשמיות למאגר לשימוש חוזר.</p></div></div>
     <p class="ff-muted">אפשר לבחור עד 25 קובצי PDF או תמונות PNG/JPG בפעימה. ניתן להעלות את 20 הטפסים יחד, בכפוף למגבלת גודל הבקשה.</p>
     <form id="ffUploadForm">
       <label for="ffFiles">בחירת קבצים</label>
       <input class="ff-input" id="ffFiles" name="files" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" multiple required>
       <div id="ffSelected" class="ff-muted"></div>
-      <button class="ff-btn" id="ffUploadButton" type="submit">העלאת הטפסים למאגר</button>
+      <button class="ff-btn" id="ffUploadButton" type="submit"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-upload"></use></svg> העלאת הטפסים למאגר</button>
       <div id="ffUploadStatus" class="ff-status" role="status" aria-live="polite"></div>
     </form>
   </section>
 
   <section class="ff-card">
-    <div class="ff-title"><h2>הטפסים השמורים</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ff-btn" type="button" onclick="openBatchPrint()">מילוי והדפסת טפסים נבחרים</button><button class="ff-btn secondary" type="button" onclick="selectAllTemplates(true)">בחירת הכול</button><button class="ff-btn secondary" type="button" onclick="selectAllTemplates(false)">ביטול בחירה</button><button class="ff-btn secondary" type="button" onclick="loadTemplates()">רענון</button></div></div>
+    <div class="ff-title ff-template-toolbar"><div class="ff-section-heading"><span class="ff-section-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-folder-open"></use></svg></span><div><h2>הטפסים השמורים</h2><p class="ff-muted">בחר תבנית למיפוי, או סמן כמה תבניות להפקת חבילה אחת.</p></div></div><div class="ff-toolbar-actions"><button class="ff-btn" type="button" onclick="openBatchPrint()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-printer"></use></svg> מילוי והדפסת נבחרים</button><button class="ff-btn secondary" type="button" onclick="selectAllTemplates(true)">בחירת הכול</button><button class="ff-btn secondary" type="button" onclick="selectAllTemplates(false)">ביטול בחירה</button><button class="ff-btn secondary" type="button" onclick="loadTemplates()">רענון</button></div></div>
     <p class="ff-muted">סמן טופס אחד או יותר כדי להפיק חבילת PDF אחת. פרטי המילוי מוזנים פעם אחת ומשולבים בכל הטפסים שבהם הוגדר אותו שדה.</p>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0"><button class="ff-btn" id="ffAutoMapButton" type="button" onclick="autoMapAllTemplates()">סריקה / ניסיון מיפוי נוסף</button><span class="ff-muted">הסריקה אינה מנחשת מיקומים. כל טופס שלא זוהו בו שדות יסומן לבדיקה ידנית, ולא ייחשב כמוכן למילוי.</span></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0"><button class="ff-btn secondary" id="ffAutoMapButton" type="button" onclick="autoMapAllTemplates()"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-search"></use></svg> סריקה / ניסיון מיפוי נוסף</button><span class="ff-muted">הסריקה אינה מנחשת מיקומים. כל טופס שלא זוהו בו שדות יסומן לבדיקה ידנית, ולא ייחשב כמוכן למילוי.</span></div>
     <div id="ffAutoMapStatus" class="ff-status" role="status" aria-live="polite"></div>
     <div id="ffTemplateList" class="ff-list">טוען...</div>
   </section>
 
 
   <section class="ff-card" id="ffMappingCard" hidden>
-    <div class="ff-title"><h2 id="ffMappingTitle">הגדרת שדות למילוי</h2><button class="ff-btn secondary" type="button" onclick="closeMapping()">סגירה</button></div>
+    <div class="ff-title"><div class="ff-section-heading"><span class="ff-section-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-map-pin"></use></svg></span><div><h2 id="ffMappingTitle">הגדרת שדות למילוי</h2><p class="ff-muted">סמן את מיקום ההדפסה ושמור את מיפוי השדות.</p></div></div><button class="ff-btn secondary" type="button" onclick="closeMapping()">סגירה</button></div>
     <p class="ff-muted">בחר עמוד, לחץ על המקום שבו יודפס הערך, והגדר שם שדה. נשמרים רק שמות השדות והמיקומים, לא הערכים שתמלא בהמשך.</p>
     <div class="ff-mapping-layout">
       <div><label for="ffMapPage">עמוד</label><select class="ff-input" id="ffMapPage"></select><div class="ff-map-help ff-muted">לחץ על המקום שבו אמור להסתיים הטקסט בצד ימין. המערכת תיישר את הערך לימין ותפרוס אותו שמאלה. כדי להזיז שדה קיים, לחץ על „הזזת מיקום” לידו ואז בחר נקודה חדשה.</div><div class="ff-map-stage" id="ffMapStage"><img id="ffMapImage" class="ff-preview" alt="תצוגת הטופס"><span id="ffMapMarker" class="ff-map-marker" hidden></span></div><div id="ffMapPosition" class="ff-muted" aria-live="polite">לחץ על נקודת ההדפסה בטופס.</div></div>
@@ -88,7 +94,7 @@
   </section>
 
   <section class="ff-card" id="ffPrintCard" hidden>
-    <h2 id="ffPrintTitle">הפקת חבילת הדפסה</h2>
+    <div class="ff-section-heading"><span class="ff-section-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-printer"></use></svg></span><div><h2 id="ffPrintTitle">הפקת חבילת הדפסה</h2><p class="ff-muted">מלא, בדוק והפק עותק זמני להדפסה.</p></div></div>
     <p class="ff-muted">בחר/י תעודת הסמכה או רישיון של בעל המקצוע. הקובץ מצורף אוטומטית כעמוד האחרון בחבילת ההדפסה ואינו נשמר במאגר הטפסים.</p>
     <div class="ff-warning ff-muted">המערכת ממלאת את השדות שהוגדרו במיפוי על גבי עותק זמני של הטופס. תאריך וחתימת בעל המקצוע נשארים למילוי ידני. תעודת ההסמכה מצורפת להדפסה בלבד ואינה נשמרת.</div>
     <form id="ffPrintForm">
@@ -96,7 +102,7 @@
       <label for="ffCertificate">תעודה / רישיון (PDF או תמונת PNG/JPG, עד 12MB)</label>
       <input class="ff-input" id="ffCertificate" name="certificate" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" required>
       <div id="ffCertificateName" class="ff-muted"></div>
-      <button class="ff-btn" id="ffPrintButton" type="submit">הפקת חבילת PDF להדפסה</button>
+      <button class="ff-btn" id="ffPrintButton" type="submit"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-printer"></use></svg> הפקת חבילת PDF להדפסה</button>
       <button class="ff-btn secondary" type="button" onclick="closePrint()">ביטול</button>
       <div id="ffPrintStatus" class="ff-status" role="status" aria-live="polite"></div>
     </form>
