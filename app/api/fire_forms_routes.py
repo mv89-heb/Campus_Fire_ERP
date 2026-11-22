@@ -446,29 +446,29 @@ def auto_map_all_fire_form_templates():
 
 
 def _has_valid_fire_form_mapping(item):
-    """Require at least one structurally valid mapped field before generating a print PDF."""
+    """Require every configured field to have a valid position before printing."""
     try:
         fields = json.loads(item.fields_schema or "[]")
     except (TypeError, ValueError):
         return False
-    if not isinstance(fields, list):
+    if not isinstance(fields, list) or not fields:
         return False
     for field in fields:
         if not isinstance(field, dict):
-            continue
+            return False
         try:
             page = int(field.get("page", -1))
             x, y = float(field.get("x")), float(field.get("y"))
             font_size = float(field.get("font_size", 10))
         except (TypeError, ValueError):
-            continue
-        if (str(field.get("key") or "").strip()
-                and str(field.get("label") or "").strip()
-                and 0 <= page < item.page_count
-                and 0 <= x <= 1 and 0 <= y <= 1
-                and 5 <= font_size <= 24):
-            return True
-    return False
+            return False
+        if (not str(field.get("key") or "").strip()
+                or not str(field.get("label") or "").strip()
+                or not 0 <= page < item.page_count
+                or not 0 <= x <= 1 or not 0 <= y <= 1
+                or not 5 <= font_size <= 24):
+            return False
+    return True
 
 
 def _overlay_mapped_values(document, item, values):
