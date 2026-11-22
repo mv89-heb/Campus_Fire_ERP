@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class UIAssetTests(unittest.TestCase):
     def test_lucide_sprite_is_valid_and_contains_every_shell_icon(self):
         sprite = ROOT / "app/static/img/lucide-sprite.svg"
-        templates = [ROOT / "app/templates/_shell.html", ROOT / "app/templates/org_dashboard.html"]
+        templates = [ROOT / "app/templates/_shell.html", ROOT / "app/templates/org_dashboard.html", ROOT / "app/templates/fire_forms.html"]
         tree = ET.parse(sprite)
         ids = {
             node.attrib["id"]
@@ -36,6 +36,13 @@ class UIAssetTests(unittest.TestCase):
         self.assertIn(".tw-flex", css)
         self.assertIn(".tw-items-center", css)
         self.assertNotIn("*,::before,::after", css, "Tailwind preflight must remain disabled")
+
+    def test_fire_forms_only_enable_print_when_mapping_coordinates_exist(self):
+        fire_forms = (ROOT / "app/templates/fire_forms.html").read_text(encoding="utf-8")
+        self.assertIn("hasMappedFireCoordinates", fire_forms)
+        self.assertIn('disabled title="יש להגדיר מיקומים לפני מילוי"', fire_forms)
+        self.assertIn("mapped?'ready':'needs'", fire_forms)
+        self.assertIn("fields.every(hasMappedFireCoordinates)", fire_forms)
 
 
 if __name__ == "__main__":
