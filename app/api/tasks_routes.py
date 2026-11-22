@@ -1,7 +1,10 @@
 """
 API עבור מערכת משימות (שלב 7).
 """
+from datetime import datetime
+
 from flask import Blueprint, jsonify, request, render_template
+from app.extensions import db
 from app.services import task_service as svc
 from app.services.task_service import TaskServiceError
 
@@ -104,7 +107,7 @@ def api_fire_safety_tracking():
                 "status": task.status,
                 "priority": task.priority,
                 "due_date": str(task.due_date) if task.due_date else fields.get("תאריך יעד לביצוע") or None,
-                "completed_date": fields.get("תאריך ביצוע בפועל") or None,
+                "completed_date": fields.get("תאריך ביצוע בפועל") or (task.completed_at.date().isoformat() if task.completed_at else None),
                 "deadline_alert": fields.get("התראת מועד", ""),
                 "description": desc,
                 "duplicate_count": 0,
@@ -156,7 +159,11 @@ def api_get_task(task_id):
 
 @tasks_bp.route('/api/tasks/<int:task_id>', methods=['PUT'])
 def api_update_task(task_id):
-    task = svc.update_task(task_id, _json_body())
+    body = _json_body()
+    task = svc.update_task(task_id, body)
+    if body.get("status") == "done" and not task.completed_at:
+        task.completed_at = datetime.utcnow()
+        db.session.commit()
     return jsonify(svc.serialize_task(task))
 
 
