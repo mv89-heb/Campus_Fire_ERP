@@ -21,8 +21,8 @@ class UIAssetTests(unittest.TestCase):
         for template in templates:
             source = template.read_text(encoding="utf-8")
             referenced.update(re.findall(r"#(icon-[a-z0-9-]+)", source))
-            referenced.update("icon-" + name for name in re.findall(r"(?:icon|ffIcon|dashboardIcon)\(['"]([a-z0-9-]+)['"]\)", source))
-        self.assertTrue(referenced, "The shared shell should use local Lucide symbols")
+            referenced.update("icon-" + name for name in re.findall(r"(?:icon|ffIcon|dashboardIcon)\('([a-z0-9-]+)'\)", source))
+        self.assertTrue(referenced, "The templates should use local Lucide symbols")
         self.assertFalse(referenced - ids, f"Missing local icon symbols: {sorted(referenced - ids)}")
 
     def test_shell_uses_local_rtl_stylesheets_and_prefixed_utilities(self):
