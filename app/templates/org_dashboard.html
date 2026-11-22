@@ -1,5 +1,5 @@
 {% extends "_shell.html" %}
-{% block title %}לוח בקרה ארגוני | Campus Fire ERP{% endblock %}
+{% block title %}תמונת מצב | Campus Fire ERP{% endblock %}
 
 {% block extra_style %}
 .page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
@@ -199,11 +199,12 @@ td { vertical-align: middle; }
   <header class="dashboard-hero">
     <div>
       <div class="dashboard-kicker"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-shield-check"></use></svg> מרכז שליטה תפעולי</div>
-      <h1>תמונת מצב בטיחות</h1>
+      <h1>תמונת מצב</h1>
       <p class="dashboard-subtitle">מעקב אחר אישורים, ליקויים, ציוד ומשימות — עם דגש על הנושאים שדורשים טיפול.</p>
     </div>
     <div class="dashboard-actions">
       <span id="dashboardLastUpdated" class="dashboard-updated">הנתונים נטענים…</span>
+      <a class="btn btn-primary" href="/tasks"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-list-checks"></use></svg> לתוכנית העבודה</a>
       <button class="btn" onclick="loadDashboard(true)" title="רענון נתונים מהשרת">
         <svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-refresh-cw"></use></svg>
         רענן נתונים
@@ -400,7 +401,7 @@ async function loadDashboard(forceRefresh = false) {
     renderBarChart('chartByMonth', permits.by_month);
     renderBarChart('chartByStatus', permits.by_status, { valid: 'בתוקף', warning: 'לקראת פקיעה', critical: 'קריטי', expired: 'פג תוקף', needs_review: 'לבדיקה' });
     renderBarChart('chartDeficiencies', deficiencies.by_severity, { low: 'נמוך', medium: 'בינוני', high: 'גבוה', critical: 'קריטי' });
-    renderBarChart('chartTasks', tasks.by_status, { open: 'פתוחה', in_progress: 'בביצוע', done: 'הושלמה', cancelled: 'בוטלה' });
+    renderBarChart('chartTasks', tasks.by_status, { open: 'לביצוע', in_progress: 'בטיפול', waiting_approval: 'ממתין לאישור', done: 'הושלם', cancelled: 'בוטל' });
 
     const expirations = Array.isArray(permits.upcoming_expirations) ? permits.upcoming_expirations : [];
     const expEl = document.getElementById('tblExpirations');

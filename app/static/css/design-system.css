@@ -421,6 +421,7 @@ a { color: inherit; }
 }
 .ds-sidebar-link:hover { background: var(--color-surface-hover); color: var(--color-text); }
 .ds-sidebar-link.active { background: var(--tint-primary); color: var(--color-primary); font-weight: var(--font-weight-medium); }
+.ds-nav-hint { margin-inline-start: auto; padding: 2px 6px; border-radius: 999px; background: var(--tint-primary); color: var(--color-primary); font-size: 0.62rem; font-weight: 800; line-height: 1.4; }
 
 .ds-main { flex: 1; min-width: 0; overflow-y: auto; padding: var(--space-5); }
 

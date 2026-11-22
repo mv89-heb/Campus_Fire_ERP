@@ -1,5 +1,5 @@
 {% extends "_shell.html" %}
-{% block title %}Campus Fire ERP | מערכת בטיחות אש
+{% block title %}אישורים ורישיונות | Campus Fire ERP
 .date-state { display:inline-flex; align-items:center; margin-inline-start:5px; padding:2px 6px; border-radius:999px; font-size:.65rem; font-weight:800; }
 .date-state.overdue { background:var(--tint-danger); color:var(--color-danger); }
 .date-state.due-soon { background:var(--tint-warning); color:var(--color-warning); }
@@ -28,7 +28,7 @@ table{width:100%;border-collapse:collapse;text-align:right;font-size:.9rem;min-w
 {% block content %}
 <header class="ds-module-hero">
   <div class="ds-module-heading"><span class="ds-module-icon"><svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-shield-check"></use></svg></span>
-    <div><div class="ds-module-kicker">מסמכי ציות ובטיחות</div><h1>אישורים ודרישות בטיחות אש</h1><p class="ds-module-subtitle">ניהול דרישות, מסמכים, תוקף ואימות נתונים לפי דרישות המערכת.</p></div>
+    <div><div class="ds-module-kicker">מסמכי ציות ובטיחות</div><h1>אישורים ורישיונות</h1><p class="ds-module-subtitle">ניהול דרישות, מסמכים, תוקף ואימות נתונים לפי דרישות המערכת.</p></div>
   </div>
   <div class="ds-module-actions">
     <input type="file" id="filePicker" accept=".pdf" multiple style="display:none" onchange="App.submitUpload(event)">

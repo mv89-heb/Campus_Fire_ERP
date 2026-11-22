@@ -48,7 +48,7 @@ class BrandIdentityTests(unittest.TestCase):
 
     def test_dashboard_uses_campus_fire_identity_and_refined_kpis(self):
         dashboard = (ROOT / "app" / "templates" / "org_dashboard.html").read_text(encoding="utf-8")
-        self.assertIn("לוח בקרה ארגוני | Campus Fire ERP", dashboard)
+        self.assertIn("תמונת מצב | Campus Fire ERP", dashboard)
         self.assertIn("Dashboard presentation refinement", dashboard)
         self.assertIn("grid-template-columns: repeat(6, minmax(0, 1fr))", dashboard)
 

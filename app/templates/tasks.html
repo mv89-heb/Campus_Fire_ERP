@@ -1,5 +1,5 @@
 {% extends "_shell.html" %}
-{% block title %}משימות | Campus Fire ERP{% endblock %}
+{% block title %}תוכנית עבודה | Campus Fire ERP{% endblock %}
 
 {% block extra_style %}
 .page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
@@ -154,6 +154,9 @@
       <input id="trackingSearch" type="search" placeholder="חיפוש משימה, נכס, תיק, טופס, אחראי או הערה..." oninput="Tasks.renderTracking()">
       <select id="trackingStatusFilter" onchange="Tasks.renderTracking()"><option value="">כל הסטטוסים</option><option value="open">לביצוע</option><option value="in_progress">בטיפול</option><option value="waiting_approval">ממתין לאישור</option><option value="done">הושלם</option><option value="cancelled">בוטל</option></select>
       <select id="trackingAssetFilter" onchange="Tasks.renderTracking()"><option value="">כל הנכסים</option></select>
+      <select id="trackingCaseFilter" onchange="Tasks.renderTracking()"><option value="">כל התיקים</option></select>
+      <select id="trackingPhaseFilter" onchange="Tasks.renderTracking()"><option value="">כל השלבים</option></select>
+      <select id="trackingOwnerFilter" onchange="Tasks.renderTracking()"><option value="">כל האחראים</option></select>
       <select id="trackingDomainFilter" onchange="Tasks.renderTracking()"><option value="">כל התחומים</option></select>
     </div>
   </div>
@@ -331,6 +334,9 @@ const Tasks = (() => {
     const status=document.getElementById('trackingStatusFilter')?.value||'';
     const asset=document.getElementById('trackingAssetFilter')?.value||'';
     const domain=document.getElementById('trackingDomainFilter')?.value||'';
+    const caseNo=document.getElementById('trackingCaseFilter')?.value||'';
+    const phase=document.getElementById('trackingPhaseFilter')?.value||'';
+    const owner=document.getElementById('trackingOwnerFilter')?.value||'';
     const today=new Date(); today.setHours(0,0,0,0);
     const isoDate=v=>{if(!v)return '';const s=String(v).trim();const m=s.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);return m?m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):s;};
     const days=t=>{if(!t.due_date)return null;const d=new Date(isoDate(t.due_date)+'T00:00:00');return Number.isNaN(d.getTime())?null:Math.round((d-today)/86400000);};
@@ -343,11 +349,12 @@ const Tasks = (() => {
     const unique=(key)=>[...new Set(_tracking.map(t=>t[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'he'));
     const fill=(id,values,label)=>{const el=document.getElementById(id);if(!el)return;const current=el.value;el.innerHTML='<option value="">'+label+'</option>'+values.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');if(values.includes(current))el.value=current;};
     fill('trackingAssetFilter',unique('asset'),'כל הנכסים');fill('trackingDomainFilter',unique('domain'),'כל התחומים');
+    fill('trackingCaseFilter',unique('case_number'),'כל התיקים');fill('trackingPhaseFilter',unique('phase'),'כל השלבים');fill('trackingOwnerFilter',unique('assignee'),'כל האחראים');
     let list=_tracking.filter(t=>{
       const hay=[t.title,t.asset,t.case_number,t.forms,t.assignee,t.phase,t.notes,t.domain].join(' ').toLocaleLowerCase('he');
       const delta=days(t);
       const quick=_trackingQuickFilter==='all'||(_trackingQuickFilter==='overdue'&&delta!==null&&delta<0&&!['done','cancelled'].includes(t.status))||(_trackingQuickFilter==='soon'&&delta!==null&&delta>=0&&delta<=7&&!['done','cancelled'].includes(t.status))||(_trackingQuickFilter==='open'&&!['done','cancelled'].includes(t.status))||(_trackingQuickFilter==='done'&&t.status==='done');
-      return quick&&(!search||hay.includes(search))&&(!status||t.status===status)&&(!asset||t.asset===asset)&&(!domain||t.domain===domain);
+      return quick&&(!search||hay.includes(search))&&(!status||t.status===status)&&(!asset||t.asset===asset)&&(!domain||t.domain===domain)&&(!caseNo||t.case_number===caseNo)&&(!phase||t.phase===phase)&&(!owner||t.assignee===owner);
     });
     const summary=document.getElementById('trackingSummary');
     if(summary)summary.textContent=list.length+' מוצגות מתוך '+_tracking.length+' רשומות · '+overdue.length+' באיחור · '+soon.length+' קרובות למועד · '+doneRows.length+' הושלמו';

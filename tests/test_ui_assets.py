@@ -75,7 +75,42 @@ class UIAssetTests(unittest.TestCase):
             self.assertIn(column, tasks)
         self.assertIn("fireOverdueCount", tasks)
         self.assertIn("trackingDomainFilter", tasks)
+        self.assertIn("trackingCaseFilter", tasks)
+        self.assertIn("trackingPhaseFilter", tasks)
+        self.assertIn("trackingOwnerFilter", tasks)
         self.assertIn("waiting_approval", tasks)
+        dashboard = (ROOT / "app/templates/org_dashboard.html").read_text(encoding="utf-8")
+        self.assertIn("waiting_approval: 'ממתין לאישור'", dashboard)
+        self.assertIn('href="/tasks"', dashboard)
+        self.assertIn("לתוכנית העבודה", dashboard)
+        dashboard_service = (ROOT / "app/services/org_dashboard_service.py").read_text(encoding="utf-8")
+        self.assertIn("גרסה: 2026-11-22-v2", dashboard_service)
+        self.assertIn("ייבוא טבלת מעקב כבאות והצלה", dashboard_service)
+
+    def test_sidebar_is_ordered_around_the_fire_safety_workflow(self):
+        shell = (ROOT / "app/templates/_shell.html").read_text(encoding="utf-8")
+        labels = [
+            "תמונת מצב", "תוכנית עבודה", "נכסים ומבנים",
+            "ליקויים וביקורות", "טפסים להגשה", "אישורים ורישיונות",
+            "מסמכים וראיות", "ספקים ואנשי מקצוע", "ציוד כיבוי אש", "דוחות ובקרה",
+        ]
+        positions = [shell.index(label) for label in labels]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("ds-nav-hint", shell)
+        expected_titles = {
+            "tasks.html": "תוכנית עבודה",
+            "sites.html": "נכסים ומבנים",
+            "fire_forms.html": "טפסים להגשה",
+            "document_intelligence.html": "מסמכים וראיות",
+            "suppliers.html": "ספקים ואנשי מקצוע",
+            "reports.html": "דוחות ובקרה",
+            "org_dashboard.html": "תמונת מצב",
+        }
+        for filename, title in expected_titles.items():
+            page = (ROOT / "app/templates" / filename).read_text(encoding="utf-8")
+            self.assertIn(title, page)
+        styles = (ROOT / "app/static/css/design-system.css").read_text(encoding="utf-8")
+        self.assertIn(".ds-nav-hint", styles)
 
     def test_home_dashboard_counts_unverified_documents_as_needing_review(self):
         index = (ROOT / "app/templates/index.html").read_text(encoding="utf-8")
