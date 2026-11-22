@@ -77,6 +77,19 @@ class UIAssetTests(unittest.TestCase):
         self.assertIn("trackingDomainFilter", tasks)
         self.assertIn("waiting_approval", tasks)
 
+    def test_sidebar_is_ordered_around_the_fire_safety_workflow(self):
+        shell = (ROOT / "app/templates/_shell.html").read_text(encoding="utf-8")
+        labels = [
+            "תמונת מצב", "תוכנית עבודה", "נכסים ומבנים",
+            "ליקויים וביקורות", "טפסים להגשה", "אישורים ורישיונות",
+            "מסמכים וראיות", "ספקים ואנשי מקצוע", "ציוד כיבוי אש", "דוחות ובקרה",
+        ]
+        positions = [shell.index(label) for label in labels]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("ds-nav-hint", shell)
+        styles = (ROOT / "app/static/css/design-system.css").read_text(encoding="utf-8")
+        self.assertIn(".ds-nav-hint", styles)
+
     def test_home_dashboard_counts_unverified_documents_as_needing_review(self):
         index = (ROOT / "app/templates/index.html").read_text(encoding="utf-8")
         self.assertIn("פג תוקף / דורש בדיקה", index)
