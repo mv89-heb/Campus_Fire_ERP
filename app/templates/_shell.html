@@ -22,17 +22,17 @@
 
 <div class="ds-shell">
   <header class="ds-header" role="banner">
-    <button class="ds-btn ds-btn-icon ds-header-hamburger" onclick="Shell.toggleSidebar()" aria-label="פתח/סגור תפריט ניווט" aria-expanded="false" aria-controls="shellSidebar">☰</button>
+    <button class="ds-btn ds-btn-icon ds-header-hamburger" onclick="Shell.toggleSidebar()" aria-label="פתח/סגור תפריט ניווט" aria-expanded="false" aria-controls="shellSidebar"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-menu"></use></svg></button>
     <div class="ds-header-brand"><img class="ds-brand-mark" src="{{ url_for('static', filename='img/campus-fire-mark.svg') }}" alt=""><span>Campus Fire ERP</span></div>
     <div class="ds-header-search">
       <label for="shellGlobalSearch" class="sr-only">חיפוש גלובלי בכל המערכת</label>
-      <input type="text" id="shellGlobalSearch" placeholder="🔎 חיפוש גלובלי בכל המערכת..." oninput="Shell.onSearchInput(this.value)" role="searchbox" aria-autocomplete="list">
+      <svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-search"></use></svg><input type="text" id="shellGlobalSearch" placeholder="חיפוש גלובלי בכל המערכת..." oninput="Shell.onSearchInput(this.value)" role="searchbox" aria-autocomplete="list">
       <div id="shellSearchResults" role="listbox" style="display:none; position:absolute; top:calc(100% + 4px); right:0; left:0; background:var(--color-surface); border:1px solid var(--color-border-strong); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); z-index:400; max-height:320px; overflow-y:auto;"></div>
     </div>
     <div class="ds-header-actions">
-      <button class="ds-btn ds-btn-icon" onclick="Shell.toggleTheme()" id="shellThemeToggle" aria-label="החלף בין מצב כהה לבהיר">🌙</button>
+      <button class="ds-btn ds-btn-icon" onclick="Shell.toggleTheme()" id="shellThemeToggle" aria-label="החלף בין מצב כהה לבהיר"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-moon"></use></svg></button>
       <button class="ds-btn ds-btn-icon" onclick="Shell.toggleNotifications()" aria-label="פתח מרכז התראות" aria-haspopup="true" style="position:relative;">
-        🔔<span id="shellNotifBadge" style="display:none; position:absolute; top:-4px; left:-4px; background:var(--color-danger); color:#fff; border-radius:50%; width:18px; height:18px; font-size:0.65rem; align-items:center; justify-content:center;"></span>
+        <svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-bell"></use></svg><span id="shellNotifBadge" style="display:none; position:absolute; top:-4px; left:-4px; background:var(--color-danger); color:#fff; border-radius:50%; width:18px; height:18px; font-size:0.65rem; align-items:center; justify-content:center;"></span>
       </button>
     </div>
   </header>
@@ -41,10 +41,10 @@
 
   <div id="shellNotifPanel" role="region" aria-label="מרכז התראות" style="display:none; position:fixed; top:64px; left:10px; width:min(380px, calc(100vw - 20px)); background:var(--color-surface); border:1px solid var(--color-border-strong); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); z-index:4000; max-height:70vh; overflow-y:auto;">
     <div style="padding:12px 15px; border-bottom:1px solid var(--color-border); display:flex; justify-content:space-between; align-items:center;">
-      <b style="font-size:0.9rem;">🔔 התראות</b>
+      <b style="font-size:0.9rem;">התראות</b>
       <div style="display:flex; gap:8px;">
         <button class="ds-btn ds-btn-sm" onclick="Shell.markAllNotificationsRead()">סמן הכל כנקרא</button>
-        <button class="ds-btn ds-btn-sm" onclick="Shell.toggleNotifications()" aria-label="סגור מרכז התראות">✕</button>
+        <button class="ds-btn ds-btn-sm" onclick="Shell.toggleNotifications()" aria-label="סגור מרכז התראות"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-x"></use></svg></button>
       </div>
     </div>
     <div id="shellNotifList" style="padding:8px;"></div>
@@ -57,31 +57,32 @@
         <div><strong>Campus Fire ERP</strong><span>בטיחות אש · ציות · תפעול</span></div>
       </div>
       <div class="ds-sidebar-group">
-        <a class="ds-sidebar-link {{ 'active' if active_nav == 'dashboard' else '' }}" href="/org-dashboard">🏠 <span>לוח בקרה</span></a>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'dashboard' else '' }}" href="/org-dashboard"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-layout-dashboard"></use></svg> <span>לוח בקרה</span></a>
       </div>
       <div class="ds-sidebar-group">
         <div class="ds-sidebar-group-label">בטיחות וציות</div>
-        <a class="ds-sidebar-link {{ 'active' if active_nav == 'permits' else '' }}" href="/">📋 <span>אישורים</span></a>
-        <a class="ds-sidebar-link {{ 'active' if active_nav == 'fire_forms' else '' }}" href="/fire-forms">🗂️ <span>מאגר טפסי כיבוי</span></a>
-        <a class="ds-sidebar-link {{ 'active' if active_nav == 'audits' else '' }}" href="/audits">🔍 <span>ביקורות וליקויים</span></a>
-        <a class="ds-sidebar-link {{ 'active' if active_nav == 'document_intelligence' else '' }}" href="/document-intelligence">🤖 <span>מסמכים ו-Gemini</span></a>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'permits' else '' }}" href="/"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-file-check"></use></svg> <span>אישורים</span></a>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'fire_forms' else '' }}" href="/fire-forms"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-files"></use></svg> <span>מאגר טפסי כיבוי</span></a>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'audits' else '' }}" href="/audits"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-clipboard-check"></use></svg> <span>ביקורות וליקויים</span></a>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'document_intelligence' else '' }}" href="/document-intelligence"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-files"></use></svg> <span>מסמכים ו-Gemini</span></a>
       </div>
       <div class="ds-sidebar-group">
-        <div class="ds-sidebar-group-label">ארגון ומיקומים</div>
-        <a class="ds-sidebar-link {{ 'active' if active_nav == 'sites' else '' }}" href="/sites">🏢 <span>אתרים ומבנים</span></a>
+        <div class="ds-sidebar-group-label">אתרים ותשתיות</div>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'sites' else '' }}" href="/sites"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-building-2"></use></svg> <span>אתרים ומבנים</span></a>
       </div>
       <div class="ds-sidebar-group">
         <div class="ds-sidebar-group-label">ציוד ותפעול</div>
-        <a class="ds-sidebar-link {{ 'active' if active_nav == 'equipment' else '' }}" href="/equipment">🧯 <span>ציוד כיבוי אש</span></a>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'equipment' else '' }}" href="/equipment"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-fire-extinguisher"></use></svg> <span>ציוד כיבוי אש</span></a>
       </div>
       <div class="ds-sidebar-group">
-        <a class="ds-sidebar-link {{ 'active' if active_nav == 'tasks' else '' }}" href="/tasks">👷 <span>משימות</span></a>
-        <a class="ds-sidebar-link {{ 'active' if active_nav == 'suppliers' else '' }}" href="/suppliers">🏭 <span>ספקים</span></a>
-        <a class="ds-sidebar-link {{ 'active' if active_nav == 'reports' else '' }}" href="/reports">📊 <span>דוחות</span></a>
+        <div class="ds-sidebar-group-label">ניהול ותכנון</div>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'tasks' else '' }}" href="/tasks"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-list-checks"></use></svg> <span>משימות</span></a>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'suppliers' else '' }}" href="/suppliers"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-truck"></use></svg> <span>ספקים</span></a>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'reports' else '' }}" href="/reports"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-chart"></use></svg> <span>דוחות</span></a>
       </div>
       <div class="ds-sidebar-group">
         <div class="ds-sidebar-group-label">מערכת</div>
-        <a class="ds-sidebar-link {{ 'active' if active_nav == 'settings' else '' }}" href="/settings">⚙️ <span>הגדרות</span></a>
+        <a class="ds-sidebar-link {{ 'active' if active_nav == 'settings' else '' }}" href="/settings"><svg class="lucide-icon" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='img/lucide-sprite.svg') }}#icon-settings"></use></svg> <span>הגדרות</span></a>
       </div>
     </nav>
 
@@ -219,7 +220,8 @@ const Shell = (() => {
 
   function updateThemeIcon() {
     const theme = document.documentElement.getAttribute('data-theme') || 'dark';
-    document.getElementById('shellThemeToggle').innerText = theme === 'dark' ? '🌙' : '☀️';
+    const button = document.getElementById('shellThemeToggle');
+    if (button) button.innerHTML = '<svg class="lucide-icon" aria-hidden="true"><use href="/static/img/lucide-sprite.svg#icon-' + (theme === 'dark' ? 'moon' : 'sun') + '"></use></svg>';
   }
 
   async function refreshNotifBadge() {
